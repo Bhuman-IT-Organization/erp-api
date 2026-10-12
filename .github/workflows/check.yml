@@ -1,0 +1,18 @@
+# The CI gate, parked (D-04, D-05; HOOK-06): free private repositories cannot require a check, so
+# this runs only by hand. Switching CI on is one commit: replace `workflow_dispatch:` with `pull_request:` and
+# `push: { branches: [main] }`. The one step is the same `corepack yarn check` a developer runs before merge (ADR-0020: thin YAML).
+name: check
+on:
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: corepack enable # before setup-node, so its yarn cache sees Yarn 4, not the runner's Yarn 1
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: yarn
+      - run: corepack yarn install --immutable
+      - run: corepack yarn check

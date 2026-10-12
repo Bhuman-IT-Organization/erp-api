@@ -1,0 +1,24 @@
+# Git hooks. Each repository root holds a
+# copy of configs/lefthook.yml. Installed by `corepack yarn install`. The full `corepack yarn check` runs
+# before merge and its output goes in the PR (D-06); these hooks are the fast part.
+pre-commit:
+  skip: [merge, rebase] # a rebase replays commits that were already checked
+  commands:
+    staged:
+      # --config: the root config only; without it lint-staged also finds configs/lint-staged.config.mjs and runs
+      # it from configs/, where there is no ESLint config and no consumer's .prettierignore applies.
+      run: corepack yarn lint-staged --config lint-staged.config.mjs
+commit-msg:
+  commands:
+    commitlint:
+      run: corepack yarn commitlint --edit {1}
+# pre-push is not here: `node configs/scripts/git-hooks.mjs install` writes .git/hooks/pre-push itself (the guard, then
+# `corepack yarn check:push`), because lefthook skips every pre-push command when HEAD has no diff to @{push}.
+post-merge:
+  commands:
+    reinstall:
+      run: node configs/scripts/git-hooks.mjs post-sync
+post-rewrite: # a rebasing pull (pull.rebase true) fires this, not post-merge (D-20); {1} is amend or rebase
+  commands:
+    reinstall:
+      run: node configs/scripts/git-hooks.mjs post-sync {1}

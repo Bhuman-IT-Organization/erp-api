@@ -1,0 +1,17 @@
+node_modules/
+dist/
+coverage/
+.yarn/*
+!.yarn/releases
+!.yarn/plugins
+!.yarn/patches
+.pnp.*
+*.log
+.env
+.env.*
+.DS_Store
+Thumbs.db
+src/shared/db/generated/
+# Stryker output (test:mutation), per machine; never committed or formatted.
+.stryker-tmp/
+reports/

@@ -1,0 +1,66 @@
+[
+  {
+    "decided_by": "migration lead",
+    "decided_on": "2026-09-23",
+    "evidence": {
+      "ddl": [],
+      "forms": [],
+      "no_writer_reason": null,
+      "readers": [],
+      "writers": []
+    },
+    "evidence_changed": false,
+    "note": "Created by Node for ADR-0034 decision 3: the append-only identity audit record, written in the same transaction as the identity change it records. Owned by v1/identity; no other module writes it. It is NOT a legacy table, so it is not in the legacy schema dump and must not appear in ownership.json, which holds only tables of the legacy schema dump. DDL: erp-api/prisma/sql/0001-identity-audit.sql, applied by corepack yarn db:apply (ADR-0036). Being a decided node-owned record it is not an open violation and it does not move the --allow-open ratchet (ADR-0035 decision 3).",
+    "owner": "node",
+    "owner_confidence": "none",
+    "table": "tblidentity_audit"
+  },
+  {
+    "decided_by": "migration lead",
+    "decided_on": "2026-10-02",
+    "evidence": {
+      "ddl": [],
+      "forms": [],
+      "no_writer_reason": null,
+      "readers": [],
+      "writers": []
+    },
+    "evidence_changed": false,
+    "note": "Created by Node for ADR-0049 (Phase 4.3, D-03/D-05): the sent-email log: one row per send, never the body, purged after 12 months. Owned by v1/mail; no other module writes it. It is NOT a legacy table (Perfex's own tblmail_queue and tblemailtemplates are different tables). DDL: erp-api/prisma/sql/0004-mail.sql, applied by corepack yarn db:apply (ADR-0036). Being a decided node-owned record it is not an open violation and it does not move the --allow-open ratchet (ADR-0035 decision 3).",
+    "owner": "node",
+    "owner_confidence": "none",
+    "table": "tblmail_sent_emails"
+  },
+  {
+    "decided_by": "migration lead",
+    "decided_on": "2026-10-02",
+    "evidence": {
+      "ddl": [],
+      "forms": [],
+      "no_writer_reason": null,
+      "readers": [],
+      "writers": []
+    },
+    "evidence_changed": false,
+    "note": "Created by Node for ADR-0049 (Phase 4.3, D-03/D-05): one subject and plain-text message per template and locale. Owned by v1/mail; no other module writes it. It is NOT a legacy table (Perfex's own tblmail_queue and tblemailtemplates are different tables). DDL: erp-api/prisma/sql/0004-mail.sql, applied by corepack yarn db:apply (ADR-0036). Being a decided node-owned record it is not an open violation and it does not move the --allow-open ratchet (ADR-0035 decision 3).",
+    "owner": "node",
+    "owner_confidence": "none",
+    "table": "tblmail_template_versions"
+  },
+  {
+    "decided_by": "migration lead",
+    "decided_on": "2026-10-02",
+    "evidence": {
+      "ddl": [],
+      "forms": [],
+      "no_writer_reason": null,
+      "readers": [],
+      "writers": []
+    },
+    "evidence_changed": false,
+    "note": "Created by Node for ADR-0049 (Phase 4.3, D-03/D-05): the email templates Node's modules send, one row per template key. Owned by v1/mail; no other module writes it. It is NOT a legacy table (Perfex's own tblmail_queue and tblemailtemplates are different tables). DDL: erp-api/prisma/sql/0004-mail.sql, applied by corepack yarn db:apply (ADR-0036). Being a decided node-owned record it is not an open violation and it does not move the --allow-open ratchet (ADR-0035 decision 3).",
+    "owner": "node",
+    "owner_confidence": "none",
+    "table": "tblmail_templates"
+  }
+]

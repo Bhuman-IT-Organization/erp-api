@@ -1,0 +1,10 @@
+node_modules
+dist
+coverage
+.git
+src/shared/db/generated
+*.log
+.yarn/cache
+# Stryker output (test:mutation), per machine; a leftover sandbox breaks the build context (plan 04-06).
+.stryker-tmp
+reports

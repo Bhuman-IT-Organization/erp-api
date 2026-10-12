@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    // The lint/typecheck project: `rootDir` is the package so `__tests__/` is a project file and
+    // typescript-eslint's projectService can give it typed rules (SF-5). Emit lives in
+    // tsconfig.build.json, which narrows `rootDir` back to `src` and drops the tests — the same
+    // split the repository root uses between tsconfig.json and tsconfig.build.json.
+    "rootDir": ".",
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts", "__tests__/**/*.ts"]
+}

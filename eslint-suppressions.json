@@ -1,0 +1,309 @@
+{
+  "packages/contracts/src/route-gates.ts": {
+    "erp/no-nested-loops": {
+      "count": 2
+    }
+  },
+  "src/shared/cache/redis.service.ts": {
+    "jsdoc/require-jsdoc": {
+      "count": 1
+    }
+  },
+  "src/shared/config/__tests__/legacy-locale.spec.ts": {
+    "vitest/no-disabled-tests": {
+      "count": 1
+    }
+  },
+  "src/shared/config/env.schema.ts": {
+    "jsdoc/require-jsdoc": {
+      "count": 1
+    },
+    "max-depth": {
+      "count": 1
+    }
+  },
+  "src/shared/config/http.ts": {
+    "jsdoc/require-jsdoc": {
+      "count": 1
+    }
+  },
+  "src/shared/config/pool.ts": {
+    "jsdoc/require-jsdoc": {
+      "count": 1
+    }
+  },
+  "src/shared/config/retry-policies.ts": {
+    "jsdoc/require-jsdoc": {
+      "count": 1
+    }
+  },
+  "src/shared/config/timings.ts": {
+    "jsdoc/require-jsdoc": {
+      "count": 1
+    }
+  },
+  "src/shared/crypto/password-hasher.port.ts": {
+    "jsdoc/require-jsdoc": {
+      "count": 1
+    }
+  },
+  "src/shared/db/database-url.ts": {
+    "jsdoc/require-jsdoc": {
+      "count": 2
+    }
+  },
+  "src/shared/db/ownership-guard.ts": {
+    "complexity": {
+      "count": 2
+    },
+    "erp/no-nested-loops": {
+      "count": 9
+    },
+    "jsdoc/require-jsdoc": {
+      "count": 3
+    },
+    "max-depth": {
+      "count": 11
+    }
+  },
+  "src/shared/db/ownership.ts": {
+    "jsdoc/require-jsdoc": {
+      "count": 1
+    }
+  },
+  "src/shared/db/prisma.service.ts": {
+    "jsdoc/require-jsdoc": {
+      "count": 1
+    }
+  },
+  "src/shared/errors/app-error.ts": {
+    "jsdoc/require-jsdoc": {
+      "count": 2
+    }
+  },
+  "src/shared/errors/error-codes.ts": {
+    "jsdoc/require-jsdoc": {
+      "count": 1
+    }
+  },
+  "src/shared/errors/problem-details.filter.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "jsdoc/require-jsdoc": {
+      "count": 1
+    }
+  },
+  "src/shared/errors/upstream-unavailable.error.ts": {
+    "jsdoc/require-jsdoc": {
+      "count": 1
+    }
+  },
+  "src/shared/events/domain-event.publisher.ts": {
+    "jsdoc/require-jsdoc": {
+      "count": 1
+    },
+    "max-depth": {
+      "count": 1
+    },
+    "no-await-in-loop": {
+      "count": 1
+    }
+  },
+  "src/shared/health/health.types.ts": {
+    "jsdoc/require-jsdoc": {
+      "count": 3
+    }
+  },
+  "src/shared/http/auth/access-token-verifier.ts": {
+    "jsdoc/require-jsdoc": {
+      "count": 2
+    }
+  },
+  "src/shared/http/compression.ts": {
+    "jsdoc/require-jsdoc": {
+      "count": 1
+    }
+  },
+  "src/shared/http/csv.ts": {
+    "jsdoc/require-jsdoc": {
+      "count": 1
+    }
+  },
+  "src/shared/http/decorators/scope.decorator.ts": {
+    "jsdoc/require-jsdoc": {
+      "count": 1
+    }
+  },
+  "src/shared/http/fastify-plugins.ts": {
+    "jsdoc/require-jsdoc": {
+      "count": 3
+    }
+  },
+  "src/shared/http/guards/jwt-auth.guard.ts": {
+    "jsdoc/require-jsdoc": {
+      "count": 1
+    }
+  },
+  "src/shared/http/guards/permission.guard.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "jsdoc/require-jsdoc": {
+      "count": 1
+    },
+    "max-depth": {
+      "count": 1
+    },
+    "no-await-in-loop": {
+      "count": 2
+    }
+  },
+  "src/shared/http/keyset.ts": {
+    "jsdoc/require-jsdoc": {
+      "count": 1
+    }
+  },
+  "src/shared/http/openapi.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "erp/no-nested-loops": {
+      "count": 2
+    },
+    "jsdoc/require-jsdoc": {
+      "count": 2
+    },
+    "max-depth": {
+      "count": 1
+    },
+    "no-nested-ternary": {
+      "count": 1
+    }
+  },
+  "src/shared/http/pagination.ts": {
+    "erp/no-nested-loops": {
+      "count": 3
+    },
+    "jsdoc/require-jsdoc": {
+      "count": 4
+    },
+    "max-depth": {
+      "count": 3
+    }
+  },
+  "src/shared/http/request-id.ts": {
+    "jsdoc/require-jsdoc": {
+      "count": 1
+    }
+  },
+  "src/shared/logger/logger.service.ts": {
+    "jsdoc/require-jsdoc": {
+      "count": 3
+    }
+  },
+  "src/shared/logger/request-context.ts": {
+    "jsdoc/require-jsdoc": {
+      "count": 4
+    }
+  },
+  "src/shared/resilience/breaker.ts": {
+    "jsdoc/require-jsdoc": {
+      "count": 4
+    }
+  },
+  "src/shared/resilience/resilience.module.ts": {
+    "jsdoc/require-jsdoc": {
+      "count": 1
+    }
+  },
+  "src/shared/resilience/retry.ts": {
+    "jsdoc/require-jsdoc": {
+      "count": 2
+    },
+    "max-depth": {
+      "count": 1
+    }
+  },
+  "src/shared/resilience/transient-error.ts": {
+    "jsdoc/require-jsdoc": {
+      "count": 1
+    }
+  },
+  "src/v1/auth/facade/auth.facade.ts": {
+    "jsdoc/require-jsdoc": {
+      "count": 1
+    }
+  },
+  "src/v1/auth/repository/in-memory-auth-session.store.ts": {
+    "no-await-in-loop": {
+      "count": 3
+    }
+  },
+  "src/v1/branding/facade/branding.facade.ts": {
+    "jsdoc/require-jsdoc": {
+      "count": 1
+    }
+  },
+  "src/v1/identity/facade/identity.facade.ts": {
+    "jsdoc/require-jsdoc": {
+      "count": 1
+    }
+  },
+  "src/v1/identity/repository/identity-audit.repository.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/v1/identity/repository/identity.repository.ts": {
+    "complexity": {
+      "count": 2
+    },
+    "erp/no-nested-loops": {
+      "count": 1
+    },
+    "no-await-in-loop": {
+      "count": 1
+    }
+  },
+  "src/v1/identity/repository/permission-rows.codec.ts": {
+    "erp/no-nested-loops": {
+      "count": 2
+    },
+    "max-depth": {
+      "count": 2
+    }
+  },
+  "src/v1/identity/service/granting-policy.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-depth": {
+      "count": 2
+    }
+  },
+  "src/v1/identity/service/identity.enricher.ts": {
+    "erp/no-nested-loops": {
+      "count": 3
+    },
+    "erp/require-complexity-note": {
+      "count": 3
+    },
+    "max-depth": {
+      "count": 5
+    }
+  },
+  "src/v1/identity/service/identity.service.ts": {
+    "complexity": {
+      "count": 5
+    },
+    "no-await-in-loop": {
+      "count": 2
+    }
+  },
+  "src/v1/identity/service/identity.transformer.ts": {
+    "erp/no-nested-loops": {
+      "count": 3
+    }
+  }
+}

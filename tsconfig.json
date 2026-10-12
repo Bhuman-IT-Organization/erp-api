@@ -1,0 +1,5 @@
+{
+  "extends": "@erp/configs/tsconfig/node.json",
+  "compilerOptions": { "sourceMap": true, "outDir": "dist", "rootDir": "src" },
+  "include": ["src/**/*.ts"]
+}
