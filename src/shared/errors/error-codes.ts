@@ -58,6 +58,14 @@ export const ERROR_CODES = {
   'ERP-TAXES-0004': { status: 409, title: 'The tax is a default tax in Settings' },
   // v1/cost-centers (plan 04.1-18): 0001 refuses a delete while any referencing column still names the cost center (D-07, D-28).
   'ERP-COSTCENTERS-0001': { status: 409, title: 'The cost center is still in use' },
+  // v1/lead-statuses: deletion restrictions.
+  // 0001: referenced by leads or email integration.
+  // 0002: built-in Customer status.
+  // 0003: configured default lead status.
+  'ERP-LEADSTATUSES-0001': { status: 409, title: 'The lead status is still in use' },
+  'ERP-LEADSTATUSES-0002': { status: 409, title: 'The built-in lead status cannot be deleted' },
+  'ERP-LEADSTATUSES-0003': { status: 409, title: 'The default lead status cannot be deleted' },
+
   // v1/payment-modes (plan 04.1-23): 0001 refuses a delete while a transactional column still names the mode (D-33), 0002 the credit expense mode (D-37).
   'ERP-PAYMENTMODES-0001': { status: 409, title: 'The payment mode is still in use' },
   'ERP-PAYMENTMODES-0002': { status: 409, title: 'The payment mode is the credit expense mode' },

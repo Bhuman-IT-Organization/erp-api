@@ -5370,8 +5370,8 @@
       ]
     },
     "evidence_changed": false,
-    "note": "",
-    "owner": "perfex-core",
+    "note": "Written by v1/lead-statuses; Perfex's delete is closed at Nginx; the quick add on the leads screen stays on Perfex.",
+    "owner": "node",
     "owner_confidence": "write-single",
     "table": "tblleads_status"
   },

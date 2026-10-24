@@ -498,6 +498,7 @@ describe('the committed register, today', () => {
       'tblcurrencies',
       'tblexpenses_categories',
       'tblidentity_audit',
+      'tblleads_status',
       'tblmail_sent_emails',
       'tblmail_template_versions',
       'tblmail_templates',
