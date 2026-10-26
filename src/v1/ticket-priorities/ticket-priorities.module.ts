@@ -3,10 +3,10 @@ import { TicketPrioritiesController } from './controller/ticket-priorities.contr
 import { TicketPrioritiesService } from './service/ticket-priorities.service.js';
 import { TicketPrioritiesRepository } from './repository/ticket-priorities.repository.js';
 import { TicketPrioritiesFacade } from './facade/ticket-priorities.facade.js';
-import { SettingsModule } from '../settings/settings.module.js'; // <-- import settings module
+import { SettingsModule } from '../settings/settings.module.js';
 
 @Module({
-  imports: [SettingsModule], // <-- add to imports
+  imports: [SettingsModule],
   controllers: [TicketPrioritiesController],
   providers: [TicketPrioritiesService, TicketPrioritiesRepository, TicketPrioritiesFacade],
   exports: [TicketPrioritiesFacade],
