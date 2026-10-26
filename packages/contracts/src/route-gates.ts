@@ -119,6 +119,9 @@ export const ROUTE_GATES: Readonly<Record<string, RouteGate>> = Object.freeze({
   '/setup/ticket-statuses': ADMIN_GATE,
   '/setup/ticket-statuses/new': ADMIN_GATE,
   '/setup/ticket-statuses/:id': ADMIN_GATE,
+  '/setup/customer-groups': ADMIN_GATE,
+  '/setup/customer-groups/new': ADMIN_GATE,
+  '/setup/customer-groups/:id': ADMIN_GATE,
 });
 
 /** Every declared route path, sorted — the set both verifying tests enumerate. */

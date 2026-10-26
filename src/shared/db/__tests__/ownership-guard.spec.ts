@@ -490,6 +490,7 @@ describe('the committed register, today', () => {
     // only read them.
     // Ticket Statuses claimed tbltickets_status for v1/ticket-statuses.
     // Update this expectation in the same PR that changes either register.
+    // Customer Groups claimed tblcustomers_groups, tblcustomer_groups for v1/customer-groups.
     const nodeOwned = [...map.entries()]
       .filter(([, o]) => o === 'node')
       .map(([t]) => t)
@@ -497,6 +498,8 @@ describe('the committed register, today', () => {
     expect(nodeOwned).toEqual([
       'tblcost_centers',
       'tblcurrencies',
+      'tblcustomer_groups',
+      'tblcustomers_groups',
       'tblexpenses_categories',
       'tblidentity_audit',
       'tblmail_sent_emails',
