@@ -5,6 +5,7 @@ import type { AuthenticatedUser } from '../../../shared/http/auth/access-token-v
 import { TicketPrioritiesRepository } from '../repository/ticket-priorities.repository.js';
 import { TicketPrioritiesService } from '../service/ticket-priorities.service.js';
 import { SettingsFacade } from '../../settings/index.js';
+
 const mockRepository = {
   findAll: vi.fn(),
   findById: vi.fn(),
@@ -15,7 +16,7 @@ const mockRepository = {
 };
 
 const mockSettingsFacade = {
-  get: vi.fn(),
+  getOption: vi.fn(), // <-- FIXED: getOption
 };
 
 const user = {} as AuthenticatedUser;
@@ -168,7 +169,7 @@ describe('remove', () => {
 
   it('refuses to delete if the priority is the email_piping_default_priority', async () => {
     mockRepository.isReferenced.mockResolvedValue(false);
-    mockSettingsFacade.get.mockResolvedValue('4');
+    mockSettingsFacade.getOption.mockResolvedValue('4');
 
     await expect(service.remove(user, { id: 4 })).rejects.toMatchObject({
       name: 'AppError',
@@ -179,7 +180,7 @@ describe('remove', () => {
 
   it('deletes the priority when unused and not the default', async () => {
     mockRepository.isReferenced.mockResolvedValue(false);
-    mockSettingsFacade.get.mockResolvedValue('1');
+    mockSettingsFacade.getOption.mockResolvedValue('1'); // <-- FIXED
     mockRepository.delete.mockResolvedValue({ priorityid: 6, name: 'Urgent' });
 
     await service.remove(user, { id: 6 });
@@ -189,7 +190,7 @@ describe('remove', () => {
 
   it('deletes when the default priority setting is unset', async () => {
     mockRepository.isReferenced.mockResolvedValue(false);
-    mockSettingsFacade.get.mockResolvedValue(undefined);
+    mockSettingsFacade.getOption.mockResolvedValue(undefined); // <-- FIXED
     mockRepository.delete.mockResolvedValue({ priorityid: 6, name: 'Urgent' });
 
     await service.remove(user, { id: 6 });
@@ -199,7 +200,7 @@ describe('remove', () => {
 
   it('still deletes when the settings lookup fails', async () => {
     mockRepository.isReferenced.mockResolvedValue(false);
-    mockSettingsFacade.get.mockRejectedValue(new Error('setting missing'));
+    mockSettingsFacade.getOption.mockRejectedValue(new Error('setting missing')); // <-- FIXED
     mockRepository.delete.mockResolvedValue({ priorityid: 6, name: 'Urgent' });
 
     await service.remove(user, { id: 6 });
@@ -209,7 +210,7 @@ describe('remove', () => {
 
   it('converts a string id to a number', async () => {
     mockRepository.isReferenced.mockResolvedValue(false);
-    mockSettingsFacade.get.mockResolvedValue('1');
+    mockSettingsFacade.getOption.mockResolvedValue('1'); // <-- FIXED
     mockRepository.delete.mockResolvedValue({ priorityid: 6, name: 'Urgent' });
 
     await service.remove(user, { id: '6' });
@@ -220,11 +221,11 @@ describe('remove', () => {
 
   it('reads the correct setting key', async () => {
     mockRepository.isReferenced.mockResolvedValue(false);
-    mockSettingsFacade.get.mockResolvedValue('1');
+    mockSettingsFacade.getOption.mockResolvedValue('1'); // <-- FIXED
     mockRepository.delete.mockResolvedValue({ priorityid: 6, name: 'Urgent' });
 
     await service.remove(user, { id: 6 });
 
-    expect(mockSettingsFacade.get).toHaveBeenCalledWith('email_piping_default_priority');
+    expect(mockSettingsFacade.getOption).toHaveBeenCalledWith('email_piping_default_priority'); // <-- FIXED
   });
 });
