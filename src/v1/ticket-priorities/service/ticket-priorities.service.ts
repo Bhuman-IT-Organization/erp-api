@@ -27,7 +27,6 @@ export class TicketPrioritiesService {
   }
 
   async list(_user: AuthenticatedUser) {
-    // Silences the unused variable warning
     try {
       const rows = await this.repository.findAll();
       return {
