@@ -4,6 +4,7 @@ import { BrandingModule } from './branding/branding.module.js';
 import { CostCentersModule } from './cost-centers/cost-centers.module.js';
 import { CurrenciesModule } from './currencies/currencies.module.js';
 import { CustomFieldsModule } from './custom-fields/custom-fields.module.js';
+import { CustomerGroupsModule } from './customer-groups/customer-groups.module.js';
 import { DepartmentsModule } from './departments/departments.module.js';
 import { ExampleItemModule } from './example-item/example-item.module.js';
 import { ExpenseCategoriesModule } from './expense-categories/expense-categories.module.js';
@@ -31,6 +32,7 @@ import { TicketStatusesModule } from './ticket-statuses/ticket-statuses.module.j
     SettingsModule,
     CustomFieldsModule,
     TicketStatusesModule,
+    CustomerGroupsModule,
   ],
 })
 export class V1Module {}

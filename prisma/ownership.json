@@ -1416,8 +1416,8 @@
       ]
     },
     "evidence_changed": false,
-    "note": "",
-    "owner": "perfex-core",
+    "note": "Written by v1/customer-groups; Perfex's delete is closed at Nginx; the quick add on the customer profile stays on Perfex.",
+    "owner": "node",
     "owner_confidence": "write-single",
     "table": "tblcustomer_groups"
   },
@@ -1439,8 +1439,8 @@
       ]
     },
     "evidence_changed": false,
-    "note": "",
-    "owner": "perfex-core",
+    "note": "Written by v1/customer-groups; Perfex's delete is closed at Nginx; the quick add on the customer profile stays on Perfex.",
+    "owner": "node",
     "owner_confidence": "write-single",
     "table": "tblcustomers_groups"
   },
