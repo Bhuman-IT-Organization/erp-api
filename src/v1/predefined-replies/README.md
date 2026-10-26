@@ -30,7 +30,10 @@ These are planned endpoints. Implementation and final request and response detai
 
 ## Events published
 
-None planned at this stage. Confirm with the lead whether this feature needs to publish domain events before implementation.
+| Event                             | Description                                   |
+| --------------------------------- | --------------------------------------------- |
+| `predefined-reply.record.created` | Published when a predefined reply is created. |
+| `predefined-reply.record.updated` | Published when a predefined reply is updated. |
 
 ## Events subscribed
 
