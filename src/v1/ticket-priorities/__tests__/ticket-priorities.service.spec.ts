@@ -4,7 +4,7 @@ import { AppError } from '../../../shared/errors/app-error.js';
 import type { AuthenticatedUser } from '../../../shared/http/auth/access-token-verifier.js';
 import { TicketPrioritiesRepository } from '../repository/ticket-priorities.repository.js';
 import { TicketPrioritiesService } from '../service/ticket-priorities.service.js';
-
+import { SettingsFacade } from '../../settings/index.js';
 const mockRepository = {
   findAll: vi.fn(),
   findById: vi.fn(),
@@ -29,7 +29,7 @@ beforeEach(async () => {
     providers: [
       TicketPrioritiesService,
       { provide: TicketPrioritiesRepository, useValue: mockRepository },
-      { provide: 'SettingsFacade', useValue: mockSettingsFacade },
+      { provide: SettingsFacade, useValue: mockSettingsFacade },
     ],
   }).compile();
 
