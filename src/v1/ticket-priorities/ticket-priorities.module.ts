@@ -2,12 +2,13 @@ import { Module } from '@nestjs/common';
 import { TicketPrioritiesController } from './controller/ticket-priorities.controller.js';
 import { TicketPrioritiesService } from './service/ticket-priorities.service.js';
 import { TicketPrioritiesRepository } from './repository/ticket-priorities.repository.js';
-import { SettingsModule } from '../settings/settings.module.js';
+import { TicketPrioritiesFacade } from './facade/ticket-priorities.facade.js';
+import { SettingsModule } from '../settings/settings.module.js'; // <-- import settings module
 
 @Module({
-  imports: [SettingsModule],
+  imports: [SettingsModule], // <-- add to imports
   controllers: [TicketPrioritiesController],
-  providers: [TicketPrioritiesService, TicketPrioritiesRepository],
-  exports: [TicketPrioritiesService],
+  providers: [TicketPrioritiesService, TicketPrioritiesRepository, TicketPrioritiesFacade],
+  exports: [TicketPrioritiesFacade],
 })
 export class TicketPrioritiesModule {}
