@@ -498,6 +498,7 @@ describe('the committed register, today', () => {
       'tblcurrencies',
       'tblexpenses_categories',
       'tblidentity_audit',
+      'tblleads_sources', // Lead Sources claimed tblleads_sources for v1/lead-sources.
       'tblmail_sent_emails',
       'tblmail_template_versions',
       'tblmail_templates',
