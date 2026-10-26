@@ -34,11 +34,7 @@ Under `api/v1/ticket-priorities` (`TICKET_PRIORITIES_ROUTES` in `ticket-prioriti
 
 ## Events published
 
-| Event                              | When                      | Payload      |
-| ---------------------------------- | ------------------------- | ------------ |
-| `ticket-priorities.record.created` | after `POST` stores it    | `{ id, at }` |
-| `ticket-priorities.record.updated` | after `PATCH` saves it    | `{ id, at }` |
-| `ticket-priorities.record.deleted` | after `DELETE` removes it | `{ id, at }` |
+None|
 
 ## Events subscribed
 
