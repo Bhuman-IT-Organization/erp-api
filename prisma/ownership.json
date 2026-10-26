@@ -7599,7 +7599,7 @@
     },
     "evidence_changed": false,
     "note": "",
-    "owner": "perfex-core",
+    "owner": "node",
     "owner_confidence": "write-single",
     "table": "tblservices"
   },

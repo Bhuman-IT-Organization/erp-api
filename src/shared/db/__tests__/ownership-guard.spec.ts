@@ -503,6 +503,7 @@ describe('the committed register, today', () => {
       'tblmail_templates',
       'tblpayment_modes',
       'tblroles',
+      'tblservices',
       'tblstaff',
       'tblstaff_departments',
       'tblstaff_permissions',
