@@ -4,6 +4,10 @@
 
 Manages support ticket priorities.
 
+## Owned tables
+
+- tbltickets_priorities
+
 ## API Routes
 
 - GET /api/v1/ticket-priorities
@@ -11,10 +15,6 @@ Manages support ticket priorities.
 - GET /api/v1/ticket-priorities/:id
 - PATCH /api/v1/ticket-priorities/:id
 - DELETE /api/v1/ticket-priorities/:id
-
-## Database Tables
-
-- tbltickets_priorities
 
 ## Business Rules
 
