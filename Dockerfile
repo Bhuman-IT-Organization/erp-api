@@ -1,8 +1,8 @@
 # erp-api local/dev image. No env file is baked in; Compose injects env/local/api.env (ADR-0014).
 # bookworm-slim, not alpine: Prisma 6's query engine links against OpenSSL 3.
-FROM node:22-bookworm-slim
+FROM node:22-bookworm
 RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \
- && rm -rf /var/lib/apt/lists/*
+&& rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 RUN corepack enable
 COPY package.json yarn.lock .yarnrc.yml ./

@@ -42,9 +42,9 @@ async function refusal(promise: Promise<unknown>): Promise<AppError> {
 }
 
 describe('SETTINGS_ALLOW_LIST (D-22, D-37)', () => {
-  it('holds exactly the 11 names of D-22 and D-37, each once, frozen', () => {
-    const expected = [...D22_NAMES, ...D37_NAMES];
-    expect(expected).toHaveLength(11);
+  it('holds exactly the 12 names required by D-22, D-37 and Ticket Statuses, each once, frozen', () => {
+    const expected = [...D22_NAMES, ...D37_NAMES, 'default_ticket_reply_status'];
+    expect(expected).toHaveLength(12);
     expect(SETTINGS_ALLOW_LIST).toHaveLength(expected.length);
     expect(new Set(SETTINGS_ALLOW_LIST).size).toBe(SETTINGS_ALLOW_LIST.length);
     expect([...SETTINGS_ALLOW_LIST].sort()).toEqual(expected.sort());
@@ -67,6 +67,11 @@ describe('SettingsService', () => {
   it("getOption('expense_credit_payment_mode') answers its row's value (D-37)", async () => {
     const { service } = serviceWith([{ name: 'expense_credit_payment_mode', value: '7' }]);
     await expect(service.getOption('expense_credit_payment_mode')).resolves.toBe('7');
+  });
+
+  it("getOption('default_ticket_reply_status') answers its row's value", async () => {
+    const { service } = serviceWith([{ name: 'default_ticket_reply_status', value: '4' }]);
+    await expect(service.getOption('default_ticket_reply_status')).resolves.toBe('4');
   });
 
   it('an allowed name with no row answers null', async () => {

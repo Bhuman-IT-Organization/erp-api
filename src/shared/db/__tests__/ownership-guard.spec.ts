@@ -507,6 +507,8 @@ describe('the committed register, today', () => {
       'tblstaff_departments',
       'tblstaff_permissions',
       'tbltaxes',
+      'tbltickets_status',
+      // Ticket Statuses claimed tbltickets_status for v1/ticket-statuses.
     ]);
     const tables = loadModelTableMap();
     for (const table of map.keys()) {
