@@ -6,7 +6,7 @@ import { TicketPrioritiesFacade } from './facade/ticket-priorities.facade.js';
 import { SettingsModule } from '../settings/settings.module.js';
 
 @Module({
-  imports: [SettingsModule],
+  imports: [SettingsModule], // the module that provides and exports SettingsFacade
   controllers: [TicketPrioritiesController],
   providers: [TicketPrioritiesService, TicketPrioritiesRepository, TicketPrioritiesFacade],
   exports: [TicketPrioritiesFacade],
