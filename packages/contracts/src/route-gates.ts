@@ -74,7 +74,8 @@ export type RouteGate = PermissionCode | readonly PermissionCode[] | typeof ADMI
  * `v1/expense-categories` declares no code and asserts the flag in every service method.
  * `/setup/taxes*` (plan 04.1-11, D-06) is the same: `v1/taxes` asserts the flag in every handler's
  * service method. So is `/setup/cost-centers*` (plan 04.1-18, D-06 and D-26: Perfex's own screen
- * had no check at all; its menu item was administrator-only). So is `/setup/payment-modes*` (plan
+ * had no check at all; its menu item was administrator-only). So is `/setup/contract-types*`
+ * (administrator-only: Perfex's own screen was administrator-only). So is `/setup/payment-modes*` (plan
  * 04.1-23, D-06 and D-32: Perfex's own screen was administrator-only already), and so is
  * `/setup/currencies*` (plan 04.1-28, D-06 and D-38: `Currencies.php:11` is
  * administrator-only).
@@ -108,6 +109,9 @@ export const ROUTE_GATES: Readonly<Record<string, RouteGate>> = Object.freeze({
   '/setup/cost-centers': ADMIN_GATE,
   '/setup/cost-centers/new': ADMIN_GATE,
   '/setup/cost-centers/:id': ADMIN_GATE,
+  '/setup/contract-types': ADMIN_GATE,
+  '/setup/contract-types/new': ADMIN_GATE,
+  '/setup/contract-types/:id': ADMIN_GATE,
   '/setup/payment-modes': ADMIN_GATE,
   '/setup/payment-modes/new': ADMIN_GATE,
   '/setup/payment-modes/:id': ADMIN_GATE,

@@ -1141,8 +1141,8 @@
       ]
     },
     "evidence_changed": false,
-    "note": "",
-    "owner": "perfex-core",
+    "note": "Written by v1/contract-types; Perfex's delete is closed at Nginx; the quick add on the contract form stays on Perfex.",
+    "owner": "node",
     "owner_confidence": "write-single",
     "table": "tblcontracts_types"
   },

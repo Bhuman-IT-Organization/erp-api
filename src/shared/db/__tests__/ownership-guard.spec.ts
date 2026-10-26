@@ -489,11 +489,13 @@ describe('the committed register, today', () => {
     // removed the Departments and Custom Fields write routes, so v1/departments and v1/custom-fields
     // only read them.
     // Update this expectation in the same PR that changes either register.
+    // Contract Types claimed tblcontracts_types for v1/contract-types.
     const nodeOwned = [...map.entries()]
       .filter(([, o]) => o === 'node')
       .map(([t]) => t)
       .sort();
     expect(nodeOwned).toEqual([
+      'tblcontracts_types',
       'tblcost_centers',
       'tblcurrencies',
       'tblexpenses_categories',
