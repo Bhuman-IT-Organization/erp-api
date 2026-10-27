@@ -8356,7 +8356,7 @@
       ]
     },
     "evidence_changed": false,
-    "note": "",
+    "note": "Ticket Priority claimed tbltickets_priorities for v1/ticket-priorities.",
     "owner": "node",
     "owner_confidence": "write-single",
     "table": "tbltickets_priorities"
