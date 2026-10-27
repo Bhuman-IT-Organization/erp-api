@@ -7,10 +7,10 @@ const validator = new ServicesValidator();
 
 describe('ServicesValidator', () => {
   describe('parseListQuery', () => {
-    it('defaults to the id descending, no search, no cursor (Perfex order)', () => {
+    it('defaults to the name ascending, no search, no cursor (Perfex order)', () => {
       const request = validator.parseListQuery({});
-      expect(request.sortField).toBe('id');
-      expect(request.order).toBe('desc');
+      expect(request.sortField).toBe('name');
+      expect(request.order).toBe('asc');
       expect(request.search).toBeNull();
       expect(request.cursor).toBeNull();
     });

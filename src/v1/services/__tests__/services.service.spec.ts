@@ -61,7 +61,7 @@ describe('ServicesService', () => {
   });
 
   describe('list and get', () => {
-    it('lists one page in the id-descending default order', async () => {
+    it('lists one page in the name-ascending default order', async () => {
       const { service, repository } = build();
       repository.list.mockResolvedValue({
         items: [{ id: 1, name: 'A' }],
@@ -72,7 +72,7 @@ describe('ServicesService', () => {
       });
       const response = await service.list(ADMIN, {});
       expect(repository.list).toHaveBeenCalledWith(
-        expect.objectContaining({ sortField: 'id', order: 'desc' }),
+        expect.objectContaining({ sortField: 'name', order: 'asc' }),
       );
       expect(response.data).toEqual([{ id: '1', name: 'A' }]);
     });
@@ -152,14 +152,17 @@ describe('ServicesService', () => {
       expect(repository.remove).not.toHaveBeenCalled();
     });
 
-    it('refuses with ERP-SERVICES-0001 while a ticket uses the service', async () => {
+    it('refuses with ERP-SERVICES-0001 while a ticket count fails', async () => {
       const { service, repository, transport } = build();
+
       repository.findById.mockResolvedValue({ id: 2, name: 'Gold' });
-      repository.countTickets.mockResolvedValue(4);
+      repository.countTickets.mockRejectedValue(new Error('Database count failed'));
 
       await expect(service.remove(ADMIN, { id: '2' })).rejects.toMatchObject({
         code: 'ERP-SERVICES-0001',
+        message: 'its use could not be counted',
       });
+
       expect(repository.countTickets).toHaveBeenCalledWith(2);
       expect(repository.remove).not.toHaveBeenCalled();
       expect(transport.publish).not.toHaveBeenCalled();

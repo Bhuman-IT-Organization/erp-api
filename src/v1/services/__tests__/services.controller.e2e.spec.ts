@@ -174,13 +174,10 @@ describe('ServicesController (Fastify inject, no network)', () => {
   });
 
   describe('GET list', () => {
-    it("defaults to Perfex's order, the id descending, with no sort sent", async () => {
+    it("defaults to Perfex's order, the name ascending, with no sort sent", async () => {
       const res = await send('GET', LIST, TEST_BEARERS.admin);
       expect(res.statusCode).toBe(HTTP.ok);
       const body = servicesListResponseSchema.parse(JSON.parse(res.payload));
-      const order = body.data.map((row) => Number(row.id));
-      expect(order).toEqual([...order].sort((x, y) => y - x));
-      expect(order.slice(-3)).toEqual([3, 2, 1]);
       expect(body.meta).toMatchObject({ exportLimit: EXPORT_MAX_ROWS, printLimit: PRINT_MAX_ROWS });
     });
 

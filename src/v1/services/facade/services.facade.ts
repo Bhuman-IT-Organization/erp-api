@@ -1,28 +1,3 @@
-// import { Injectable } from '@nestjs/common';
-// import type { Service } from '../model/services.model.js';
-// import { ServicesService, type ServicesDescription } from '../service/services.service.js';
-
-// @Injectable()
-// export class ServicesFacade {
-//   constructor(private readonly service: ServicesService) {}
-
-//   describe(): ServicesDescription {
-//     return this.service.describe();
-//   }
-
-//   findById(id: number): Promise<Service | null> {
-//     return this.service.findById(id);
-//   }
-
-//   listAll(): Promise<readonly Service[]> {
-//     return this.service.listAll();
-//   }
-
-//   findByIds(ids: readonly number[]): Promise<readonly Service[]> {
-//     return this.service.findByIds(ids);
-//   }
-// }
-
 import { Injectable } from '@nestjs/common';
 import type { Service } from '../model/services.model.js';
 import { ServicesService, type ServicesDescription } from '../service/services.service.js';

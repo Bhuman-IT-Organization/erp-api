@@ -148,7 +148,13 @@ export class ServicesController {
     summary: 'Delete a service (administrators only); refused while a ticket uses it',
     params: servicesParamsSchema,
     responses: { [HTTP_STATUS.NO_CONTENT]: null },
-    errors: ['ERP-VALIDATION-0001', 'ERP-AUTH-0004', 'ERP-AUTH-0005', 'ERP-CORE-0004'],
+    errors: [
+      'ERP-VALIDATION-0001',
+      'ERP-AUTH-0004',
+      'ERP-AUTH-0005',
+      'ERP-CORE-0004',
+      'ERP-SERVICES-0001',
+    ],
   })
   remove(@CurrentUser() user: AuthenticatedUser, @Param() params: unknown): Promise<void> {
     return this.service.remove(user, params);

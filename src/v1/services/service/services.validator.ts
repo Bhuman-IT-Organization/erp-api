@@ -1,7 +1,7 @@
 /**
  * Validator: the request parsing (BE-09: an expected failure is an `AppError`; nothing here throws
  * a Nest exception). The list is parsed by `shared/http/pagination.ts`'s `parseListQuery` (BE-19),
- * then this file adds ONE sort segment (default `-id`, Perfex's order), the cursor decoded for that
+ * then this file adds ONE sort segment (default `name` ascending, Perfex's order), the cursor decoded for that
  * sort, and `?q=` bounded. This list takes no filter.
  */
 import { Injectable } from '@nestjs/common';
@@ -20,11 +20,11 @@ import {
 } from '../dto/services.dto.js';
 import type { ServicesListRequest, ServicesSortField } from '../model/services.model.js';
 
-/** The columns `?sort=` accepts. With no `sort`, the list reads `id` descending. */
+/** The columns `?sort=` accepts. With no `sort`, the list reads `name` ascending. */
 export const SERVICES_SORT_FIELDS = ['id', 'name'] as const satisfies readonly ServicesSortField[];
 
-/** The sort with no `?sort=`: the id descending, Perfex's order. */
-const DEFAULT_SORT = { field: 'id', direction: 'desc' } as const;
+/** The sort with no `?sort=`: the name ascending, Perfex's `[1,'asc']`. */
+const DEFAULT_SORT = { field: 'name', direction: 'asc' } as const;
 
 /** The kind of value each sort column's cursor must carry: a decoded cursor is checked, not trusted. */
 const SORT_KINDS = { id: 'number', name: 'string' } as const satisfies Record<
@@ -73,7 +73,7 @@ function parseSearch(input: unknown): string | null {
 
 @Injectable()
 export class ServicesValidator {
-  /** `GET` list: BE-19's grammar, one keyset sort (default `-id`), the cursor bound to it, `q`. */
+  /** `GET` list: BE-19's grammar, one keyset sort (default `name` ascending), the cursor bound to it, `q`. */
   parseListQuery(input: unknown): ServicesListRequest {
     const query = parseListQuery(input, SERVICES_SORT_FIELDS);
     if (query.filters.length > 0)

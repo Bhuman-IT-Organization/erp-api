@@ -49,6 +49,9 @@ function inUse(tickets: number): AppError | null {
     ? new AppError('ERP-SERVICES-0001', `used by ${String(tickets)} ticket(s)`)
     : null;
 }
+function ticketCountFailed(): AppError {
+  return new AppError('ERP-SERVICES-0001', 'its use could not be counted');
+}
 
 @Injectable()
 export class ServicesService {
@@ -121,7 +124,14 @@ export class ServicesService {
     this.assertAdministrator(actor, ADMIN_ONLY);
     const { id } = this.validator.parseParams(params);
     if ((await this.repository.findById(id)) === null) throw notFound();
-    const refusal = inUse(await this.repository.countTickets(id));
+    let tickets: number;
+
+    try {
+      tickets = await this.repository.countTickets(id);
+    } catch {
+      throw ticketCountFailed();
+    }
+    const refusal = inUse(tickets);
     if (refusal !== null) throw refusal;
     const at = this.now().toISOString();
     if (!(await this.repository.remove(id))) throw notFound();

@@ -114,7 +114,6 @@ export const ROUTE_GATES: Readonly<Record<string, RouteGate>> = Object.freeze({
   '/setup/currencies': ADMIN_GATE,
   '/setup/currencies/new': ADMIN_GATE,
   '/setup/currencies/:id': ADMIN_GATE,
-  // Services is the only module that has a screen but no permission code, so it is administrator-only (D-06, D-26, BE-25).
   '/setup/services': ADMIN_GATE,
   '/setup/services/new': ADMIN_GATE,
   '/setup/services/:id': ADMIN_GATE,

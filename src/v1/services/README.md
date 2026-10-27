@@ -6,7 +6,7 @@ The Services (tickets) list (Setup > Support > Services): list, read, create, up
 
 ## Owned tables
 
-- `tblservices`: claimed for `node` in the ownership register, written here through Prisma's typed delegate, which the ownership guard admits because the register names `node`. Node writes `name` (`VARCHAR(50)`); `serviceid` is assigned by the database. An update writes the name and nothing else. Perfex's own screen was its one writer: no co-writer. The one other Perfex path that still writes it is the quick add on the ticket form (`/admin/tickets/service`), which stays on Perfex.
+- `tblservices`: claimed for `node` in the ownership register, written here through Prisma's typed delegate, which the ownership guard admits because the register names `node`. Node writes `name` (`VARCHAR(50)`); `serviceid` is assigned by the database. An update writes the name and nothing else. Perfex's own screen was its primary writer before this migration. Node now writes `tblservices` through this module, and Perfex's quick add on the ticket form (`/admin/tickets/service`) remains an additional writer and stays on Perfex.
 
 Read only, never written (DB-03):
 
@@ -85,15 +85,15 @@ None.
 
 Perfex's `admin/tickets/services` screen, rebuilt from its views. Business outcomes are kept 1:1; each workflow simplification is listed:
 
-| Perfex                                                                            | Node                                                                         | Notes                                   |
-| --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------- |
-| the list with an add/edit modal                                                   | `GET`, `POST`, `PATCH` behind the `/setup/services`, `/new` and `/:id` pages | the modal becomes a page (D-04)         |
-| the table ordered by id                                                           | the list, the id descending by default                                       | the same order as the other Setup lists |
-| `Tickets_model::delete_service` refuses a service a ticket uses (`is_referenced`) | `DELETE` refused with 409 `ERP-SERVICES-0001`                                | same outcome, in the feature's words    |
-| no administrator check on the controller                                          | administrators only on every endpoint                                        | D-26                                    |
-| the quick add on the ticket form (`/admin/tickets/service`)                       | stays on Perfex                                                              | not blocked at Nginx                    |
-| no uniqueness check                                                               | none either: a duplicate name is accepted                                    | the same                                |
-| the success alert after a save or delete                                          | a toast                                                                      | the screens                             |
+| Perfex                                                                            | Node                                                                         | Notes                                                                                            |
+| --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| the list with an add/edit modal                                                   | `GET`, `POST`, `PATCH` behind the `/setup/services`, `/new` and `/:id` pages | the modal becomes a page (D-04)                                                                  |
+| the table ordered by name                                                         | the list, the id descending by default                                       | Perfex orders by service name; Node defaults to id descending                                    |
+| `Tickets_model::delete_service` refuses a service a ticket uses (`is_referenced`) | `DELETE` refused with 409 `ERP-SERVICES-0001`                                | same outcome, in the feature's words                                                             |
+| administrator checks using `is_admin()` in `Tickets.php`                          | administrators only on every endpoint                                        | Perfex checks administration access; Node enforces administrator access on every endpoint (D-26) |
+| the quick add on the ticket form (`/admin/tickets/service`)                       | stays on Perfex                                                              | not blocked at Nginx                                                                             |
+| no uniqueness check                                                               | none either: a duplicate name is accepted                                    | the same                                                                                         |
+| the success alert after a save or delete                                          | a toast                                                                      | the screens                                                                                      |
 
 ## How to run its tests
 
