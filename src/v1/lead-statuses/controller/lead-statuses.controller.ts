@@ -145,7 +145,16 @@ export class LeadStatusesController {
     responses: {
       [HTTP_STATUS.NO_CONTENT]: null,
     },
-    errors: ['ERP-VALIDATION-0001', 'ERP-AUTH-0004', 'ERP-AUTH-0005', 'ERP-CORE-0004'],
+    errors: [
+      'ERP-VALIDATION-0001',
+      'ERP-AUTH-0004',
+      'ERP-AUTH-0005',
+      'ERP-CORE-0004',
+      'ERP-LEADSTATUSES-0001',
+      'ERP-LEADSTATUSES-0002',
+      'ERP-LEADSTATUSES-0003',
+      'ERP-LEADSTATUSES-0004',
+    ],
   })
   remove(@CurrentUser() user: AuthenticatedUser, @Param() params: unknown): Promise<void> {
     return this.service.remove(user, params);

@@ -1,158 +1,180 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { Test } from '@nestjs/testing';
-import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
-import type { ExecutionContext } from '@nestjs/common';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { JwtAuthGuard } from '../../../shared/http/guards/jwt-auth.guard.js';
-import { PermissionGuard } from '../../../shared/http/guards/permission.guard.js';
+import {
+  createLeadStatusesTestApp,
+  TEST_BEARERS,
+  type LeadStatusesTestApp,
+} from '../__tests__/create-lead-statuses-test-app.js';
+import { LEAD_STATUSES_ROUTES } from '../lead-statuses.routes.js';
+import { API_PREFIX } from '../../../shared/http/api-prefix.js';
 
-import { LeadStatusesController } from '../controller/lead-statuses.controller.js';
-import { LeadStatusesService } from '../service/lead-statuses.service.js';
+interface ProtectedRequest {
+  readonly method: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  readonly url: string;
+  readonly payload?: Record<string, string>;
+}
 
-describe('LeadStatusesController HTTP routes', () => {
-  let app: NestFastifyApplication;
+function joinRoute(...parts: string[]): string {
+  const path = parts
+    .map((part) => part.replace(/^\/+|\/+$/g, ''))
+    .filter(Boolean)
+    .join('/');
 
-  const admin = {
-    staffId: 5,
-    sessionId: 'test-session',
-    jti: 'test-jti',
-    isAdmin: true,
-    roleId: null,
-    tokenVersion: 0,
-    expiresAt: 4_102_444_800,
-  };
+  return `/${path}`;
+}
 
-  const status = {
-    id: '3',
-    name: 'Contacted',
-    statusorder: 3,
-    color: '#28B8DA',
-    isdefault: 0,
-    usage: {
-      leads: 0,
-      emailIntegration: 0,
-    },
-    isConfiguredDefault: false,
-  };
+const apiRoute = (...parts: string[]): string =>
+  joinRoute(API_PREFIX, LEAD_STATUSES_ROUTES.base, ...parts);
 
-  const service = {
-    list: vi.fn(() =>
-      Promise.resolve({
-        data: [status],
-        meta: {
-          nextCursor: null,
-          prevCursor: null,
-          total: 1,
-          rangeStart: 1,
-          exportLimit: 1000,
-          printLimit: 1000,
-        },
-      }),
-    ),
+const listUrl = apiRoute(LEAD_STATUSES_ROUTES.list);
+const exportUrl = apiRoute(LEAD_STATUSES_ROUTES.export);
+const recordUrl = (id: string): string => apiRoute(LEAD_STATUSES_ROUTES.record.replace(':id', id));
 
-    get: vi.fn(() => Promise.resolve(status)),
+const protectedRequests: readonly ProtectedRequest[] = [
+  { method: 'GET', url: listUrl },
+  { method: 'GET', url: exportUrl },
+  { method: 'GET', url: recordUrl('3') },
+  {
+    method: 'POST',
+    url: listUrl,
+    payload: { name: 'Authentication Test Status' },
+  },
+  {
+    method: 'PATCH',
+    url: recordUrl('3'),
+    payload: { name: 'Authentication Test Status' },
+  },
+  { method: 'DELETE', url: recordUrl('3') },
+];
 
-    create: vi.fn(() => Promise.resolve(status)),
-
-    update: vi.fn(() => Promise.resolve(status)),
-
-    remove: vi.fn(() => Promise.resolve(undefined)),
-
-    exportCsv: vi.fn(),
-  };
+describe('Lead Statuses controller HTTP routes', () => {
+  let testApp: LeadStatusesTestApp;
 
   beforeAll(async () => {
-    const module = await Test.createTestingModule({
-      controllers: [LeadStatusesController],
-      providers: [
-        {
-          provide: LeadStatusesService,
-          useValue: service,
-        },
-      ],
-    })
-      .overrideGuard(JwtAuthGuard)
-      .useValue({
-        canActivate(context: ExecutionContext) {
-          const request = context.switchToHttp().getRequest<{
-            user: typeof admin;
-          }>();
-
-          request.user = admin;
-          return true;
-        },
-      })
-      .overrideGuard(PermissionGuard)
-      .useValue({
-        canActivate: () => true,
-      })
-      .compile();
-
-    app = module.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
-
-    await app.init();
-    await app.getHttpAdapter().getInstance().ready();
+    testApp = await createLeadStatusesTestApp();
   });
 
   afterAll(async () => {
-    await app.close();
+    await testApp.close();
   });
 
-  it('GET /lead-statuses returns the list', async () => {
-    const response = await app.inject({
-      method: 'GET',
-      url: '/lead-statuses',
-    });
+  describe('authentication and authorization', () => {
+    for (const request of protectedRequests) {
+      it(`${request.method} ${request.url} returns 401 without a token`, async () => {
+        const response = await testApp.app.inject({
+          method: request.method,
+          url: request.url,
+          ...(request.payload ? { payload: request.payload } : {}),
+        });
 
-    expect(response.statusCode).toBe(200);
-    expect(response.json<{ data: (typeof status)[] }>().data).toHaveLength(1);
-    expect(service.list).toHaveBeenCalled();
+        expect(response.statusCode).toBe(401);
+      });
+
+      it(`${request.method} ${request.url} rejects a non-admin user`, async () => {
+        const response = await testApp.app.inject({
+          method: request.method,
+          url: request.url,
+          headers: {
+            authorization: `Bearer ${TEST_BEARERS.everyCode}`,
+          },
+          ...(request.payload ? { payload: request.payload } : {}),
+        });
+
+        expect(response.statusCode).toBe(403);
+      });
+    }
   });
 
-  it('GET /lead-statuses/:id returns one status', async () => {
-    const response = await app.inject({
-      method: 'GET',
-      url: '/lead-statuses/3',
+  describe('administrator requests', () => {
+    const adminHeaders = {
+      authorization: `Bearer ${TEST_BEARERS.admin}`,
+    };
+
+    let createdId: string;
+
+    it('GET list returns lead statuses', async () => {
+      const response = await testApp.app.inject({
+        method: 'GET',
+        url: listUrl,
+        headers: adminHeaders,
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      const body = response.json<{
+        data: { id: string; name: string }[];
+      }>();
+
+      expect(body.data.length).toBeGreaterThan(0);
+      expect(body.data.some((item) => item.name === 'Customer')).toBe(true);
     });
 
-    expect(response.statusCode).toBe(200);
-    expect(response.json<{ name: string }>().name).toBe('Contacted');
-    expect(service.get).toHaveBeenCalled();
-  });
+    it('GET record returns a status by ID', async () => {
+      const response = await testApp.app.inject({
+        method: 'GET',
+        url: recordUrl('3'),
+        headers: adminHeaders,
+      });
 
-  it('POST /lead-statuses returns 201', async () => {
-    const response = await app.inject({
-      method: 'POST',
-      url: '/lead-statuses',
-      payload: {
-        name: 'Contacted',
-      },
+      expect(response.statusCode).toBe(200);
+      expect(response.json<{ name: string }>().name).toBe('Qualified');
     });
 
-    expect(response.statusCode).toBe(201);
-    expect(service.create).toHaveBeenCalled();
-  });
+    it('GET export returns a successful response', async () => {
+      const response = await testApp.app.inject({
+        method: 'GET',
+        url: exportUrl,
+        headers: adminHeaders,
+      });
 
-  it('PATCH /lead-statuses/:id returns updated status', async () => {
-    const response = await app.inject({
-      method: 'PATCH',
-      url: '/lead-statuses/3',
-      payload: {
-        name: 'Contacted',
-      },
+      expect(response.statusCode).toBe(200);
     });
 
-    expect(response.statusCode).toBe(200);
-    expect(service.update).toHaveBeenCalled();
-  });
+    it('POST creates a lead status', async () => {
+      const response = await testApp.app.inject({
+        method: 'POST',
+        url: listUrl,
+        headers: adminHeaders,
+        payload: {
+          name: 'E2E Created Status',
+        },
+      });
 
-  it('DELETE /lead-statuses/:id returns 204', async () => {
-    const response = await app.inject({
-      method: 'DELETE',
-      url: '/lead-statuses/3',
+      expect(response.statusCode).toBe(201);
+
+      const body = response.json<{ id: string; name: string }>();
+      expect(body.name).toBe('E2E Created Status');
+      expect(body.id).toBeTruthy();
+
+      createdId = body.id;
     });
 
-    expect(response.statusCode).toBe(204);
-    expect(service.remove).toHaveBeenCalled();
+    it('PATCH updates the created status', async () => {
+      expect(createdId).toBeTruthy();
+
+      const response = await testApp.app.inject({
+        method: 'PATCH',
+        url: recordUrl(createdId),
+        headers: adminHeaders,
+        payload: {
+          name: 'E2E Updated Status',
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json<{ name: string }>().name).toBe('E2E Updated Status');
+    });
+
+    it('DELETE removes the created status', async () => {
+      expect(createdId).toBeTruthy();
+
+      const response = await testApp.app.inject({
+        method: 'DELETE',
+        url: recordUrl(createdId),
+        headers: adminHeaders,
+      });
+
+      expect(response.statusCode).toBe(204);
+    });
   });
 });

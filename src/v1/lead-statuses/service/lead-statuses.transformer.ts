@@ -59,7 +59,9 @@ export function toExportRow(row: LeadStatusRow): LeadStatusExportRow {
 /** Default usage when a status has no references. */
 export const NO_LEAD_STATUS_USAGE: LeadStatusUsage = {
   leads: 0,
+  lastLeadStatus: 0,
   emailIntegration: 0,
+  webToLead: 0,
 };
 
 /** Convert one database record into an API response. */

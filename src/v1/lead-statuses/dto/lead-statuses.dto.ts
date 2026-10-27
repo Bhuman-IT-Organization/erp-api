@@ -51,14 +51,16 @@ export const exportLeadStatusesQuerySchema = listLeadStatusesQuerySchema
 export const leadStatusesParamsSchema = z.object({
   id: z.coerce.number().int().positive(),
 });
-
+// MySQL signed INT boundaries.
+const MYSQL_INT_MIN = -2_147_483_648;
+const MYSQL_INT_MAX = 2_147_483_647;
 /** Request body when creating a status. */
 export const createLeadStatusesBodySchema = z.strictObject({
   name: z.string().trim().min(1).max(LEAD_STATUSES_NAME_MAX),
 
   color: z.string().trim().max(LEAD_STATUS_COLOR_MAX_LENGTH).nullable().optional(),
 
-  statusorder: z.number().int().nullable().optional(),
+  statusorder: z.number().int().min(MYSQL_INT_MIN).max(MYSQL_INT_MAX).nullable().optional(),
 });
 
 /** Request body when updating a status. */
@@ -67,7 +69,9 @@ export const updateLeadStatusesBodySchema = createLeadStatusesBodySchema;
 /** Counts of records referencing this status. */
 export const leadStatusUsageSchema = z.object({
   leads: z.number().int().nonnegative(),
+  lastLeadStatus: z.number().int().nonnegative(),
   emailIntegration: z.number().int().nonnegative(),
+  webToLead: z.number().int().nonnegative(),
 });
 
 /** One lead status returned by the backend. */

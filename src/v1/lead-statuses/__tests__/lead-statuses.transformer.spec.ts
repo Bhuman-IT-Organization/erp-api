@@ -17,8 +17,10 @@ const row: LeadStatusRow = {
 };
 
 const usage: LeadStatusUsage = {
-  leads: 5,
+  leads: 2,
+  lastLeadStatus: 0,
   emailIntegration: 2,
+  webToLead: 0,
 };
 
 describe('LeadStatusesTransformer', () => {
@@ -55,7 +57,9 @@ describe('LeadStatusesTransformer', () => {
 
     expect(result.usage).toEqual({
       leads: 0,
+      lastLeadStatus: 0,
       emailIntegration: 0,
+      webToLead: 0,
     });
   });
 

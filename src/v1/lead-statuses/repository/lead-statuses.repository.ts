@@ -53,6 +53,11 @@ const usageRowsSchema = z.array(
     n: countSchema,
   }),
 );
+const columnCountRowsSchema = z.array(
+  z.object({
+    n: countSchema,
+  }),
+);
 
 type Key = readonly [KeyValue, number];
 
@@ -254,7 +259,11 @@ export class LeadStatusesRepository {
         data: {
           ...(patch.name !== undefined ? { name: patch.name } : {}),
 
-          ...(patch.color !== undefined ? { color: patch.color } : {}),
+          ...(patch.color !== undefined
+            ? {
+                color: patch.color?.trim() ? patch.color.trim() : '#757575',
+              }
+            : {}),
 
           ...(patch.statusorder !== undefined ? { statusorder: patch.statusorder } : {}),
         },
@@ -281,7 +290,7 @@ export class LeadStatusesRepository {
     return result.count > 0;
   }
 
-  // Count references from leads and email integration
+  // Count every known reference to lead statuses.
   async usageByStatuses(ids: readonly number[]): Promise<ReadonlyMap<number, LeadStatusUsage>> {
     const unique = [...new Set(ids)];
 
@@ -291,67 +300,112 @@ export class LeadStatusesRepository {
 
     const bound = Prisma.join(unique);
 
-    const [leadsAnswer, emailAnswer] = await Promise.all([
-      this.prisma.client.$queryRaw`
+    try {
+      // Required reference locations plus checks for optional legacy columns.
+      const [leadsAnswer, emailAnswer, lastLeadStatusColumnAnswer, webToLeadColumnAnswer] =
+        await Promise.all([
+          this.prisma.client.$queryRaw`
           SELECT status AS id, COUNT(*) AS n
           FROM tblleads
           WHERE status IN (${bound})
           GROUP BY status
         `,
 
-      this.prisma.client.$queryRaw`
+          this.prisma.client.$queryRaw`
           SELECT lead_status AS id, COUNT(*) AS n
           FROM tblleads_email_integration
           WHERE lead_status IN (${bound})
           GROUP BY lead_status
         `,
-    ]);
 
-    const totals = new Map<number, LeadStatusUsage>(
-      unique.map((id) => [
-        id,
-        {
-          leads: 0,
-          emailIntegration: 0,
-        },
-      ]),
-    );
+          this.prisma.client.$queryRaw`
+          SELECT COUNT(*) AS n
+          FROM information_schema.columns
+          WHERE table_schema = DATABASE()
+            AND table_name = 'tblleads'
+            AND column_name = 'last_lead_status'
+        `,
 
-    for (const { id, n } of usageRowsSchema.parse(leadsAnswer)) {
-      const old = totals.get(id);
+          this.prisma.client.$queryRaw`
+          SELECT COUNT(*) AS n
+          FROM information_schema.columns
+          WHERE table_schema = DATABASE()
+            AND table_name = 'tblweb_to_lead'
+            AND column_name = 'lead_status'
+        `,
+        ]);
 
-      if (old !== undefined) {
-        totals.set(id, {
-          ...old,
-          leads: n,
-        });
-      }
+      const lastColumnCount = columnCountRowsSchema.parse(lastLeadStatusColumnAnswer)[0]?.n ?? 0;
+
+      const webToLeadColumnCount = columnCountRowsSchema.parse(webToLeadColumnAnswer)[0]?.n ?? 0;
+
+      // Only query optional columns when the installed schema contains them.
+      const [lastLeadStatusAnswer, webToLeadAnswer] = await Promise.all([
+        lastColumnCount > 0
+          ? this.prisma.client.$queryRaw`
+              SELECT last_lead_status AS id, COUNT(*) AS n
+              FROM tblleads
+              WHERE last_lead_status IN (${bound})
+              GROUP BY last_lead_status
+            `
+          : Promise.resolve([]),
+
+        webToLeadColumnCount > 0
+          ? this.prisma.client.$queryRaw`
+              SELECT lead_status AS id, COUNT(*) AS n
+              FROM tblweb_to_lead
+              WHERE lead_status IN (${bound})
+              GROUP BY lead_status
+            `
+          : Promise.resolve([]),
+      ]);
+
+      const totals = new Map<number, LeadStatusUsage>(
+        unique.map((id) => [
+          id,
+          {
+            leads: 0,
+            lastLeadStatus: 0,
+            emailIntegration: 0,
+            webToLead: 0,
+          },
+        ]),
+      );
+
+      const applyCounts = (answer: unknown, field: keyof LeadStatusUsage): void => {
+        for (const { id, n } of usageRowsSchema.parse(answer)) {
+          const previous = totals.get(id);
+
+          if (previous !== undefined) {
+            totals.set(id, {
+              ...previous,
+              [field]: n,
+            });
+          }
+        }
+      };
+
+      applyCounts(leadsAnswer, 'leads');
+      applyCounts(emailAnswer, 'emailIntegration');
+      applyCounts(lastLeadStatusAnswer, 'lastLeadStatus');
+      applyCounts(webToLeadAnswer, 'webToLead');
+
+      return totals;
+    } catch {
+      // Never allow deletion when reference usage cannot be established.
+      throw new AppError('ERP-LEADSTATUSES-0004', 'Lead status usage could not be counted');
     }
-
-    for (const { id, n } of usageRowsSchema.parse(emailAnswer)) {
-      const old = totals.get(id);
-
-      if (old !== undefined) {
-        totals.set(id, {
-          ...old,
-          emailIntegration: n,
-        });
-      }
-    }
-
-    return totals;
   }
-
-  // Count usage for a single status
   async usageByStatus(id: number): Promise<LeadStatusUsage> {
     const usage = await this.usageByStatuses([id]);
 
-    const found = usage.get(id);
-
-    if (found === undefined) {
-      throw new AppError('ERP-INTERNAL-0001', 'Lead status usage could not be counted');
-    }
-
-    return found;
+    return (
+      usage.get(id) ?? {
+        leads: 0,
+        lastLeadStatus: 0,
+        emailIntegration: 0,
+        webToLead: 0,
+      }
+    );
   }
 }

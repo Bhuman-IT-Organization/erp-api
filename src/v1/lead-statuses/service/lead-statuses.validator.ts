@@ -32,8 +32,8 @@ export const LEAD_STATUSES_SORT_FIELDS = [
 ] as const satisfies readonly LeadStatusesSortField[];
 
 const DEFAULT_SORT = {
-  field: 'id',
-  direction: 'desc',
+  field: 'name',
+  direction: 'asc',
 } as const;
 
 const SORT_KINDS = {

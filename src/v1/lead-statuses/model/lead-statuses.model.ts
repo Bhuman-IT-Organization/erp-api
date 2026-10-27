@@ -20,7 +20,9 @@ export interface NewLeadStatus {
 /** References that can prevent status deletion. */
 export interface LeadStatusUsage {
   readonly leads: number;
+  readonly lastLeadStatus: number;
   readonly emailIntegration: number;
+  readonly webToLead: number;
 }
 
 /** Public entity exposed by LeadStatusesFacade. */

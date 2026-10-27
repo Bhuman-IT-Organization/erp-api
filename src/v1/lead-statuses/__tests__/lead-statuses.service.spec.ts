@@ -41,7 +41,9 @@ const MEMBER = actor(false);
 
 const ZERO_USAGE: LeadStatusUsage = {
   leads: 0,
+  lastLeadStatus: 0,
   emailIntegration: 0,
+  webToLead: 0,
 };
 
 function seededRows(): Map<number, LeadStatusRow> {
@@ -242,7 +244,9 @@ describe('LeadStatusesService: read operations', () => {
 
     usage.set(3, {
       leads: 2,
+      lastLeadStatus: 0,
       emailIntegration: 0,
+      webToLead: 0,
     });
 
     const result = await service.list(ADMIN, {});
@@ -253,7 +257,9 @@ describe('LeadStatusesService: read operations', () => {
 
     expect(result.data[2]?.usage).toEqual({
       leads: 2,
+      lastLeadStatus: 0,
       emailIntegration: 0,
+      webToLead: 0,
     });
   });
 
@@ -396,7 +402,9 @@ describe('LeadStatusesService: deletion protections', () => {
 
     usage.set(3, {
       leads: 5,
+      lastLeadStatus: 0,
       emailIntegration: 0,
+      webToLead: 0,
     });
 
     await expect(service.remove(ADMIN, { id: '3' })).rejects.toMatchObject({
@@ -411,9 +419,10 @@ describe('LeadStatusesService: deletion protections', () => {
 
     usage.set(3, {
       leads: 0,
+      lastLeadStatus: 0,
       emailIntegration: 1,
+      webToLead: 0,
     });
-
     await expect(service.remove(ADMIN, { id: '3' })).rejects.toMatchObject({
       code: 'ERP-LEADSTATUSES-0001',
     });
@@ -456,15 +465,13 @@ describe('LeadStatusesService: deletion protections', () => {
     expect(repository.remove).not.toHaveBeenCalled();
   });
 
-  it('refuses deletion when the default setting is invalid', async () => {
+  it('treats an invalid default setting as no configured default', async () => {
     const { service, repository, transport } = build();
 
     transport.configuredDefaultStatus.mockResolvedValueOnce('invalid');
 
-    await expect(service.remove(ADMIN, { id: '4' })).rejects.toMatchObject({
-      code: 'ERP-INTERNAL-0001',
-    });
+    await service.remove(ADMIN, { id: '4' });
 
-    expect(repository.remove).not.toHaveBeenCalled();
+    expect(repository.remove).toHaveBeenCalledWith(4);
   });
 });

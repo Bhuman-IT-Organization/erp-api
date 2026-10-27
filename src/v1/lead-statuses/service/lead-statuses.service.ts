@@ -187,8 +187,16 @@ export class LeadStatusesService {
     // Protect statuses used by other records
     const usage = await this.repository.usageByStatus(id);
 
-    if (usage.leads > 0 || usage.emailIntegration > 0) {
-      throw new AppError('ERP-LEADSTATUSES-0001', 'Lead status is still referenced');
+    if (
+      usage.leads > 0 ||
+      usage.lastLeadStatus > 0 ||
+      usage.emailIntegration > 0 ||
+      usage.webToLead > 0
+    ) {
+      throw new AppError(
+        'ERP-LEADSTATUSES-0001',
+        `Lead status is still referenced. Usage counts: leads=${String(usage.leads)}, lastLeadStatus=${String(usage.lastLeadStatus)}, emailIntegration=${String(usage.emailIntegration)}, webToLead=${String(usage.webToLead)}`,
+      );
     }
 
     const deleted = await this.repository.remove(id);
@@ -280,7 +288,7 @@ export class LeadStatusesService {
     return this.transformer.toResponse(row, usage, defaultId);
   }
 
-  // Read configured default status from Settings
+  // Read configured default status using PHP-like integer casting.
   private async configuredDefaultId(): Promise<number | null> {
     const raw = await this.transport.configuredDefaultStatus();
 
@@ -288,16 +296,12 @@ export class LeadStatusesService {
       return null;
     }
 
-    const trimmed = raw.trim();
+    // PHP's (int) cast accepts a numeric prefix and treats invalid text as zero.
+    const id = Number.parseInt(raw.trim(), 10);
 
-    if (!/^\d+$/.test(trimmed)) {
-      throw new AppError('ERP-INTERNAL-0001', 'Default lead status setting is invalid');
-    }
-
-    const id = Number(trimmed);
-
-    if (!Number.isSafeInteger(id) || id < 1) {
-      throw new AppError('ERP-INTERNAL-0001', 'Default lead status setting is invalid');
+    // Only positive, safely representable IDs count as configured defaults.
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      return null;
     }
 
     return id;
