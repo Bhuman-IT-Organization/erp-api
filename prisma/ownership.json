@@ -8352,12 +8352,12 @@
         "perfex-core"
       ],
       "writers": [
-        "perfex-core"
+        "node"
       ]
     },
     "evidence_changed": false,
     "note": "",
-    "owner": "perfex-core",
+    "owner": "node",
     "owner_confidence": "write-single",
     "table": "tbltickets_priorities"
   },
