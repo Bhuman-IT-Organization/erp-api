@@ -35,10 +35,31 @@ const ADMIN: AuthenticatedUser = {
 };
 const MEMBER: AuthenticatedUser = { ...ADMIN, staffId: 2, isAdmin: false };
 
-const ROWS: TicketStatus[] = [
-  { ticketstatusid: 1, name: 'Open', isdefault: 1, statuscolor: '#03a9f4', statusorder: 1 },
-  { ticketstatusid: 2, name: 'In progress', isdefault: 0, statuscolor: '#ff2d42', statusorder: 2 },
-  { ticketstatusid: 3, name: 'Closed', isdefault: 0, statuscolor: null, statusorder: 3 },
+const ROWS: readonly TicketStatus[] = [
+  {
+    ticketstatusid: 1,
+    name: 'Open',
+    isdefault: 1,
+    statuscolor: '#03a9f4',
+    statusorder: 1,
+    ticket_count: 0,
+  },
+  {
+    ticketstatusid: 2,
+    name: 'In progress',
+    isdefault: 0,
+    statuscolor: '#ff2d42',
+    statusorder: 2,
+    ticket_count: 0,
+  },
+  {
+    ticketstatusid: 3,
+    name: 'Closed',
+    isdefault: 0,
+    statuscolor: null,
+    statusorder: 3,
+    ticket_count: 0,
+  },
 ];
 
 type RepositoryPort = Pick<
@@ -70,7 +91,12 @@ class MemoryRepository implements RepositoryPort {
 
   create(input: NewTicketStatus): Promise<TicketStatus> {
     this.lastId += 1;
-    const row = { ticketstatusid: this.lastId, isdefault: 0, ...input };
+    const row: TicketStatus = {
+      ticketstatusid: this.lastId,
+      isdefault: 0,
+      ...input,
+      ticket_count: 0,
+    };
     this.rows.set(row.ticketstatusid, row);
     return Promise.resolve(row);
   }
@@ -78,14 +104,17 @@ class MemoryRepository implements RepositoryPort {
   update(id: number, patch: TicketStatusPatch): Promise<TicketStatus | null> {
     const row = this.rows.get(id);
     if (row === undefined) return Promise.resolve(null);
-    const updated = { ...row, ...patch };
+
+    const updated: TicketStatus = { ...row, ...patch };
     this.rows.set(id, updated);
     return Promise.resolve(updated);
   }
 
   hasTicketReferences(id: number): Promise<boolean> {
     this.referenceChecks += 1;
-    if (this.referenceFailure !== null) return Promise.reject(this.referenceFailure);
+    if (this.referenceFailure !== null) {
+      return Promise.reject(this.referenceFailure);
+    }
     return Promise.resolve(this.ticketReferences.has(id));
   }
 
@@ -96,7 +125,10 @@ class MemoryRepository implements RepositoryPort {
 }
 
 class RecordingLogger extends LoggerService {
-  readonly lines: { message: string; meta: Record<string, unknown> | undefined }[] = [];
+  readonly lines: {
+    message: string;
+    meta: Record<string, unknown> | undefined;
+  }[] = [];
 
   override log(message: string, meta?: Record<string, unknown>): void {
     this.lines.push({ message, meta });
@@ -188,13 +220,17 @@ describe('TicketStatusesService: CRUD', () => {
 
   it('creates a non-default status with nullable fields and publishes after the write', async () => {
     const { service, repository, events, logger } = build();
-    const created = await service.create(ADMIN, { name: '  Waiting  ', statuscolor: '#aabbcc' });
+    const created = await service.create(ADMIN, {
+      name: '  Waiting  ',
+      statuscolor: '#aabbcc',
+    });
     expect(created).toEqual({
       ticketstatusid: '4',
       name: 'Waiting',
       isdefault: 0,
       statuscolor: '#aabbcc',
       statusorder: null,
+      ticket_count: 0,
     });
     expect(repository.rows.get(4)?.isdefault).toBe(0);
     expect(events.drain().map((event) => event.constructor)).toEqual([TicketStatusCreatedV1]);
@@ -214,6 +250,7 @@ describe('TicketStatusesService: CRUD', () => {
       isdefault: 0,
       statuscolor: '#112233',
       statusorder: 4,
+      ticket_count: 0,
     });
     expect(repository.rows.get(2)?.isdefault).toBe(0);
     expect(events.drain().map((event) => event.constructor)).toEqual([TicketStatusUpdatedV1]);

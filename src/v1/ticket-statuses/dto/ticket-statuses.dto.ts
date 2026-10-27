@@ -68,6 +68,7 @@ export const updateTicketStatusBodySchema = createTicketStatusBodySchema
   .refine((body) => Object.keys(body).length > 0, 'send at least one field');
 
 /** Response fields mirror `tbltickets_status`, with its integer key stringified on the wire. */
+/** Response fields mirror `tbltickets_status`, with its integer key stringified on the wire. */
 export const ticketStatusResponseSchema = z
   .strictObject({
     ticketstatusid: z.string(),
@@ -75,6 +76,7 @@ export const ticketStatusResponseSchema = z
     isdefault: z.number().int(),
     statuscolor: z.string().max(TICKET_STATUS_COLOR_MAX).nullable(),
     statusorder: z.number().int().nullable(),
+    ticket_count: z.number().int().nonnegative(),
   })
   .readonly();
 

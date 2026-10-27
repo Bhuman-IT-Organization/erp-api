@@ -8,6 +8,7 @@ import type {
 } from '../model/ticket-statuses.model.js';
 
 const RECORD_NOT_FOUND = 'P2025';
+
 const COLUMNS = {
   ticketstatusid: true,
   name: true,
@@ -23,6 +24,7 @@ const rowSchema = z.object({
   statuscolor: z.string().nullable(),
   statusorder: z.number().int().nullable(),
 });
+
 const rowsSchema = z.array(rowSchema);
 
 function isRecordNotFound(error: unknown): boolean {
@@ -39,12 +41,24 @@ export class TicketStatusesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async list(): Promise<readonly TicketStatus[]> {
-    return rowsSchema.parse(
+    const statuses = rowsSchema.parse(
       await this.prisma.client.tbltickets_status.findMany({
         orderBy: [{ statusorder: 'asc' }, { ticketstatusid: 'asc' }],
         select: COLUMNS,
       }),
     );
+
+    const counts = await this.prisma.client.tbltickets.groupBy({
+      by: ['status'],
+      _count: { _all: true },
+    });
+
+    const countByStatus = new Map(counts.map((row) => [row.status, row._count._all]));
+
+    return statuses.map((status) => ({
+      ...status,
+      ticket_count: countByStatus.get(status.ticketstatusid) ?? 0,
+    }));
   }
 
   async findById(id: number): Promise<TicketStatus | null> {
@@ -52,7 +66,15 @@ export class TicketStatusesRepository {
       where: { ticketstatusid: id },
       select: COLUMNS,
     });
-    return row === null ? null : rowSchema.parse(row);
+
+    if (row === null) return null;
+
+    const status = rowSchema.parse(row);
+    const ticket_count = await this.prisma.client.tbltickets.count({
+      where: { status: id },
+    });
+
+    return { ...status, ticket_count };
   }
 
   async create(input: NewTicketStatus): Promise<TicketStatus> {
@@ -60,7 +82,8 @@ export class TicketStatusesRepository {
       data: input,
       select: COLUMNS,
     });
-    return rowSchema.parse(row);
+
+    return { ...rowSchema.parse(row), ticket_count: 0 };
   }
 
   async update(id: number, patch: TicketStatusPatch): Promise<TicketStatus | null> {
@@ -70,23 +93,34 @@ export class TicketStatusesRepository {
         data: patch,
         select: COLUMNS,
       });
-      return rowSchema.parse(row);
+
+      const status = rowSchema.parse(row);
+      const ticket_count = await this.prisma.client.tbltickets.count({
+        where: { status: id },
+      });
+
+      return { ...status, ticket_count };
     } catch (error) {
       if (isRecordNotFound(error)) return null;
       throw error;
     }
   }
 
-  /** True if any `tbltickets.status` row still names this status; failures propagate. */
+  /** True if any ticket still uses this status. */
   async hasTicketReferences(id: number): Promise<boolean> {
-    return (await this.prisma.client.tbltickets.count({ where: { status: id } })) > 0;
+    return (
+      (await this.prisma.client.tbltickets.count({
+        where: { status: id },
+      })) > 0
+    );
   }
 
-  /** Deletes by id and answers false if the row disappeared after the service's checks. */
+  /** Deletes by id and returns false if the row no longer exists. */
   async remove(id: number): Promise<boolean> {
     const { count } = await this.prisma.client.tbltickets_status.deleteMany({
       where: { ticketstatusid: id },
     });
+
     return count > 0;
   }
 }

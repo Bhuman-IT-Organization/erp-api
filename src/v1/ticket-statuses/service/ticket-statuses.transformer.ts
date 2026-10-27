@@ -29,6 +29,7 @@ export class TicketStatusesTransformer {
       isdefault: row.isdefault,
       statuscolor: row.statuscolor,
       statusorder: row.statusorder,
+      ticket_count: row.ticket_count,
     };
   }
 

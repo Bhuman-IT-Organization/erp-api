@@ -5,6 +5,7 @@ export interface TicketStatus {
   readonly isdefault: number;
   readonly statuscolor: string | null;
   readonly statusorder: number | null;
+  readonly ticket_count: number;
 }
 
 /** The fields the Perfex status form may create; `isdefault` uses the database default of 0. */

@@ -10,6 +10,7 @@ const ROW: TicketStatus = {
   isdefault: 0,
   statuscolor: '#03a9f4',
   statusorder: 1,
+  ticket_count: 0,
 };
 
 function build() {
@@ -21,16 +22,25 @@ function build() {
       update: vi.fn().mockResolvedValue(ROW),
       deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
-    tbltickets: { count: vi.fn().mockResolvedValue(0) },
+    tbltickets: {
+      count: vi.fn().mockResolvedValue(0),
+      groupBy: vi.fn().mockResolvedValue([{ status: 3, _count: { _all: 5 } }]),
+    },
   };
-  const repository = new TicketStatusesRepository({ client } as unknown as ClientHolder);
+
+  const repository = new TicketStatusesRepository({
+    client,
+  } as unknown as ClientHolder);
+
   return { repository, client };
 }
 
 describe('TicketStatusesRepository', () => {
   it('lists statuses in Perfex statusorder and id order', async () => {
     const { repository, client } = build();
-    await expect(repository.list()).resolves.toEqual([ROW]);
+
+    await expect(repository.list()).resolves.toEqual([{ ...ROW, ticket_count: 5 }]);
+
     expect(client.tbltickets_status.findMany).toHaveBeenCalledWith({
       orderBy: [{ statusorder: 'asc' }, { ticketstatusid: 'asc' }],
       select: {
@@ -41,37 +51,66 @@ describe('TicketStatusesRepository', () => {
         statusorder: true,
       },
     });
+
+    expect(client.tbltickets.groupBy).toHaveBeenCalledWith({
+      by: ['status'],
+      _count: { _all: true },
+    });
   });
 
   it('keeps every Prisma operation inside the repository and maps P2025 to null', async () => {
     const { repository, client } = build();
+
     await expect(repository.findById(3)).resolves.toEqual(ROW);
+
     expect(client.tbltickets_status.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: { ticketstatusid: 3 } }),
     );
+
     await expect(
-      repository.create({ name: 'New', statuscolor: null, statusorder: null }),
+      repository.create({
+        name: 'New',
+        statuscolor: null,
+        statusorder: null,
+      }),
     ).resolves.toEqual(ROW);
+
     expect(client.tbltickets_status.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: { name: 'New', statuscolor: null, statusorder: null },
+        data: {
+          name: 'New',
+          statuscolor: null,
+          statusorder: null,
+        },
       }),
     );
 
-    client.tbltickets_status.update.mockRejectedValueOnce({ code: 'P2025' });
+    client.tbltickets_status.update.mockRejectedValueOnce({
+      code: 'P2025',
+    });
+
     await expect(repository.update(404, { name: 'Missing' })).resolves.toBeNull();
+
     await expect(repository.hasTicketReferences(3)).resolves.toBe(false);
-    expect(client.tbltickets.count).toHaveBeenCalledWith({ where: { status: 3 } });
+
+    expect(client.tbltickets.count).toHaveBeenCalledWith({
+      where: { status: 3 },
+    });
+
     await expect(repository.remove(3)).resolves.toBe(true);
   });
 
   it('propagates database failures and reports whether a ticket references the status', async () => {
     const { repository, client } = build();
     const failure = new Error('database unavailable');
+
     client.tbltickets.count.mockRejectedValueOnce(failure).mockResolvedValueOnce(1);
+
     await expect(repository.hasTicketReferences(3)).rejects.toBe(failure);
     await expect(repository.hasTicketReferences(3)).resolves.toBe(true);
+
     client.tbltickets_status.deleteMany.mockRejectedValueOnce(failure);
+
     await expect(repository.remove(3)).rejects.toBe(failure);
   });
 });

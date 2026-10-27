@@ -11,6 +11,7 @@ const row: TicketStatus = {
   isdefault: 0,
   statuscolor: '#12abEF',
   statusorder: 2,
+  ticket_count: 0,
 };
 
 describe('TicketStatusesTransformer', () => {
@@ -23,6 +24,7 @@ describe('TicketStatusesTransformer', () => {
       isdefault: 0,
       statuscolor: '#12abEF',
       statusorder: 2,
+      ticket_count: 0,
     });
   });
 
