@@ -1,29 +1,39 @@
-/**
- * Transformer: entity to wire shape. Pure, so no database or Nest app.
- */
 import { describe, expect, it } from 'vitest';
+import { EXPORT_MAX_ROWS } from '../../../shared/http/csv.js';
+import { PRINT_MAX_ROWS } from '../../../shared/http/export.js';
+import type { CustomerGroupRow } from '../model/customer-groups.model.js';
 import {
+  CUSTOMER_GROUPS_EXPORT_CELLS,
   CustomerGroupsTransformer,
   toCustomerGroup,
+  toExportRow,
+  toResponse,
 } from '../service/customer-groups.transformer.js';
 
-const transformer = new CustomerGroupsTransformer();
+const ROW: CustomerGroupRow = { id: 1, name: 'VIP' };
+const OTHER: CustomerGroupRow = { id: 2, name: 'Gold' };
 
-describe('CustomerGroupsTransformer.toResponse', () => {
-  it('answers the id as text and the name as stored', () => {
-    expect(transformer.toResponse({ id: 7, name: 'VIP' })).toEqual({ id: '7', name: 'VIP' });
+describe('toResponse', () => {
+  it('writes the id as text and the name as stored', () => {
+    expect(toResponse(ROW)).toEqual({ id: '1', name: 'VIP' });
+  });
+
+  it('answers nothing the wire shape does not name', () => {
+    const row = { ...ROW, secret: 'x' } as CustomerGroupRow;
+    expect(Object.keys(toResponse(row)).sort()).toEqual(['id', 'name']);
   });
 });
 
 describe('CustomerGroupsTransformer.toListResponse', () => {
-  it('wraps the rows and copies the four page fields', () => {
-    const response = transformer.toListResponse(
-      [
-        { id: 2, name: 'Gold' },
-        { id: 1, name: 'VIP' },
-      ],
-      { nextCursor: null, prevCursor: null, total: 2, rangeStart: 1 },
-    );
+  const transformer = new CustomerGroupsTransformer();
+
+  it('wraps the rows and copies the page fields plus the export and print limits', () => {
+    const response = transformer.toListResponse([OTHER, ROW], {
+      nextCursor: null,
+      prevCursor: null,
+      total: 2,
+      rangeStart: 1,
+    });
     expect(response.data).toEqual([
       { id: '2', name: 'Gold' },
       { id: '1', name: 'VIP' },
@@ -33,23 +43,38 @@ describe('CustomerGroupsTransformer.toListResponse', () => {
       prevCursor: null,
       total: 2,
       rangeStart: 1,
+      exportLimit: EXPORT_MAX_ROWS,
+      printLimit: PRINT_MAX_ROWS,
     });
   });
 
-  it('answers an empty page', () => {
-    const response = transformer.toListResponse([], {
-      nextCursor: null,
-      prevCursor: null,
-      total: 0,
-      rangeStart: 0,
+  it('keeps the cursors it is given', () => {
+    const response = transformer.toListResponse([ROW], {
+      nextCursor: 'next',
+      prevCursor: 'prev',
+      total: 5,
+      rangeStart: 3,
     });
-    expect(response.data).toEqual([]);
-    expect(response.meta.total).toBe(0);
+    expect(response.meta.nextCursor).toBe('next');
+    expect(response.meta.prevCursor).toBe('prev');
+    expect(response.meta.rangeStart).toBe(3);
+  });
+});
+
+describe('export rows', () => {
+  it('toExportRow writes the id as text and the name', () => {
+    expect(toExportRow(ROW)).toEqual({ id: '1', name: 'VIP' });
+  });
+
+  it('each export cell reads its own column of the exported row', () => {
+    const exported = toExportRow(ROW);
+    expect(CUSTOMER_GROUPS_EXPORT_CELLS.id.value(exported)).toBe('1');
+    expect(CUSTOMER_GROUPS_EXPORT_CELLS.name.value(exported)).toBe('VIP');
   });
 });
 
 describe('toCustomerGroup', () => {
-  it('hands the facade the id and the name as numbers and text', () => {
-    expect(toCustomerGroup({ id: 3, name: 'Silver' })).toEqual({ id: 3, name: 'Silver' });
+  it('is the facade shape: the numeric id and the name', () => {
+    expect(toCustomerGroup(ROW)).toEqual({ id: 1, name: 'VIP' });
   });
 });

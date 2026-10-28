@@ -3,14 +3,14 @@
  * maps to problem details; nothing here throws a Nest exception).
  *
  * The list is parsed by `shared/http/pagination.ts`'s `parseListQuery` (BE-19), then this file adds
- * what a keyset list needs: ONE sort segment (default `-id`), the opaque cursor decoded for that
+ * what a keyset list needs: ONE sort segment (default `-name`), the opaque cursor decoded for that
  * sort with the right kind of value, and `?q=` bounded. This list takes no filter.
  */
 import { Injectable } from '@nestjs/common';
 import type { z } from 'zod';
 import { AppError } from '../../../shared/errors/app-error.js';
 import { decodeCursor } from '../../../shared/http/keyset.js';
-import { parseListQuery } from '../../../shared/http/pagination.js';
+import { LIST_QUERY_LIMITS, parseListQuery } from '../../../shared/http/pagination.js';
 import {
   CUSTOMER_GROUPS_SEARCH_MAX,
   createCustomerGroupsBodySchema,
@@ -25,13 +25,13 @@ import type {
   CustomerGroupsSortField,
 } from '../model/customer-groups.model.js';
 
-/** The columns `?sort=` accepts. With no `sort`, the list reads `id` descending. */
+/** The columns `?sort=` accepts. With no `sort`, the list reads `name` descending. */
 export const CUSTOMER_GROUPS_SORT_FIELDS = [
   'id',
   'name',
 ] as const satisfies readonly CustomerGroupsSortField[];
 
-const DEFAULT_SORT = { field: 'id', direction: 'desc' } as const;
+const DEFAULT_SORT = { field: 'name', direction: 'desc' } as const;
 
 /** The kind of value each sort column's cursor must carry: a decoded cursor is checked, not trusted. */
 const SORT_KINDS = { id: 'number', name: 'string' } as const satisfies Record<
@@ -78,7 +78,7 @@ function parseSearch(input: unknown): string | null {
 
 @Injectable()
 export class CustomerGroupsValidator {
-  /** `GET` list: BE-19's grammar, one keyset sort (default `-id`), the cursor bound to it, `q`. */
+  /** `GET` list: BE-19's grammar, one keyset sort (default `-name`), the cursor bound to it, `q`. */
   parseListQuery(input: unknown): CustomerGroupsListRequest {
     const query = parseListQuery(input, CUSTOMER_GROUPS_SORT_FIELDS);
     if (query.filters.length > 0)
@@ -98,6 +98,15 @@ export class CustomerGroupsValidator {
       cursor,
       limit: query.limit,
     };
+  }
+
+  /**
+   * `GET export`: the list's query (`q`, one sort), read from the first row in batches of the list
+   * maximum. The export parameters and the refusal of `limit` and `cursor` are the shared core's
+   * (`parseExportOptions`, `shared/http/export.ts`), which the service runs first.
+   */
+  parseExportList(input: unknown): CustomerGroupsListRequest {
+    return { ...this.parseListQuery(input), cursor: null, limit: LIST_QUERY_LIMITS.max };
   }
 
   /** `:id`: a non-numeric or non-positive id is a 400, never a 404 probe. */

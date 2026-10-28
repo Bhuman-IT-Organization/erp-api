@@ -260,6 +260,10 @@ function clauseSources(): ClauseSource[] {
 const read = (...parts: string[]) => readFileSync(join(...parts), 'utf8');
 const listDir = (dir: string) => (existsSync(dir) ? readdirSync(dir).sort() : []);
 
+// The three ADR-0034 clauses inspect the same immutable source snapshot. Cache it once so the
+// architecture suite does not reread and re-strip the entire v1/shared tree for every assertion.
+const CLAUSE_SOURCES = clauseSources();
+
 /** Lines between `## <heading>` and the next `## ` heading. */
 const section = (readme: string, heading: string): string[] => {
   const lines = readme.split('\n');
@@ -337,7 +341,7 @@ describe('src/v1 module shape', () => {
 
   it(`lets only v1/${IDENTITY_MODULE} name ${IDENTITY_TABLES.join(' and ')} (ADR-0034 decision 1)`, () => {
     const offences: string[] = [];
-    for (const { module, file, source } of clauseSources()) {
+    for (const { module, file, source } of CLAUSE_SOURCES) {
       if (module === IDENTITY_MODULE) continue;
       const code = stripComments(source);
       for (const table of IDENTITY_TABLES) {
@@ -353,7 +357,7 @@ describe('src/v1 module shape', () => {
 
   it(`lets only ${STAFF_TABLE_ALLOWLIST.join(' and ')} name ${SHARED_STAFF_TABLE} (ADR-0034 decision 1, BE-04 column scope)`, () => {
     const offences: string[] = [];
-    for (const { module, file, source } of clauseSources()) {
+    for (const { module, file, source } of CLAUSE_SOURCES) {
       if (STAFF_TABLE_ALLOWLIST.includes(module)) continue;
       if (new RegExp(String.raw`\b${SHARED_STAFF_TABLE}\b`).test(stripComments(source))) {
         offences.push(
@@ -366,7 +370,7 @@ describe('src/v1 module shape', () => {
 
   it(`lets no module but v1/${IDENTITY_MODULE} import ${IDENTITY_REPOSITORY_IMPORT} (ADR-0034 decision 1)`, () => {
     const offences: string[] = [];
-    for (const { module, file, source } of clauseSources()) {
+    for (const { module, file, source } of CLAUSE_SOURCES) {
       if (module === IDENTITY_MODULE) continue;
       if (stripComments(source).includes(IDENTITY_REPOSITORY_IMPORT)) {
         offences.push(

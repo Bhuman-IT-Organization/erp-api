@@ -10,7 +10,7 @@ import type { CustomerGroupsRepository } from '../repository/customer-groups.rep
 import { CustomerGroupsService } from '../service/customer-groups.service.js';
 import { CustomerGroupsTransformer } from '../service/customer-groups.transformer.js';
 import { CustomerGroupsValidator } from '../service/customer-groups.validator.js';
-
+import { CustomerGroupsTransport } from '../service/customer-groups.transport.js';
 const admin = { isAdmin: true, staffId: 1 } as unknown as AuthenticatedUser;
 const member = { isAdmin: false, staffId: 2 } as unknown as AuthenticatedUser;
 
@@ -21,17 +21,26 @@ function build() {
     create: vi.fn(),
     update: vi.fn(),
     remove: vi.fn(),
+    countCustomers: vi.fn(),
     listAll: vi.fn(),
     findByIds: vi.fn(),
   };
   const logger = { log: vi.fn() };
+  const published: unknown[] = [];
+  const transport = {
+    publish: (event: unknown) => {
+      published.push(event);
+      return Promise.resolve();
+    },
+  } as unknown as CustomerGroupsTransport;
   const service = new CustomerGroupsService(
     new CustomerGroupsValidator(),
     repository as unknown as CustomerGroupsRepository,
     new CustomerGroupsTransformer(),
+    transport,
     logger as unknown as LoggerService,
   );
-  return { service, repository, logger };
+  return { service, repository, logger, published };
 }
 
 describe('CustomerGroupsService: administrators only', () => {
@@ -125,30 +134,44 @@ describe('CustomerGroupsService.update', () => {
 });
 
 describe('CustomerGroupsService.remove', () => {
-  it('deletes the group through the repository (which also removes its customer links)', async () => {
+  it('deletes a group no customer is in, through the repository', async () => {
     const { service, repository, logger } = build();
     repository.findById.mockResolvedValueOnce({ id: 5, name: 'VIP' });
+    repository.countCustomers.mockResolvedValueOnce(0);
     repository.remove.mockResolvedValueOnce(true);
     await expect(service.remove(admin, { id: '5' })).resolves.toBeUndefined();
+    expect(repository.countCustomers).toHaveBeenCalledWith(5);
     expect(repository.remove).toHaveBeenCalledWith(5);
     expect(logger.log).toHaveBeenCalledWith('customer group deleted', { id: 5 });
   });
 
-  it('answers not found when the group does not exist, and deletes nothing', async () => {
+  it('refuses with ERP-CUSTOMERGROUPS-0001 while a customer is in the group, and deletes nothing', async () => {
+    const { service, repository, logger } = build();
+    repository.findById.mockResolvedValueOnce({ id: 5, name: 'VIP' });
+    repository.countCustomers.mockResolvedValueOnce(2);
+    const error = await service.remove(admin, { id: '5' }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(AppError);
+    expect(error).toMatchObject({ code: 'ERP-CUSTOMERGROUPS-0001' });
+    expect(repository.remove).not.toHaveBeenCalled();
+    expect(logger.log).not.toHaveBeenCalled();
+  });
+
+  it('answers not found when the group does not exist, and counts and deletes nothing', async () => {
     const { service, repository } = build();
     repository.findById.mockResolvedValueOnce(null);
     await expect(service.remove(admin, { id: '5' })).rejects.toBeInstanceOf(AppError);
+    expect(repository.countCustomers).not.toHaveBeenCalled();
     expect(repository.remove).not.toHaveBeenCalled();
   });
 
   it('answers not found when the row vanished between the read and the delete', async () => {
     const { service, repository } = build();
     repository.findById.mockResolvedValueOnce({ id: 5, name: 'VIP' });
+    repository.countCustomers.mockResolvedValueOnce(0);
     repository.remove.mockResolvedValueOnce(false);
     await expect(service.remove(admin, { id: '5' })).rejects.toBeInstanceOf(AppError);
   });
 });
-
 describe('CustomerGroupsService facade reads', () => {
   it('findById answers the plain shape or null, with no administrator check', async () => {
     const { service, repository } = build();

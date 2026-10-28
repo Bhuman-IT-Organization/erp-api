@@ -4,9 +4,9 @@
  * methods structurally, with the same keyset order both ways (ties broken on the id), `total` and
  * `rangeStart`, and the same `q` (the name contains it, case-insensitively as the column's `_ci`
  * collation compares; an all-digit `q` is also the id).
- *
  * What it adds that the table cannot produce on demand: the customer links (`tblcustomer_groups`
- * rows) held in `links`, so a spec can prove that `remove` deletes the group's links and no one
+ * rows, Perfex's table) held in `links`, so `countCustomers` can answer and a spec can prove that
+ * `remove` never touches them.
  * else's, exactly as the real transaction does.
  */
 import { AppError } from '../../../shared/errors/app-error.js';
@@ -29,7 +29,7 @@ export interface CustomerGroupLink {
 
 /**
  * Three rows, ids 1 to 3: two share the name `Gold` (Perfex has no uniqueness check). By the
- * default `-id` they read 3, 2, 1; by name 1, 3, 2.
+ * default `-name` they read Silver (2), Gold (3), Gold (1); by `name` ascending, Gold (1), Gold (3), Silver (2).
  */
 export const SEED_CUSTOMER_GROUPS: readonly CustomerGroupRow[] = [
   { id: 1, name: 'Gold' },
@@ -47,7 +47,15 @@ export const SEED_CUSTOMER_LINKS: readonly CustomerGroupLink[] = [
 /** The repository's public surface, which the fake answers method for method. */
 export type CustomerGroupsRepositoryPort = Pick<
   CustomerGroupsRepository,
-  'list' | 'findById' | 'create' | 'update' | 'remove' | 'listAll' | 'findByIds'
+  | 'list'
+  | 'count'
+  | 'findById'
+  | 'create'
+  | 'update'
+  | 'remove'
+  | 'countCustomers'
+  | 'listAll'
+  | 'findByIds'
 >;
 
 type Key = readonly [KeyValue, number];
@@ -107,6 +115,10 @@ export class InMemoryCustomerGroupsRepository implements CustomerGroupsRepositor
       rangeStart,
     });
   }
+  /** The number of groups the list's `q` matches (no cursor): what the export counts first. */
+  count(request: CustomerGroupsListRequest): Promise<number> {
+    return Promise.resolve(this.matching(request).length);
+  }
 
   findById(id: number): Promise<CustomerGroupRow | null> {
     return Promise.resolve(this.rows.get(id) ?? null);
@@ -128,9 +140,13 @@ export class InMemoryCustomerGroupsRepository implements CustomerGroupsRepositor
     return Promise.resolve(updated);
   }
 
-  /** The group's links and then the group, as the real transaction does; `false` when it was missing. */
+  /** The number of links of the group (read only), as the real `count` on `tblcustomer_groups`. */
+  countCustomers(groupId: number): Promise<number> {
+    return Promise.resolve(this.links.filter((link) => link.groupid === groupId).length);
+  }
+
+  /** The group only; `false` when it was missing. The links are never touched. */
   remove(id: number): Promise<boolean> {
-    this.links = this.links.filter((link) => link.groupid !== id);
     return Promise.resolve(this.rows.delete(id));
   }
 

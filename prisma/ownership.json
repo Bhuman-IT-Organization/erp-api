@@ -1396,8 +1396,8 @@
     "table": "tblcustomer_admins"
   },
   {
-    "decided_by": null,
-    "decided_on": null,
+    "decided_by": "challaramJanaki",
+    "decided_on": "2026-10-28",
     "evidence": {
       "ddl": [],
       "forms": [
@@ -1416,34 +1416,34 @@
       ]
     },
     "evidence_changed": false,
-    "note": "Written by v1/customer-groups; Perfex's delete is closed at Nginx; the quick add on the customer profile stays on Perfex.",
-    "owner": "node",
+    "note": "Owner perfex-core by decision: Perfex keeps writing this table from the customer screens (customer create Clients_model.php:188, profile save Clients_model.php:296, customer delete Clients_model.php:984, bulk actions Clients.php:892), so Node must not own it. v1/customer-groups only reads it (a count of the customers in a group) to refuse a group delete with 409 ERP-CUSTOMERGROUPS-0001 while any customer is in the group; it never writes or deletes rows here.",
+    "owner": "perfex-core",
     "owner_confidence": "write-single",
     "table": "tblcustomer_groups"
   },
   {
-    "decided_by": null,
-    "decided_on": null,
-    "evidence": {
-      "ddl": [],
-      "forms": [
-        "db_prefix_concat"
-      ],
-      "no_writer_reason": null,
-      "readers": [
-        "fixed_equipment",
-        "perfex-core"
-      ],
-      "writers": [
-        "perfex-core"
-      ]
-    },
-    "evidence_changed": false,
-    "note": "Written by v1/customer-groups; Perfex's delete is closed at Nginx; the quick add on the customer profile stays on Perfex.",
-    "owner": "node",
-    "owner_confidence": "write-single",
-    "table": "tblcustomers_groups"
+  "decided_by": "migration lead",
+  "decided_on": "2026-10-27",
+  "evidence": {
+    "ddl": [],
+    "forms": [
+      "db_prefix_concat"
+    ],
+    "no_writer_reason": null,
+    "readers": [
+      "fixed_equipment",
+      "perfex-core"
+    ],
+    "writers": [
+      "perfex-core"
+    ]
   },
+  "evidence_changed": false,
+  "note": "Written by v1/customer-groups; Perfex's delete is closed at Nginx; the quick add on the customer profile stays on Perfex.",
+  "owner": "node",
+  "owner_confidence": "write-single",
+  "table": "tblcustomers_groups"
+},
   {
     "decided_by": null,
     "decided_on": null,

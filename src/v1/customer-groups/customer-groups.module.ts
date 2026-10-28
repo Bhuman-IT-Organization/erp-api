@@ -9,6 +9,7 @@ import { CustomerGroupsFacade } from './facade/customer-groups.facade.js';
 import { CustomerGroupsRepository } from './repository/customer-groups.repository.js';
 import { CustomerGroupsService } from './service/customer-groups.service.js';
 import { CustomerGroupsTransformer } from './service/customer-groups.transformer.js';
+import { CustomerGroupsTransport } from './service/customer-groups.transport.js';
 import { CustomerGroupsValidator } from './service/customer-groups.validator.js';
 
 @Module({
@@ -18,6 +19,7 @@ import { CustomerGroupsValidator } from './service/customer-groups.validator.js'
     CustomerGroupsValidator,
     CustomerGroupsTransformer,
     CustomerGroupsRepository,
+    CustomerGroupsTransport,
     CustomerGroupsFacade,
   ],
   exports: [CustomerGroupsFacade],

@@ -1,8 +1,9 @@
 /**
  * Request and response DTOs. Types are `z.infer` of the schemas. Every field is written inline.
  *
- * The list response is BE-19's envelope: `{ data, meta }`. A single resource is a bare body; the
- * request id is never in a body (it travels in the `x-request-id` header).
+ * The list response is BE-19's envelope on the superset meta: `{ data, meta: { nextCursor,
+ * prevCursor, total, rangeStart, exportLimit, printLimit } }`. A single resource is a bare body;
+ * the request id is never in a body (it travels in the `x-request-id` header).
  *
  * The id is a STRING on the wire: the web treats it as opaque. The table's key is an integer, so
  * `shared/http/keyset.ts`'s `[value, id]` cursor applies; the transformer writes `String(row.id)`.
@@ -12,6 +13,18 @@
  * name is saved, so any other key is a 400.
  */
 import { z } from 'zod';
+import {
+  exportBlankField,
+  exportColumnField,
+  exportDateFormatField,
+  exportFormatField,
+  exportHeaderField,
+  exportNoField,
+  exportTimeFormatField,
+  exportTimeZoneField,
+  exportTitleField,
+  exportYesField,
+} from '../../../shared/http/export.js';
 import { listPageMetaSchema } from '../../../shared/http/keyset.js';
 import { LIST_QUERY_LIMITS } from '../../../shared/http/pagination.js';
 
@@ -29,9 +42,29 @@ export const listCustomerGroupsQuerySchema = z.object({
   cursor: z.string().min(1).optional(),
   /** Search: the name contains `q`; when `q` is all digits, also the id equal to it. */
   q: z.string().max(CUSTOMER_GROUPS_SEARCH_MAX).optional(),
-  /** `-id` (default), `id`, `name` or `-name`; a leading `-` is descending. */
+  /** `-name` (default, Perfex's order), `name`, `id` or `-id`; a leading `-` is descending. */
   sort: z.string().optional(),
 });
+
+/**
+ * `GET export`: the list query minus `limit` and `cursor` (an export is every row), plus the export
+ * parameters of ADR-0043 as literal keys. Documentation only: `parseExportOptions` in
+ * `shared/http/export.ts` is the gate. No `key`: the list has no row selection.
+ */
+export const exportCustomerGroupsQuerySchema = listCustomerGroupsQuerySchema
+  .omit({ limit: true, cursor: true })
+  .extend({
+    header: exportHeaderField,
+    format: exportFormatField,
+    column: exportColumnField,
+    title: exportTitleField,
+    yes: exportYesField,
+    no: exportNoField,
+    blank: exportBlankField,
+    dateFormat: exportDateFormatField,
+    timeFormat: exportTimeFormatField,
+    timeZone: exportTimeZoneField,
+  });
 
 /** `:id` of the record routes: a non-numeric or non-positive id is a 400, never a 404 probe. */
 export const customerGroupsParamsSchema = z.object({
@@ -60,11 +93,16 @@ export const customerGroupsListRowSchema = customerGroupsResponseSchema;
 export const customerGroupsListResponseSchema = z
   .object({
     data: z.array(customerGroupsListRowSchema),
-    meta: listPageMetaSchema,
+    /** The pager's meta, `exportLimit` (CSV and Excel, `EXPORT_MAX_ROWS`) and `printLimit` (PDF and print, `PRINT_MAX_ROWS`). */
+    meta: listPageMetaSchema.extend({
+      exportLimit: z.number().int().positive(),
+      printLimit: z.number().int().positive(),
+    }),
   })
   .readonly();
 
 export type ListCustomerGroupsQuery = z.infer<typeof listCustomerGroupsQuerySchema>;
+export type CustomerGroupsExportQuery = z.infer<typeof exportCustomerGroupsQuerySchema>;
 export type CustomerGroupsParams = z.infer<typeof customerGroupsParamsSchema>;
 export type CreateCustomerGroupsBody = z.infer<typeof createCustomerGroupsBodySchema>;
 export type UpdateCustomerGroupsBody = z.infer<typeof updateCustomerGroupsBodySchema>;

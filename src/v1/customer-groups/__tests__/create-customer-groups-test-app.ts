@@ -1,10 +1,11 @@
 /**
  * The module inside a real Nest + Fastify application, without a network or a database: the
  * repository is `InMemoryCustomerGroupsRepository` (`fakes.ts`) seeded with the three groups and
- * their links, the access-token verifier is a stub with three known bearers, and the logger records
- * its `log` lines, so a spec can assert them. Everything else (the module wiring, the guards, the
- * request-id hook, the global prefix, the problem-details filter) is the production code path, so
- * `app.inject` proves the HTTP contract `main.ts` serves.
+ * their links, the access-token verifier is a stub with three known bearers, the domain-event
+ * publisher is the recording one, and the logger records its `log` lines, so a spec can assert the
+ * events and the log lines. Everything else (the module wiring, the guards, the request-id hook,
+ * the global prefix, the problem-details filter) is the production code path, so `app.inject`
+ * proves the HTTP contract `main.ts` serves.
  *
  * The bearers follow `v1/identity`'s test app: an administrator, a member holding EVERY code in the
  * `@erp/contracts` catalogue who is still not an administrator (the proof that no code opens this
@@ -15,6 +16,11 @@ import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fa
 import { Test, type TestingModule } from '@nestjs/testing';
 import { PERMISSION_CODES } from '@erp/contracts';
 import { ProblemDetailsFilter } from '../../../shared/errors/problem-details.filter.js';
+import {
+  DOMAIN_EVENT_PUBLISHER,
+  RecordingDomainEventPublisher,
+} from '../../../shared/events/domain-event.publisher.js';
+import { EventsModule } from '../../../shared/events/events.module.js';
 import { API_PREFIX, UNPREFIXED_ROUTES } from '../../../shared/http/api-prefix.js';
 import {
   ACCESS_TOKEN_VERIFIER,
@@ -122,6 +128,8 @@ export interface CustomerGroupsTestApp {
   readonly routes: readonly string[];
   /** The repository's fake, seeded with the three groups (ids 1 to 3) and their links. */
   readonly repo: InMemoryCustomerGroupsRepository;
+  /** Every domain event the module published. */
+  readonly events: RecordingDomainEventPublisher;
   /** Every `log` line the module wrote. */
   readonly logger: RecordingLogger;
   close(): Promise<void>;
@@ -129,13 +137,16 @@ export interface CustomerGroupsTestApp {
 
 export async function createCustomerGroupsTestApp(): Promise<CustomerGroupsTestApp> {
   const repo = seededStore();
+  const events = new RecordingDomainEventPublisher();
   const logger = new RecordingLogger();
 
   const moduleRef = await Test.createTestingModule({
-    imports: [LoggerModule, StubVerifierModule, CustomerGroupsModule],
+    imports: [LoggerModule, EventsModule, StubVerifierModule, CustomerGroupsModule],
   })
     .overrideProvider(CustomerGroupsRepository)
     .useValue(asRepository(repo))
+    .overrideProvider(DOMAIN_EVENT_PUBLISHER)
+    .useValue(events)
     .overrideProvider(LoggerService)
     .useValue(logger)
     .compile();
@@ -157,5 +168,5 @@ export async function createCustomerGroupsTestApp(): Promise<CustomerGroupsTestA
   await app.init();
   await app.getHttpAdapter().getInstance().ready();
 
-  return { app, moduleRef, routes, repo, logger, close: () => app.close() };
+  return { app, moduleRef, routes, repo, events, logger, close: () => app.close() };
 }
