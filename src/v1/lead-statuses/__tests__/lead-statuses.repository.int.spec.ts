@@ -207,7 +207,9 @@ describe.skipIf(!process.env.DATABASE_URL)('LeadStatusesRepository against local
 
     expect(usage).toEqual({
       leads: 0,
+      lastLeadStatus: 0,
       emailIntegration: 0,
+      webToLead: 0,
     });
 
     expect(
@@ -237,7 +239,9 @@ describe.skipIf(!process.env.DATABASE_URL)('LeadStatusesRepository against local
     // Confirm that the real database record is counted.
     await expect(repository.usageByStatus(status.id)).resolves.toEqual({
       leads: 1,
+      lastLeadStatus: 0,
       emailIntegration: 0,
+      webToLead: 0,
     });
 
     // The service must refuse to delete the referenced status.
@@ -271,7 +275,9 @@ describe.skipIf(!process.env.DATABASE_URL)('LeadStatusesRepository against local
     // Confirm that the real database record is counted.
     await expect(repository.usageByStatus(status.id)).resolves.toEqual({
       leads: 0,
+      lastLeadStatus: 0,
       emailIntegration: 1,
+      webToLead: 0,
     });
 
     // The service must refuse to delete the referenced status.
