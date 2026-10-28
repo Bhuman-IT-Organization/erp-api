@@ -36,6 +36,7 @@ const SCREEN_READS: Readonly<Record<string, HandlerName | null>> = {
 };
 
 const OTHER_HANDLERS: Readonly<Record<string, string>> = {
+  exportCsv: '/setup/customer-groups',
   remove: '/setup/customer-groups',
   create: '/setup/customer-groups/new',
   update: '/setup/customer-groups/:id',

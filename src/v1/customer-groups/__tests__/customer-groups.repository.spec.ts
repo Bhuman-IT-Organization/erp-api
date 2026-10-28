@@ -1,6 +1,6 @@
 /**
  * Repository: the Prisma client is replaced by a mock, so these specs prove the shape of each call
- * (and the order of the delete transaction) without a database.
+ * without a database.
  */
 import { describe, expect, it, vi } from 'vitest';
 import { CustomerGroupsRepository } from '../repository/customer-groups.repository.js';
@@ -9,53 +9,45 @@ import { CustomerGroupsRepository } from '../repository/customer-groups.reposito
 type RepositoryDeps = ConstructorParameters<typeof CustomerGroupsRepository>[0];
 
 function build() {
-  const calls: string[] = [];
-  const tx = {
-    tblcustomer_groups: {
-      deleteMany: vi.fn((): Promise<{ count: number }> => {
-        calls.push('links');
-        return Promise.resolve({ count: 3 });
-      }),
-    },
-    tblcustomers_groups: {
-      deleteMany: vi.fn((): Promise<{ count: number }> => {
-        calls.push('group');
-        return Promise.resolve({ count: 1 });
-      }),
-    },
-  };
   const groups = {
     findFirst: vi.fn(),
     findMany: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
     count: vi.fn(),
+    deleteMany: vi.fn(),
   };
-  const client = {
-    tblcustomers_groups: groups,
-    $transaction: vi.fn((work: (inner: typeof tx) => Promise<boolean>) => work(tx)),
-  };
+  const links = { count: vi.fn(), deleteMany: vi.fn() };
+  const client = { tblcustomers_groups: groups, tblcustomer_groups: links };
   const repository = new CustomerGroupsRepository({ client } as unknown as RepositoryDeps);
-  return { repository, client, tx, groups, calls };
+  return { repository, client, groups, links };
 }
 
 describe('CustomerGroupsRepository.remove', () => {
-  it('deletes the group links and then the group, inside ONE transaction', async () => {
-    const { repository, client, tx, calls } = build();
+  it('deletes the group only and never touches the customer links', async () => {
+    const { repository, groups, links } = build();
+    groups.deleteMany.mockResolvedValueOnce({ count: 1 });
     await expect(repository.remove(5)).resolves.toBe(true);
-    expect(client.$transaction).toHaveBeenCalledTimes(1);
-    expect(tx.tblcustomer_groups.deleteMany).toHaveBeenCalledWith({ where: { groupid: 5 } });
-    expect(tx.tblcustomers_groups.deleteMany).toHaveBeenCalledWith({ where: { id: 5 } });
-    expect(calls).toEqual(['links', 'group']);
+    expect(groups.deleteMany).toHaveBeenCalledWith({ where: { id: 5 } });
+    expect(links.deleteMany).not.toHaveBeenCalled();
   });
 
   it('answers false when the group did not exist', async () => {
-    const { repository, tx } = build();
-    tx.tblcustomers_groups.deleteMany.mockResolvedValueOnce({ count: 0 });
+    const { repository, groups } = build();
+    groups.deleteMany.mockResolvedValueOnce({ count: 0 });
     await expect(repository.remove(99)).resolves.toBe(false);
   });
 });
 
+describe('CustomerGroupsRepository.countCustomers', () => {
+  it('counts the rows of tblcustomer_groups for the group (read only)', async () => {
+    const { repository, links } = build();
+    links.count.mockResolvedValueOnce(2);
+    await expect(repository.countCustomers(5)).resolves.toBe(2);
+    expect(links.count).toHaveBeenCalledWith({ where: { groupid: 5 } });
+    expect(links.deleteMany).not.toHaveBeenCalled();
+  });
+});
 describe('CustomerGroupsRepository.findById', () => {
   it('answers the row or null', async () => {
     const { repository, groups } = build();

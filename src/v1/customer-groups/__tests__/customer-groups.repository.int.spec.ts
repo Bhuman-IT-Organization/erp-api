@@ -1,18 +1,9 @@
 /**
  * CustomerGroupsRepository against the local mirror (DATABASE_URL from
  * ../erp-infra/env/local/api.host.env).
- *
- * `tblcustomers_groups` and `tblcustomer_groups` are node-owned, so the ownership guard admits the
- * writes this spec makes through the typed delegates. The spec proves the rule of the task card:
- * `remove` deletes the group's rows in `tblcustomer_groups` and the group in ONE transaction, and
- * it leaves every other group's links alone.
- *
- * Everything this spec writes it creates itself and deletes again: `tblcustomers_groups` rows whose
- * name starts with `MARKER`, and `tblcustomer_groups` rows whose `customer_id` is `MARKER_CUSTOMER`
- * (a number no real customer holds), removed before the run (a leftover of a crashed run) and
- * after it. No seeded row is touched, and no value from the local data is read into an assertion
- * message: ids and counts are compared, never printed, and every name asserted is one this spec
- * wrote.
+ * `tblcustomers_groups` is node-owned. `tblcustomer_groups` is Perfex's: the module only counts it
+ * (read only). The test links are written by a separate, unguarded client (`perfex`) that stands in
+ * for Perfex; the module under test never uses it, so the ownership guard stays fully on.
  */
 import 'reflect-metadata';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -20,7 +11,9 @@ import { z } from 'zod';
 import { AppConfig } from '../../../shared/config/app-config.js';
 import { PrismaService } from '../../../shared/db/prisma.service.js';
 import { HealthService } from '../../../shared/health/health.service.js';
+import type { AuthenticatedUser } from '../../../shared/http/auth/access-token-verifier.js';
 import { decodeCursor } from '../../../shared/http/keyset.js';
+import type { LoggerService } from '../../../shared/logger/logger.service.js';
 import { CUSTOMER_GROUPS_NAME_MAX } from '../dto/customer-groups.dto.js';
 import type {
   CustomerGroupRow,
@@ -28,18 +21,30 @@ import type {
   CustomerGroupsPage,
 } from '../model/customer-groups.model.js';
 import { CustomerGroupsRepository } from '../repository/customer-groups.repository.js';
+import { CustomerGroupsService } from '../service/customer-groups.service.js';
+import { CustomerGroupsTransformer } from '../service/customer-groups.transformer.js';
+import { CustomerGroupsTransport } from '../service/customer-groups.transport.js';
+import { CustomerGroupsValidator } from '../service/customer-groups.validator.js';
+import { PrismaClient } from '../../../shared/db/generated/client.js';
 
 /** Every group this spec creates carries this prefix, so the cleanup deletes exactly its own rows. */
 const MARKER = 'int-spec-customer-groups';
 
-/** A customer id no real customer holds (below INT's maximum): marks the links this spec writes. */
-const MARKER_CUSTOMER = 2_000_000_001;
+/** A customer id for the test links: `tblcustomer_groups` has no foreign key, so no client is needed. */
+const FAKE_CUSTOMER_ID = 2147480001;
 
 const numberSchema = z.union([z.bigint(), z.number()]).transform(Number);
 const lengthSchema = z.tuple([z.object({ len: numberSchema })]);
 
 function request(overrides: Partial<CustomerGroupsListRequest> = {}): CustomerGroupsListRequest {
-  return { search: MARKER, sortField: 'name', order: 'asc', cursor: null, limit: 25, ...overrides };
+  return {
+    search: MARKER,
+    sortField: 'name',
+    order: 'asc',
+    cursor: null,
+    limit: 25,
+    ...overrides,
+  };
 }
 
 const ids = (page: CustomerGroupsPage): number[] => page.items.map((row) => row.id);
@@ -47,26 +52,50 @@ const ids = (page: CustomerGroupsPage): number[] => page.items.map((row) => row.
 describe.skipIf(!process.env.DATABASE_URL)(
   'CustomerGroupsRepository against the local mirror',
   () => {
-    const service = new PrismaService(new AppConfig(), new HealthService());
-    const repository = new CustomerGroupsRepository(service);
-    const client = service.client;
+    const prisma = new PrismaService(new AppConfig(), new HealthService());
+    const repository = new CustomerGroupsRepository(prisma);
+    const client = prisma.client;
+
+    /**
+     * Test fixtures only: a plain, unguarded client that plays Perfex (the real writer of
+     * `tblcustomer_groups`). The module under test never uses it.
+     */
+    const perfex = new PrismaClient({
+      datasourceUrl: process.env.DATABASE_URL ?? '',
+    });
+
+    const logger = { log: () => undefined } as unknown as LoggerService;
+    const transport = { publish: () => Promise.resolve() } as unknown as CustomerGroupsTransport;
+    const service = new CustomerGroupsService(
+      new CustomerGroupsValidator(),
+      repository,
+      new CustomerGroupsTransformer(),
+      transport,
+      logger,
+    );
+
+    const admin = { isAdmin: true } as unknown as AuthenticatedUser;
+
     let a: CustomerGroupRow;
     let b: CustomerGroupRow;
     let c: CustomerGroupRow;
+
     /** The id of a row this spec created and deleted: guaranteed missing (ids are never reused). */
     let missingId = 0;
 
-    /** Links first, then groups: the order the repository's own delete uses. */
+    /** Stands in for Perfex linking a customer to a group. */
+    const link = async (groupId: number): Promise<void> => {
+      await perfex.$executeRaw`INSERT INTO tblcustomer_groups (groupid, customer_id) VALUES (${groupId}, ${FAKE_CUSTOMER_ID})`;
+    };
+
     const cleanup = async (): Promise<void> => {
-      await client.tblcustomer_groups.deleteMany({ where: { customer_id: MARKER_CUSTOMER } });
+      // The test links first (as Perfex), then the node-owned groups (through the guarded client).
+      await perfex.$executeRaw`DELETE tcg FROM tblcustomer_groups tcg JOIN tblcustomers_groups g ON g.id = tcg.groupid WHERE g.name LIKE ${`${MARKER}%`}`;
       await client.tblcustomers_groups.deleteMany({ where: { name: { startsWith: MARKER } } });
     };
 
     const create = (suffix: string): Promise<CustomerGroupRow> =>
       repository.create({ name: `${MARKER}-${suffix}` });
-
-    const linksOf = (groupid: number): Promise<number> =>
-      client.tblcustomer_groups.count({ where: { groupid, customer_id: MARKER_CUSTOMER } });
 
     beforeAll(async () => {
       await cleanup();
@@ -80,7 +109,8 @@ describe.skipIf(!process.env.DATABASE_URL)(
 
     afterAll(async () => {
       await cleanup();
-      await service.client.$disconnect();
+      await perfex.$disconnect();
+      await prisma.client.$disconnect();
     });
 
     it('create answers the database id; findById returns the row as stored', async () => {
@@ -100,20 +130,24 @@ describe.skipIf(!process.env.DATABASE_URL)(
       const first = await repository.list(request({ limit: 1 }));
       expect(ids(first)).toEqual([a.id]);
       expect(first.total).toBe(3);
+
       const second = await repository.list(
         request({ limit: 1, cursor: decodeCursor(first.nextCursor, 'name') }),
       );
       expect(ids(second)).toEqual([b.id]);
+
       const third = await repository.list(
         request({ limit: 1, cursor: decodeCursor(second.nextCursor, 'name') }),
       );
       expect(ids(third)).toEqual([c.id]);
       expect(third.nextCursor).toBeNull();
       expect(third.rangeStart).toBe(3);
+
       const back = await repository.list(
         request({ limit: 1, cursor: decodeCursor(third.prevCursor, 'name') }),
       );
       expect(ids(back)).toEqual([b.id]);
+
       const byId = await repository.list(request({ sortField: 'id', order: 'desc' }));
       expect(ids(byId)).toEqual([b.id, a.id, c.id]);
     });
@@ -136,42 +170,50 @@ describe.skipIf(!process.env.DATABASE_URL)(
         .filter((row) => row.name.startsWith(MARKER))
         .map((row) => row.id);
       expect(own).toEqual([a.id, b.id, c.id]);
+
       const picked = await repository.findByIds([c.id, missingId, a.id]);
       expect(picked.map((row) => row.id).sort((x, y) => x - y)).toEqual(
         [a.id, c.id].sort((x, y) => x - y),
       );
     });
 
-    it("remove deletes the group's customer links with it, and leaves every other group's links alone", async () => {
-      // `a` has two links, `b` has one: deleting `a` must remove exactly the two.
-      await client.tblcustomer_groups.createMany({
-        data: [
-          { groupid: a.id, customer_id: MARKER_CUSTOMER },
-          { groupid: a.id, customer_id: MARKER_CUSTOMER },
-          { groupid: b.id, customer_id: MARKER_CUSTOMER },
-        ],
+    it('countCustomers is 0 for a group no customer is in, and counts its links (read only)', async () => {
+      expect(await repository.countCustomers(a.id)).toBe(0);
+      const linked = await create('count-linked');
+      await link(linked.id);
+      expect(await repository.countCustomers(linked.id)).toBe(1);
+      await link(linked.id);
+      expect(await repository.countCustomers(linked.id)).toBe(2);
+    });
+
+    it('delete is refused with 409 ERP-CUSTOMERGROUPS-0001 while a customer is in the group, and nothing is deleted', async () => {
+      const linked = await create('in-use');
+      await link(linked.id);
+      await expect(service.remove(admin, { id: String(linked.id) })).rejects.toMatchObject({
+        code: 'ERP-CUSTOMERGROUPS-0001',
       });
-      expect(await linksOf(a.id)).toBe(2);
-      expect(await linksOf(b.id)).toBe(1);
+      expect(await repository.findById(linked.id)).not.toBeNull();
+      expect(await repository.countCustomers(linked.id)).toBe(1);
+    });
 
+    it('delete of an empty group succeeds (204) and the group is gone', async () => {
+      const empty = await create('empty');
+      expect(await repository.countCustomers(empty.id)).toBe(0);
+      await expect(service.remove(admin, { id: String(empty.id) })).resolves.toBeUndefined();
+      expect(await repository.findById(empty.id)).toBeNull();
+    });
+
+    it('remove deletes the group only', async () => {
       expect(await repository.remove(a.id)).toBe(true);
-
       expect(await repository.findById(a.id)).toBeNull();
-      expect(await linksOf(a.id)).toBe(0);
-      expect(await linksOf(b.id)).toBe(1);
       expect(await repository.findById(b.id)).not.toBeNull();
     });
 
-    it('remove answers false for a missing id and removes no link', async () => {
-      await client.tblcustomer_groups.create({
-        data: { groupid: b.id, customer_id: MARKER_CUSTOMER },
-      });
-      const before = await linksOf(b.id);
+    it('remove answers false for a missing id', async () => {
       expect(await repository.remove(missingId)).toBe(false);
-      expect(await linksOf(b.id)).toBe(before);
     });
 
-    it('remove answers true, then the row is gone, then false; 0 marker rows remain after the cleanup', async () => {
+    it('remove answers true, then the row is gone, then false; 0 marker rows and 0 test links remain after cleanup', async () => {
       expect(await repository.remove(c.id)).toBe(true);
       expect(await repository.findById(c.id)).toBeNull();
       expect(await repository.remove(c.id)).toBe(false);
@@ -180,7 +222,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
         await client.tblcustomers_groups.count({ where: { name: { startsWith: MARKER } } }),
       ).toBe(0);
       expect(
-        await client.tblcustomer_groups.count({ where: { customer_id: MARKER_CUSTOMER } }),
+        await client.tblcustomer_groups.count({ where: { customer_id: FAKE_CUSTOMER_ID } }),
       ).toBe(0);
     });
   },

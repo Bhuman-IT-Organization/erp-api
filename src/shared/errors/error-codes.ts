@@ -77,6 +77,8 @@ export const ERROR_CODES = {
     status: 409,
     title: 'The currency code cannot change while the currency is in use',
   },
+  // v1/customer-groups: 0001 refuses a delete while any customer is still in the group (read-only count of tblcustomer_groups, which Perfex keeps writing).
+  'ERP-CUSTOMERGROUPS-0001': { status: 409, title: 'The customer group is still in use' },
   // v1/mail (plan 04.3-07). ERP-MAIL-0001 and ERP-MAIL-0003 are web copy keys only, never thrown: an unknown merge field
   // is the `unknown_merge_field` rule inside ERP-VALIDATION-0001 and a stale save is ERP-CORE-0013 (ADR-0040).
   'ERP-MAIL-0002': { status: 409, title: 'Email is not configured' },

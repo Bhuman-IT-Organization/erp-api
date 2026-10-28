@@ -55,9 +55,9 @@ describe('CustomerGroupsValidator.parseUpdateBody', () => {
 });
 
 describe('CustomerGroupsValidator.parseListQuery', () => {
-  it('defaults to the id descending with no search and no cursor', () => {
+  it('defaults to the name descending with no search and no cursor', () => {
     const request = validator.parseListQuery({});
-    expect(request.sortField).toBe('id');
+    expect(request.sortField).toBe('name');
     expect(request.order).toBe('desc');
     expect(request.search).toBeNull();
     expect(request.cursor).toBeNull();

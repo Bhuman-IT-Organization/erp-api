@@ -3,14 +3,13 @@
  *
  * Owner of the two tables it writes (ADR-0029; `ownership.json`):
  *   `tblcustomers_groups`  node: `name` (`VARCHAR(191)`); `id` is assigned by the database.
- *   `tblcustomer_groups`   node: the links `(groupid, customer_id)`; this module only DELETES them,
- *                          when their group is deleted. The quick add on the customer profile stays
- *                          on Perfex.
- * Every read and write goes through the typed delegate, which the ownership guard admits because
- * the register names `node`.
- *
- * `remove` deletes the group's links and the group in ONE transaction, so no customer points at a
- * group that no longer exists (Perfex's `Client_groups_model::delete` does both).
+ * Owner of the table it writes (ADR-0029; `ownership.json`):
+ *   `tblcustomers_groups`  node: `name` (`VARCHAR(191)`); `id` is assigned by the database.
+ *   `tblcustomer_groups`   perfex-core: the links `(groupid, customer_id)`; Perfex keeps writing them
+ *                          from the customer screens. This module only COUNTS them (read only), to
+ *                          refuse a delete while a customer is in the group.
+ * Every write goes through the typed delegate, which the ownership guard admits because the
+ * register names `node` for `tblcustomers_groups`.
  *
  * Every row is re-parsed through its zod schema, never trusted from the generic (BE-11).
  */
@@ -139,7 +138,10 @@ export class CustomerGroupsRepository {
     ]);
     return { items, ...pageMeta(sortField, keys, total, before) };
   }
-
+  /** The list's own match without the cursor: what the export counts before it reads a row. */
+  count(request: CustomerGroupsListRequest): Promise<number> {
+    return this.prisma.client.tblcustomers_groups.count({ where: matchOf(request.search) });
+  }
   /** One row in its stored form, or `null` when the id is missing. */
   async findById(id: number): Promise<CustomerGroupRow | null> {
     const row = await this.prisma.client.tblcustomers_groups.findFirst({
@@ -174,15 +176,20 @@ export class CustomerGroupsRepository {
   }
 
   /**
-   * Deletes the group's rows in `tblcustomer_groups` and then the group, in ONE transaction: both
-   * happen or neither does. `false` when the group was missing (nothing was deleted).
+   * Counts the customers in the group: the rows of `tblcustomer_groups` (Perfex's table, read only)
+   * for `groupid`. The service refuses the delete while this is above 0.
+   */
+  async countCustomers(groupId: number): Promise<number> {
+    return this.prisma.client.tblcustomer_groups.count({ where: { groupid: groupId } });
+  }
+
+  /**
+   * Deletes the group. `false` when the group was missing (nothing was deleted). It never touches
+   * `tblcustomer_groups`: the service has already refused while any customer is in the group.
    */
   async remove(id: number): Promise<boolean> {
-    return this.prisma.client.$transaction(async (tx) => {
-      await tx.tblcustomer_groups.deleteMany({ where: { groupid: id } });
-      const { count } = await tx.tblcustomers_groups.deleteMany({ where: { id } });
-      return count > 0;
-    });
+    const { count } = await this.prisma.client.tblcustomers_groups.deleteMany({ where: { id } });
+    return count > 0;
   }
 
   /**
