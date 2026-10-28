@@ -5345,7 +5345,7 @@
       ]
     },
     "evidence_changed": false,
-    "note": "",
+    "note": "Node writes lead sources through v1/lead-sources. Perfex's delete route is closed at Nginx; quick add remains on Perfex.",
     "owner": "node",
     "owner_confidence": "write-single",
     "table": "tblleads_sources"

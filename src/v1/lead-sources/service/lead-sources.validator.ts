@@ -5,7 +5,7 @@
  *
  * The list is parsed by `shared/http/pagination.ts`'s `parseListQuery` (BE-19: `limit`, `cursor`,
  * `sort`; `page`/`size` refused), then this file adds what a keyset list needs: ONE sort segment
- * from `LEAD_SOURCES_SORT_FIELDS` (default `-id`, Perfex's inline table `[0, 'desc']`), the opaque
+ * from `LEAD_SOURCES_SORT_FIELDS` (default `name`, ascending), the opaque
  * cursor decoded for that sort (`shared/http/keyset.ts`) with the right kind of value, and `?q=`
  * bounded. This list takes no filter: any `filter[...]` is a 400 on `filter`.
  *
@@ -28,14 +28,14 @@ import {
 } from '../dto/lead-sources.dto.js';
 import type { LeadSourcesListRequest, LeadSourcesSortField } from '../model/lead-sources.model.js';
 
-/** The columns `?sort=` accepts. With no `sort`, the list reads `id` descending (Perfex's order). */
+/** The columns `?sort=` accepts. With no `sort`, the list reads `name` ascending (Perfex's order). */
 export const LEAD_SOURCES_SORT_FIELDS = [
   'id',
   'name',
 ] as const satisfies readonly LeadSourcesSortField[];
 
-/** The sort with no `?sort=`: the id descending, Perfex's inline table `[0, 'desc']`. */
-const DEFAULT_SORT = { field: 'id', direction: 'desc' } as const;
+/** The sort with no `?sort=`: Perfex lists lead sources by name ascending. */
+const DEFAULT_SORT = { field: 'name', direction: 'asc' } as const;
 
 /** The kind of value each sort column's cursor must carry: a decoded cursor is checked, not trusted. */
 const SORT_KINDS = { id: 'number', name: 'string' } as const satisfies Record<
@@ -84,7 +84,7 @@ function parseSearch(input: unknown): string | null {
 
 @Injectable()
 export class LeadSourcesValidator {
-  /** `GET` list: BE-19's grammar, one keyset sort (default `-id`), the cursor bound to it, `q`. */
+  /** `GET` list: BE-19's grammar, one keyset sort (default `name`), the cursor bound to it, `q`. */
   parseListQuery(input: unknown): LeadSourcesListRequest {
     const query = parseListQuery(input, LEAD_SOURCES_SORT_FIELDS);
     if (query.filters.length > 0)
@@ -120,7 +120,7 @@ export class LeadSourcesValidator {
     return parse(leadSourcesParamsSchema, input, 'Path parameter is invalid');
   }
 
-  /** `POST`: `{ name }`, strict (any other key is a 400 naming it, D-26); trimmed, 1 to 255 characters. */
+  /** `POST`: `{ name }`, strict (any other key is a 400 naming it, D-26); trimmed, 1 to 150 characters. */
   parseCreateBody(input: unknown): CreateLeadSourcesBody {
     return parse(createLeadSourcesBodySchema, input, 'Request body is invalid');
   }

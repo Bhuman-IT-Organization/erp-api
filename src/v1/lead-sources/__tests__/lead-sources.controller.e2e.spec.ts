@@ -132,7 +132,8 @@ describe('LeadSourcesController (Fastify inject)', () => {
     const body = JSON.parse(response.payload) as {
       data: { id: string; usage: { leads: number } }[];
     };
-    expect(body.data[0]).toEqual({ id: '3', name: 'Website', usage: { leads: 2 } });
+    expect(body.data.map((row) => row.id)).toEqual(['2', '1', '3']);
+    expect(body.data[2]).toEqual({ id: '3', name: 'Website', usage: { leads: 2 } });
   });
 
   it('creates, updates and deletes with events and expected status codes', async () => {

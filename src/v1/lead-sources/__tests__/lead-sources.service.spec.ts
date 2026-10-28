@@ -31,7 +31,7 @@ const ADMIN: AuthenticatedUser = {
 };
 const MEMBER: AuthenticatedUser = { ...ADMIN, staffId: 2, isAdmin: false };
 
-function build() {
+function build(defaultSource: string | null = null) {
   const repo = seededStore();
   const events = new RecordingDomainEventPublisher();
   const logger = new RecordingLogger();
@@ -39,7 +39,7 @@ function build() {
     new LeadSourcesValidator(),
     asRepository(repo),
     new LeadSourcesTransformer(),
-    new LeadSourcesTransport(events),
+    new LeadSourcesTransport(events, { getOption: () => Promise.resolve(defaultSource) }),
     logger,
   );
   service.now = () => TEST_NOW;
@@ -95,14 +95,14 @@ describe('LeadSourcesService: administrator access', () => {
 });
 
 describe('LeadSourcesService: reads', () => {
-  it('lists in id-descending order with usage for each row', async () => {
+  it('lists in name-ascending order with usage for each row', async () => {
     const { service, repo } = build();
     repo.usage.set(1, { leads: 2 });
     const response = await service.list(ADMIN, {});
     expect(response.data.map((row) => [row.id, row.usage.leads])).toEqual([
-      ['3', 0],
       ['2', 0],
       ['1', 2],
+      ['3', 0],
     ]);
     expect(response.meta.total).toBe(3);
   });
@@ -164,6 +164,31 @@ describe('LeadSourcesService: writes', () => {
     expect(events.count).toBe(0);
     expect(logger.lines).toEqual([]);
     expect(await repo.findById(1)).not.toBeNull();
+  });
+
+  it('refuses deletion of the configured default source', async () => {
+    const { service, repo, events } = build('1');
+    const usage = vi.spyOn(repo, 'usageByLeadSource');
+    const error = await refusal(service.remove(ADMIN, { id: '1' }));
+    expect(error.code).toBe('ERP-LEADSOURCES-0002');
+    expect(error.status).toBe(409);
+    expect(usage).not.toHaveBeenCalled();
+    expect(events.count).toBe(0);
+    expect(await repo.findById(1)).not.toBeNull();
+  });
+
+  it('returns a 409 and logs when deletion usage cannot be counted', async () => {
+    const { service, repo, logger } = build();
+    const logError = vi.spyOn(logger, 'error');
+    vi.spyOn(repo, 'usageByLeadSource').mockRejectedValue(new Error('database unavailable'));
+    const error = await refusal(service.remove(ADMIN, { id: '1' }));
+    expect(error.code).toBe('ERP-LEADSOURCES-0001');
+    expect(error.status).toBe(409);
+    expect(error.message).toBe('its use could not be counted');
+    expect(logError).toHaveBeenCalledWith(
+      'lead source usage could not be counted',
+      expect.objectContaining({ id: 1 }),
+    );
   });
 
   it('deletes an unused record and publishes one deletion event', async () => {

@@ -1,7 +1,7 @@
 /**
  * Repository: the module's data seam (BE-08) and the only file here that touches Prisma (DB-04).
  *
- * Owner of the table it writes: `tblleads_sources` (node: `name` VARCHAR(255); `id` assigned by DB).
+ * Owner of the table it writes: `tblleads_sources` (node: `name` VARCHAR(150); `id` assigned by DB).
  */
 import { Injectable } from '@nestjs/common';
 import { z } from 'zod';
@@ -71,6 +71,22 @@ export const LEAD_SOURCE_REFERENCES: readonly LeadSourceReference[] = Object.fre
     match: 'id',
     count: (client, ids) =>
       client.$queryRaw`SELECT r.source AS id, COUNT(*) AS n FROM tblleads r WHERE r.source IN (${ids}) GROUP BY r.source`,
+  },
+  {
+    group: 'leads',
+    table: 'tblleads_email_integration',
+    column: 'lead_source',
+    match: 'id',
+    count: (client, ids) =>
+      client.$queryRaw`SELECT r.lead_source AS id, COUNT(*) AS n FROM tblleads_email_integration r WHERE r.lead_source IN (${ids}) GROUP BY r.lead_source`,
+  },
+  {
+    group: 'leads',
+    table: 'tblweb_to_lead',
+    column: 'lead_source',
+    match: 'id',
+    count: (client, ids) =>
+      client.$queryRaw`SELECT r.lead_source AS id, COUNT(*) AS n FROM tblweb_to_lead r WHERE r.lead_source IN (${ids}) GROUP BY r.lead_source`,
   },
 ]);
 

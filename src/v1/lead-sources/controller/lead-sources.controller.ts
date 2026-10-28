@@ -164,6 +164,7 @@ export class LeadSourcesController {
       'ERP-AUTH-0005',
       'ERP-CORE-0004',
       'ERP-LEADSOURCES-0001',
+      'ERP-LEADSOURCES-0002',
     ],
   })
   remove(@CurrentUser() user: AuthenticatedUser, @Param() params: unknown): Promise<void> {

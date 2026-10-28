@@ -26,6 +26,7 @@ const D22_NAMES = [
 
 /** D-37 (04.1): the credit-expense mode the client's expense code reads (payment modes, plan 04.1-23). */
 const D37_NAMES = ['expense_credit_payment_mode'];
+const LEAD_SOURCES_NAMES = ['leads_default_source'];
 
 function serviceWith(rows: SettingRow[] = []) {
   const repository = new InMemorySettingsRepository(rows);
@@ -41,10 +42,10 @@ async function refusal(promise: Promise<unknown>): Promise<AppError> {
   return error;
 }
 
-describe('SETTINGS_ALLOW_LIST (D-22, D-37)', () => {
-  it('holds exactly the 11 names of D-22 and D-37, each once, frozen', () => {
-    const expected = [...D22_NAMES, ...D37_NAMES];
-    expect(expected).toHaveLength(11);
+describe('SETTINGS_ALLOW_LIST (D-22, D-37, lead sources)', () => {
+  it('holds the names of D-22, D-37 and lead sources, each once, frozen', () => {
+    const expected = [...D22_NAMES, ...D37_NAMES, ...LEAD_SOURCES_NAMES];
+    expect(expected).toHaveLength(12);
     expect(SETTINGS_ALLOW_LIST).toHaveLength(expected.length);
     expect(new Set(SETTINGS_ALLOW_LIST).size).toBe(SETTINGS_ALLOW_LIST.length);
     expect([...SETTINGS_ALLOW_LIST].sort()).toEqual(expected.sort());
@@ -67,6 +68,11 @@ describe('SettingsService', () => {
   it("getOption('expense_credit_payment_mode') answers its row's value (D-37)", async () => {
     const { service } = serviceWith([{ name: 'expense_credit_payment_mode', value: '7' }]);
     await expect(service.getOption('expense_credit_payment_mode')).resolves.toBe('7');
+  });
+
+  it("getOption('leads_default_source') answers its row's value", async () => {
+    const { service } = serviceWith([{ name: 'leads_default_source', value: '7' }]);
+    await expect(service.getOption('leads_default_source')).resolves.toBe('7');
   });
 
   it('an allowed name with no row answers null', async () => {

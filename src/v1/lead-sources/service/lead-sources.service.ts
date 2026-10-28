@@ -91,7 +91,7 @@ export class LeadSourcesService {
   }
 
   /**
-   * `GET /api/v1/lead-sources?limit&cursor&q&sort`: one keyset page (the id descending by default),
+   * `GET /api/v1/lead-sources?limit&cursor&q&sort`: one keyset page (the name ascending by default),
    * the page's usage read once.
    */
   async list(actor: AuthenticatedUser, input: unknown): Promise<LeadSourcesListResponseDto> {
@@ -147,14 +147,23 @@ export class LeadSourcesService {
   }
 
   /**
-   * `DELETE /api/v1/lead-sources/:id`: a missing id is `ERP-CORE-0004`; a lead source anything still
-   * holds is `ERP-LEADSOURCES-0001`. One `LeadSourcesDeletedV1` after the delete, then the log line.
+   * `DELETE /api/v1/lead-sources/:id`: a missing id is `ERP-CORE-0004`; the default source and any
+   * source still in use are refused with 409s. One `LeadSourcesDeletedV1` after the delete, then the log line.
    */
   async remove(actor: AuthenticatedUser, params: unknown): Promise<void> {
     this.assertAdministrator(actor, ADMIN_ONLY);
     const { id } = this.validator.parseParams(params);
     if ((await this.repository.findById(id)) === null) throw notFound();
-    const usage = await this.repository.usageByLeadSource([id]);
+    if (await this.transport.isDefaultSource(id)) {
+      throw new AppError('ERP-LEADSOURCES-0002', 'it is the default lead source');
+    }
+    let usage: ReadonlyMap<number, LeadSourceUsage>;
+    try {
+      usage = await this.repository.usageByLeadSource([id]);
+    } catch (error) {
+      this.logger.error('lead source usage could not be counted', { id, error });
+      throw new AppError('ERP-LEADSOURCES-0001', NOT_COUNTED);
+    }
     const refusal = inUse(usage.get(id));
     if (refusal !== null) throw refusal;
     const at = this.now().toISOString();

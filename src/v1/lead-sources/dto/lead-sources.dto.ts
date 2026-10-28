@@ -12,7 +12,7 @@
  * applies; the transformer writes `String(row.id)`.
  *
  * Node keeps Perfex's business outcomes (D-29): the name is required (Perfex's form requires it),
- * trimmed, 1 to `LEAD_SOURCES_NAME_MAX` characters (the `VARCHAR(255)` column), every character
+ * trimmed, 1 to `LEAD_SOURCES_NAME_MAX` characters (the `VARCHAR(150)` column), every character
  * accepted and stored as text (`<` and `>` included), and a name another lead source holds is
  * accepted (Perfex has no uniqueness check). The body is strict: Perfex saved every posted field,
  * Node saves only the name (D-26), so any other key is a 400.
@@ -33,8 +33,8 @@ import {
 import { listPageMetaSchema } from '../../../shared/http/keyset.js';
 import { LIST_QUERY_LIMITS } from '../../../shared/http/pagination.js';
 
-/** The longest name a body may carry: Perfex's `VARCHAR(255)` column (the int spec reads it). */
-export const LEAD_SOURCES_NAME_MAX = 255;
+/** The longest name a body may carry: `tblleads_sources.name` is `VARCHAR(150)`. */
+export const LEAD_SOURCES_NAME_MAX = 150;
 /** The longest `?q=`; a longer one is a 400 on `q`. */
 export const LEAD_SOURCES_SEARCH_MAX = 100;
 
@@ -51,7 +51,7 @@ export const listLeadSourcesQuerySchema = z.object({
    * fits the unsigned id column, also the id equal to it.
    */
   q: z.string().max(LEAD_SOURCES_SEARCH_MAX).optional(),
-  /** `-id` (default, Perfex's order), `id`, `name` or `-name`; a leading `-` is descending. */
+  /** `name` (default, Perfex's order), `-name`, `id` or `-id`; a leading `-` is descending. */
   sort: z.string().optional(),
 });
 

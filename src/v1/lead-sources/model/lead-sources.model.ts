@@ -1,6 +1,6 @@
 /**
  * Domain entity types of the module; nothing here is a DTO. The entity is one `tblleads_sources` row
- * in its STORED form: `id` (`INT UNSIGNED`, assigned by the database) and `name` (`VARCHAR(255)`).
+ * in its STORED form: `id` (`INT UNSIGNED`, assigned by the database) and `name` (`VARCHAR(150)`).
  */
 import type { DecodedCursor, ListPageMeta } from '../../../shared/http/keyset.js';
 

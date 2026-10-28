@@ -54,7 +54,11 @@ function stub(options: StubOptions = {}) {
       const sql = strings.join('?');
       rawCalls.push({ sql, values });
       if (sql.includes('information_schema.COLUMNS')) {
-        const columns = options.columns ?? [{ t: 'tblleads', c: 'source' }];
+        const columns = options.columns ?? [
+          { t: 'tblleads', c: 'source' },
+          { t: 'tblleads_email_integration', c: 'lead_source' },
+          { t: 'tblweb_to_lead', c: 'lead_source' },
+        ];
         return columns instanceof Error ? Promise.reject(columns) : Promise.resolve(columns);
       }
       return options.raw instanceof Error
@@ -129,16 +133,20 @@ describe('LeadSourcesRepository', () => {
     await expect(missing.repository.update(404, { name: 'No row' })).resolves.toBeNull();
   });
 
-  it('discovers the lead reference and counts usage with ids bound as parameters', async () => {
+  it('counts references from all three tables and keeps ids bound as parameters', async () => {
     const { repository, rawCalls } = stub({ raw: [{ id: 7, n: 2n }] });
     const usage = await repository.usageByLeadSource([7, 9]);
-    expect(usage.get(7)).toEqual({ leads: 2 });
+    expect(usage.get(7)).toEqual({ leads: 6 });
     expect(usage.get(9)).toEqual(NO_LEAD_SOURCE_USAGE);
-    expect(rawCalls).toHaveLength(2);
+    expect(rawCalls).toHaveLength(4);
     expect(rawCalls[0]?.sql).toContain('information_schema.COLUMNS');
     expect(rawCalls[1]?.sql).toContain('FROM tblleads r');
     expect(rawCalls[1]?.sql).toContain('r.source IN (?)');
     expect(rawCalls[1]?.values).toHaveLength(1);
+    expect(rawCalls[2]?.sql).toContain('FROM tblleads_email_integration r');
+    expect(rawCalls[2]?.sql).toContain('r.lead_source IN (?)');
+    expect(rawCalls[3]?.sql).toContain('FROM tblweb_to_lead r');
+    expect(rawCalls[3]?.sql).toContain('r.lead_source IN (?)');
   });
 
   it('returns an empty usage map without querying for no ids', async () => {

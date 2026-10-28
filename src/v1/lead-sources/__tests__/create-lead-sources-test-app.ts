@@ -17,6 +17,8 @@ import {
 import { registerRequestId } from '../../../shared/http/request-id.js';
 import { LoggerModule } from '../../../shared/logger/logger.module.js';
 import { LoggerService, type LogMeta } from '../../../shared/logger/logger.service.js';
+import { SettingsModule } from '../../settings/settings.module.js';
+import { FakeSettingsFacade, stubSettingsModule } from '../../settings/__tests__/fakes.js';
 import { LeadSourcesModule } from '../lead-sources.module.js';
 import { LeadSourcesRepository } from '../repository/lead-sources.repository.js';
 import { LeadSourcesService } from '../service/lead-sources.service.js';
@@ -103,11 +105,14 @@ export async function createLeadSourcesTestApp(): Promise<LeadSourcesTestApp> {
   const repo = seededStore();
   const events = new RecordingDomainEventPublisher();
   const logger = new RecordingLogger();
+  const settings = new FakeSettingsFacade();
   const moduleRef = await Test.createTestingModule({
     imports: [LoggerModule, EventsModule, StubVerifierModule, LeadSourcesModule],
   })
     .overrideProvider(LeadSourcesRepository)
     .useValue(asRepository(repo))
+    .overrideModule(SettingsModule)
+    .useModule(stubSettingsModule(settings))
     .overrideProvider(DOMAIN_EVENT_PUBLISHER)
     .useValue(events)
     .overrideProvider(LoggerService)

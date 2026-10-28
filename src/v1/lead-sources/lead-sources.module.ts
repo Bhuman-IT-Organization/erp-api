@@ -7,6 +7,7 @@
  * `DbModule`.
  */
 import { Module } from '@nestjs/common';
+import { SettingsModule } from '../settings/settings.module.js';
 import { LeadSourcesController } from './controller/lead-sources.controller.js';
 import { LeadSourcesFacade } from './facade/lead-sources.facade.js';
 import { LeadSourcesRepository } from './repository/lead-sources.repository.js';
@@ -16,7 +17,7 @@ import { LeadSourcesTransport } from './service/lead-sources.transport.js';
 import { LeadSourcesValidator } from './service/lead-sources.validator.js';
 
 @Module({
-  imports: [],
+  imports: [SettingsModule],
   controllers: [LeadSourcesController],
   providers: [
     LeadSourcesService,

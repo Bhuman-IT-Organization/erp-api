@@ -32,12 +32,12 @@ const refusedOn = (fn: () => unknown): unknown => firstIssue(fn)?.path;
 describe('LeadSourcesValidator: list queries', () => {
   const validator = new LeadSourcesValidator();
 
-  it('defaults to id descending with the default limit, no cursor, and no search', () => {
+  it('defaults to name ascending with the default limit, no cursor, and no search', () => {
     expect(LEAD_SOURCES_SORT_FIELDS).toEqual(['id', 'name']);
     expect(validator.parseListQuery({})).toEqual({
       search: null,
-      sortField: 'id',
-      order: 'desc',
+      sortField: 'name',
+      order: 'asc',
       cursor: null,
       limit: LIST_QUERY_LIMITS.default,
     });
@@ -107,7 +107,7 @@ describe('LeadSourcesValidator: ids and bodies', () => {
     }
   });
 
-  it('trims valid names and accepts the 255-character maximum', () => {
+  it('trims valid names and accepts the 150-character maximum', () => {
     expect(validator.parseCreateBody({ name: '  Web site  ' })).toEqual({ name: 'Web site' });
     const longest = 'n'.repeat(LEAD_SOURCES_NAME_MAX);
     expect(validator.parseCreateBody({ name: longest })).toEqual({ name: longest });

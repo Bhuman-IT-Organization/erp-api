@@ -18,6 +18,7 @@ export const SETTINGS_ALLOW_LIST = Object.freeze([
   'decimal_separator',
   'remove_decimals_on_zero',
   'default_timezone',
+  'leads_default_source',
   // payment modes (04.1 D-37): the credit-expense mode the client's expense code reads
   'expense_credit_payment_mode',
 ] as const);

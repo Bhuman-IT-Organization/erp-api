@@ -49,8 +49,9 @@ export const ERROR_CODES = {
   // v1/expense-categories (plan 04.1-03): 0001 refuses a delete while anything still uses the category.
   'ERP-EXPENSECATEGORIES-0001': { status: 409, title: 'The expense category is still in use' },
 
-  // v1/lead-sources (plan 04.1-04): 0001 refuses a delete while any lead still points at the source.
+  // v1/lead-sources: 0001 refuses a delete while references remain; 0002 protects the default source.
   'ERP-LEADSOURCES-0001': { status: 409, title: 'Lead source is still in use' },
+  'ERP-LEADSOURCES-0002': { status: 409, title: 'The lead source is the default source' },
 
   // v1/taxes (plan 04.1-11): in use (0001), Perfex's locked edit (0002), a duplicate name (0003), a default tax in Settings (0004, D-21).
   'ERP-TAXES-0001': { status: 409, title: 'The tax is still in use' },
