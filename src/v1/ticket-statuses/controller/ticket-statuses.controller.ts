@@ -132,6 +132,7 @@ export class TicketStatusesController {
       'ERP-CORE-0004',
       'ERP-TICKETSTATUSES-0001',
       'ERP-TICKETSTATUSES-0002',
+      'ERP-TICKETSTATUSES-0003',
     ],
   })
   remove(@CurrentUser() user: AuthenticatedUser, @Param() params: unknown): Promise<void> {

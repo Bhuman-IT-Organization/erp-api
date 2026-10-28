@@ -11,7 +11,11 @@ import type {
   TicketStatusResponseDto,
   TicketStatusesListResponseDto,
 } from '../dto/ticket-statuses.dto.js';
-import type { TicketStatus, TicketStatusPatch } from '../model/ticket-statuses.model.js';
+import type {
+  TicketStatus,
+  TicketStatusPatch,
+  TicketStatusesPage,
+} from '../model/ticket-statuses.model.js';
 import { TicketStatusesRepository } from '../repository/ticket-statuses.repository.js';
 import {
   TicketStatusCreatedV1,
@@ -35,8 +39,22 @@ function referenced(): AppError {
   return new AppError('ERP-TICKETSTATUSES-0001', 'is_referenced');
 }
 
+function notCounted(): AppError {
+  return new AppError('ERP-TICKETSTATUSES-0001', 'its use could not be counted');
+}
+
 function builtIn(): AppError {
   return new AppError('ERP-TICKETSTATUSES-0002', 'default ticket statuses cannot be deleted');
+}
+
+function defaultReplyStatus(): AppError {
+  return new AppError('ERP-TICKETSTATUSES-0003', 'default ticket reply status cannot be deleted');
+}
+
+export function parseDefaultTicketReplyStatus(raw: string | null | undefined): number | null {
+  if (raw === null || raw === undefined) return null;
+  const value = Number.parseInt(raw, 10);
+  return Number.isSafeInteger(value) ? value : null;
 }
 
 @Injectable()
@@ -51,49 +69,50 @@ export class TicketStatusesService {
     private readonly logger: LoggerService,
   ) {}
 
+  private normalizePage(data: TicketStatusesPage | null | undefined): TicketStatusesPage {
+    if (data === null || data === undefined) {
+      return { items: [], nextCursor: null, prevCursor: null, total: 0, rangeStart: 0 };
+    }
+
+    return data;
+  }
+
   async list(actor: AuthenticatedUser, query: unknown): Promise<TicketStatusesListResponseDto> {
     this.assertAdministrator(actor);
-    this.validator.parseListQuery(query);
-    return this.transformer.toListResponse(await this.repository.list());
+    const request = this.validator.parseListQuery(query);
+    const page = this.normalizePage(await this.repository.list(request));
+    return this.transformer.toListResponse(page);
   }
 
   async exportCsv(actor: AuthenticatedUser, input: unknown): Promise<ExportFile> {
     this.assertAdministrator(actor);
-    const query = this.validator.parseExportQuery(input);
+
     const options = parseExportOptions(input, {
       columns: TICKET_STATUSES_EXPORT_COLUMNS,
       keys: 'refuse',
     });
-    const search = query.q?.toLocaleLowerCase();
-    let statuses = (await this.repository.list()).filter(
-      (status) =>
-        search === undefined ||
-        String(status.ticketstatusid).toLocaleLowerCase().includes(search) ||
-        status.name.toLocaleLowerCase().includes(search),
-    );
-    if (query.sort !== undefined) {
-      const descending = query.sort.startsWith('-');
-      const field = descending ? query.sort.slice(1) : query.sort;
-      statuses = [...statuses].sort((left, right) => {
-        const order =
-          field === 'id'
-            ? left.ticketstatusid - right.ticketstatusid
-            : left.name.localeCompare(right.name, undefined, {
-                numeric: true,
-                sensitivity: 'base',
-              });
-        return descending ? -order : order;
-      });
-    }
-    const rows = statuses.map((status) => this.transformer.toExportRow(status));
-    const request = { sortField: 'id' as const, cursor: null };
+
+    const request = this.validator.parseExportList(input);
+
     return runExport({
       stem: TICKET_STATUSES_EXPORT_FILE_STEM,
       cells: TICKET_STATUSES_EXPORT_CELLS,
       options,
       request,
-      count: () => Promise.resolve(rows.length),
-      page: () => Promise.resolve({ items: rows, nextCursor: null }),
+      count: async (list) => {
+        if (typeof this.repository.count === 'function') {
+          return this.repository.count(list);
+        }
+        const page = this.normalizePage(await this.repository.list(list));
+        return page.total;
+      },
+      page: async (list) => {
+        const page = this.normalizePage(await this.repository.list(list));
+        return {
+          items: page.items.map((row) => this.transformer.toExportRow(row)),
+          nextCursor: page.nextCursor,
+        };
+      },
       now: this.now(),
     });
   }
@@ -147,25 +166,51 @@ export class TicketStatusesService {
     const row = await this.repository.findById(id);
     if (row === null) throw notFound();
     if (row.isdefault === 1) throw builtIn();
-    if (await this.repository.hasTicketReferences(id)) throw referenced();
+
+    let hasReferences: boolean;
+    try {
+      hasReferences = await this.repository.hasTicketReferences(id);
+    } catch {
+      throw notCounted();
+    }
+    if (hasReferences) throw referenced();
+
     const defaultStatus = await this.transport.defaultTicketReplyStatus();
-    if (defaultStatus === String(id)) throw referenced();
+    const parsedDefaultStatus = parseDefaultTicketReplyStatus(defaultStatus);
+    if (parsedDefaultStatus !== null && parsedDefaultStatus > 0 && parsedDefaultStatus === id) {
+      throw defaultReplyStatus();
+    }
+
     const at = this.now().toISOString();
     if (!(await this.repository.remove(id))) throw notFound();
     await this.transport.publish(new TicketStatusDeletedV1({ id, at }));
     this.logger.log('ticket status deleted', { id });
   }
 
-  /** Module-to-module reads have no actor and return stored fields, not HTTP DTOs. */
+  /** Module-to-module read; no actor is available. */
   findById(id: number): Promise<TicketStatus | null> {
     return this.repository.findById(id);
   }
 
-  listAll(): Promise<readonly TicketStatus[]> {
-    return this.repository.list();
+  /** Full list for internal consumers that require every status. */
+  async listAll(): Promise<readonly TicketStatus[]> {
+    if (typeof this.repository.listAll === 'function') {
+      return this.repository.listAll();
+    }
+
+    const fallback = await this.repository.list({
+      search: null,
+      sortField: 'id',
+      order: 'desc',
+      cursor: null,
+      limit: Number.MAX_SAFE_INTEGER,
+    });
+    return this.normalizePage(fallback).items;
   }
 
   private assertAdministrator(actor: AuthenticatedUser): void {
-    if (!actor.isAdmin) throw new AppError('ERP-AUTH-0005', ADMIN_ONLY);
+    if (!actor.isAdmin) {
+      throw new AppError('ERP-AUTH-0005', ADMIN_ONLY);
+    }
   }
 }

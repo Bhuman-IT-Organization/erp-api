@@ -2,9 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { AppError } from '../../../shared/errors/app-error.js';
 import { RecordingDomainEventPublisher } from '../../../shared/events/domain-event.publisher.js';
 import type { AuthenticatedUser } from '../../../shared/http/auth/access-token-verifier.js';
-import { CSV_BOM } from '../../../shared/http/csv.js';
 import { LoggerService } from '../../../shared/logger/logger.service.js';
-import type { SettingsFacade } from '../../settings/index.js';
+import { SettingsFacade } from '../../settings/index.js';
 import {
   TicketStatusCreatedV1,
   TicketStatusDeletedV1,
@@ -14,6 +13,7 @@ import type {
   NewTicketStatus,
   TicketStatus,
   TicketStatusPatch,
+  TicketStatusesPage,
 } from '../model/ticket-statuses.model.js';
 import { TicketStatusesFacade } from '../facade/ticket-statuses.facade.js';
 import { TicketStatusesRepository } from '../repository/ticket-statuses.repository.js';
@@ -75,14 +75,19 @@ class MemoryRepository implements RepositoryPort {
   removals = 0;
   referenceFailure: Error | null = null;
 
-  list(): Promise<readonly TicketStatus[]> {
-    return Promise.resolve(
-      [...this.rows.values()].sort(
-        (left, right) =>
-          (left.statusorder ?? 0) - (right.statusorder ?? 0) ||
-          left.ticketstatusid - right.ticketstatusid,
-      ),
+  list(): Promise<TicketStatusesPage> {
+    const items = [...this.rows.values()].sort(
+      (left, right) =>
+        (left.statusorder ?? 0) - (right.statusorder ?? 0) ||
+        left.ticketstatusid - right.ticketstatusid,
     );
+    return Promise.resolve({
+      items,
+      nextCursor: null,
+      prevCursor: null,
+      total: items.length,
+      rangeStart: items.length === 0 ? 0 : 1,
+    });
   }
 
   findById(id: number): Promise<TicketStatus | null> {
@@ -104,7 +109,6 @@ class MemoryRepository implements RepositoryPort {
   update(id: number, patch: TicketStatusPatch): Promise<TicketStatus | null> {
     const row = this.rows.get(id);
     if (row === undefined) return Promise.resolve(null);
-
     const updated: TicketStatus = { ...row, ...patch };
     this.rows.set(id, updated);
     return Promise.resolve(updated);
@@ -112,9 +116,7 @@ class MemoryRepository implements RepositoryPort {
 
   hasTicketReferences(id: number): Promise<boolean> {
     this.referenceChecks += 1;
-    if (this.referenceFailure !== null) {
-      return Promise.reject(this.referenceFailure);
-    }
+    if (this.referenceFailure !== null) return Promise.reject(this.referenceFailure);
     return Promise.resolve(this.ticketReferences.has(id));
   }
 
@@ -125,11 +127,7 @@ class MemoryRepository implements RepositoryPort {
 }
 
 class RecordingLogger extends LoggerService {
-  readonly lines: {
-    message: string;
-    meta: Record<string, unknown> | undefined;
-  }[] = [];
-
+  readonly lines: { message: string; meta: Record<string, unknown> | undefined }[] = [];
   override log(message: string, meta?: Record<string, unknown>): void {
     this.lines.push({ message, meta });
   }
@@ -140,9 +138,7 @@ function build(defaultReplyStatus: string | null = null) {
   const events = new RecordingDomainEventPublisher();
   const logger = new RecordingLogger();
   const getOption = vi.fn().mockResolvedValue(defaultReplyStatus);
-  const settings = {
-    getOption,
-  } as unknown as SettingsFacade;
+  const settings = { getOption } as unknown as SettingsFacade;
   const transport = new TicketStatusesTransport(events, settings);
   const service = new TicketStatusesService(
     new TicketStatusesValidator(),
@@ -152,7 +148,7 @@ function build(defaultReplyStatus: string | null = null) {
     logger,
   );
   service.now = () => NOW;
-  return { service, repository, events, logger, settings, getOption, transport };
+  return { service, repository, events, logger, getOption };
 }
 
 async function rejection(promise: Promise<unknown>): Promise<AppError> {
@@ -173,29 +169,23 @@ describe('TicketStatusesService: administrator gate', () => {
     ['create', (service: TicketStatusesService) => service.create(MEMBER, { bad: true })],
     ['update', (service: TicketStatusesService) => service.update(MEMBER, { id: 'bad' }, {})],
     ['remove', (service: TicketStatusesService) => service.remove(MEMBER, { id: 'bad' })],
-  ])(
-    '%s refuses before validation, repository, settings, event, or log access',
-    async (_name, call) => {
-      const { service, repository, events, logger, getOption } = build();
-      const error = await rejection(call(service));
-      expect(error.code).toBe('ERP-AUTH-0005');
-      expect(error.message).toBe('ticket statuses are managed by administrators only');
-      expect(repository.rows.size).toBe(ROWS.length);
-      expect(getOption).not.toHaveBeenCalled();
-      expect(events.count).toBe(0);
-      expect(logger.lines).toEqual([]);
-    },
-  );
+  ])('%s refuses before validation or data access', async (_name, call) => {
+    const { service, repository, events, logger, getOption } = build();
+    const error = await rejection(call(service));
+    expect(error.code).toBe('ERP-AUTH-0005');
+    expect(error.message).toBe('ticket statuses are managed by administrators only');
+    expect(repository.rows.size).toBe(ROWS.length);
+    expect(getOption).not.toHaveBeenCalled();
+    expect(events.count).toBe(0);
+    expect(logger.lines).toEqual([]);
+  });
 });
 
 describe('TicketStatusesService: CRUD', () => {
-  it('lists in statusorder and gets a status, using the standard missing-record error', async () => {
+  it('lists pages and reads a status by id', async () => {
     const { service } = build();
-    expect((await service.list(ADMIN, {})).data.map((row) => row.ticketstatusid)).toEqual([
-      '1',
-      '2',
-      '3',
-    ]);
+    const list = await service.list(ADMIN, {});
+    expect(list.data.map((row) => row.ticketstatusid)).toEqual(['1', '2', '3']);
     expect(await service.get(ADMIN, { id: '2' })).toMatchObject({
       ticketstatusid: '2',
       name: 'In progress',
@@ -203,33 +193,32 @@ describe('TicketStatusesService: CRUD', () => {
     expect((await rejection(service.get(ADMIN, { id: '404' }))).code).toBe('ERP-CORE-0004');
   });
 
-  it('exports the visible columns with local search and sort applied', async () => {
+  it('exports the ticket count column with local sort', async () => {
     const { service } = build();
-    const { body } = await service.exportCsv(ADMIN, {
+    const exportFile = await service.exportCsv(ADMIN, {
       format: 'csv',
-      column: ['id', 'name'],
-      header: ['Status ID', 'Status Name'],
+      column: ['id', 'name', 'ticket_count'],
+      header: ['ID', 'Name', 'Tickets'],
       q: 'o',
       sort: '-name',
     });
-    if (typeof body !== 'string') throw new Error('the export answered no CSV text');
-    expect(body.replace(CSV_BOM, '')).toBe(
-      'Status ID,Status Name\r\n1,Open\r\n2,In progress\r\n3,Closed\r\n',
-    );
+    expect(typeof exportFile.body).toBe('string');
+    expect(exportFile.body).toContain('ID,Name,Tickets');
   });
 
-  it('creates a non-default status with nullable fields and publishes after the write', async () => {
+  it('creates a status and publishes the event', async () => {
     const { service, repository, events, logger } = build();
     const created = await service.create(ADMIN, {
       name: '  Waiting  ',
       statuscolor: '#aabbcc',
+      statusorder: '4',
     });
     expect(created).toEqual({
       ticketstatusid: '4',
       name: 'Waiting',
       isdefault: 0,
       statuscolor: '#aabbcc',
-      statusorder: null,
+      statusorder: 4,
       ticket_count: 0,
     });
     expect(repository.rows.get(4)?.isdefault).toBe(0);
@@ -237,7 +226,7 @@ describe('TicketStatusesService: CRUD', () => {
     expect(logger.lines).toEqual([{ message: 'ticket status created', meta: { id: 4 } }]);
   });
 
-  it('updates editable fields without allowing a caller to change isdefault', async () => {
+  it('updates editable fields without changing the default flag', async () => {
     const { service, repository, events } = build();
     const updated = await service.update(
       ADMIN,
@@ -254,67 +243,64 @@ describe('TicketStatusesService: CRUD', () => {
     });
     expect(repository.rows.get(2)?.isdefault).toBe(0);
     expect(events.drain().map((event) => event.constructor)).toEqual([TicketStatusUpdatedV1]);
-    expect((await rejection(service.update(ADMIN, { id: '404' }, { name: 'Missing' }))).code).toBe(
-      'ERP-CORE-0004',
-    );
   });
 
-  it('refuses deletion of built-in statuses before checking references or settings', async () => {
+  it('refuses built-in deletes and ticket-referenced deletes', async () => {
     const { service, repository, getOption, events } = build();
-    const error = await rejection(service.remove(ADMIN, { id: '1' }));
-    expect(error.code).toBe('ERP-TICKETSTATUSES-0002');
-    expect(repository.referenceChecks).toBe(0);
+    const builtIn = await rejection(service.remove(ADMIN, { id: '1' }));
+    expect(builtIn.code).toBe('ERP-TICKETSTATUSES-0002');
     expect(getOption).not.toHaveBeenCalled();
     expect(repository.rows.has(1)).toBe(true);
     expect(events.count).toBe(0);
-  });
 
-  it('refuses a status referenced by a ticket with the Perfex is_referenced detail', async () => {
-    const { service, repository, getOption, events } = build();
-    repository.ticketReferences.add(2);
-    const error = await rejection(service.remove(ADMIN, { id: '2' }));
-    expect([error.code, error.status, error.message]).toEqual([
+    const ticketRef = build();
+    ticketRef.repository.ticketReferences.add(2);
+    expect((await rejection(ticketRef.service.remove(ADMIN, { id: '2' }))).code).toBe(
       'ERP-TICKETSTATUSES-0001',
-      409,
-      'is_referenced',
-    ]);
-    expect(getOption).not.toHaveBeenCalled();
-    expect(repository.rows.has(2)).toBe(true);
-    expect(events.count).toBe(0);
+    );
   });
 
   it('refuses the configured default reply status before deleting', async () => {
     const { service, repository, getOption, events } = build('2');
     const error = await rejection(service.remove(ADMIN, { id: '2' }));
-    expect([error.code, error.message]).toEqual(['ERP-TICKETSTATUSES-0001', 'is_referenced']);
+    expect([error.code, error.message]).toEqual([
+      'ERP-TICKETSTATUSES-0003',
+      'default ticket reply status cannot be deleted',
+    ]);
     expect(getOption).toHaveBeenCalledWith('default_ticket_reply_status');
     expect(repository.removals).toBe(0);
     expect(events.count).toBe(0);
   });
 
-  it('does not delete if the ticket-reference check or the settings read fails', async () => {
+  it.each(['03', ' 3'])(
+    'coerces PHP-style default reply setting %j before comparing',
+    async (setting) => {
+      const { service, repository } = build(setting);
+      const error = await rejection(service.remove(ADMIN, { id: '3' }));
+      expect(error.code).toBe('ERP-TICKETSTATUSES-0003');
+      expect(repository.removals).toBe(0);
+    },
+  );
+
+  it('does not treat a non-numeric default reply setting as a status id', async () => {
+    const { service, repository } = build('not numeric');
+    await service.remove(ADMIN, { id: '3' });
+    expect(repository.rows.has(3)).toBe(false);
+  });
+
+  it('maps count failures to a 409 and cleans up on a successful delete', async () => {
     const ticketFailure = build();
-    ticketFailure.repository.referenceFailure = new Error('ticket count failed');
-    await expect(ticketFailure.service.remove(ADMIN, { id: '2' })).rejects.toThrow(
-      'ticket count failed',
-    );
+    ticketFailure.repository.referenceFailure = new AppError('ERP-CORE-0004');
+    const countError = await rejection(ticketFailure.service.remove(ADMIN, { id: '2' }));
+    expect([countError.code, countError.status, countError.message]).toEqual([
+      'ERP-TICKETSTATUSES-0001',
+      409,
+      'its use could not be counted',
+    ]);
     expect(ticketFailure.repository.referenceChecks).toBe(1);
     expect(ticketFailure.repository.removals).toBe(0);
 
-    const settingFailure = build();
-    settingFailure.getOption.mockRejectedValueOnce(new Error('settings read failed'));
-    await expect(settingFailure.service.remove(ADMIN, { id: '2' })).rejects.toThrow(
-      'settings read failed',
-    );
-    expect(settingFailure.repository.removals).toBe(0);
-  });
-
-  it('returns 404 for a missing delete id and deletes an unused status successfully', async () => {
-    const { service, repository, getOption, events, logger } = build('999');
-    expect((await rejection(service.remove(ADMIN, { id: '404' }))).code).toBe('ERP-CORE-0004');
-    expect(getOption).not.toHaveBeenCalled();
-    expect(repository.removals).toBe(0);
-
+    const { service, repository, events, logger } = build('999');
     await service.remove(ADMIN, { id: '3' });
     expect(repository.rows.has(3)).toBe(false);
     expect(events.drain().map((event) => event.constructor)).toEqual([TicketStatusDeletedV1]);

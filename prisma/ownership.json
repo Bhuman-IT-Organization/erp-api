@@ -8362,8 +8362,8 @@
     "table": "tbltickets_priorities"
   },
   {
-    "decided_by": null,
-    "decided_on": null,
+    "decided_by": "migration lead",
+    "decided_on": "2026-10-27",
     "evidence": {
       "ddl": [],
       "forms": [

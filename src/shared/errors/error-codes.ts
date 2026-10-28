@@ -61,6 +61,10 @@ export const ERROR_CODES = {
   // v1/ticket-statuses (plan 06): 0001 is a referenced status, 0002 is a built-in status.
   'ERP-TICKETSTATUSES-0001': { status: 409, title: 'The ticket status is still referenced' },
   'ERP-TICKETSTATUSES-0002': { status: 409, title: 'The built-in ticket status cannot be deleted' },
+  'ERP-TICKETSTATUSES-0003': {
+    status: 409,
+    title: 'The ticket status is the default reply status',
+  },
   // v1/payment-modes (plan 04.1-23): 0001 refuses a delete while a transactional column still names the mode (D-33), 0002 the credit expense mode (D-37).
   'ERP-PAYMENTMODES-0001': { status: 409, title: 'The payment mode is still in use' },
   'ERP-PAYMENTMODES-0002': { status: 409, title: 'The payment mode is the credit expense mode' },

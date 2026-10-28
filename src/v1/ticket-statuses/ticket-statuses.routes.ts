@@ -6,5 +6,5 @@ export const TICKET_STATUSES_ROUTES = {
   record: ':id',
 } as const;
 
-export const TICKET_STATUSES_EXPORT_COLUMNS = ['id', 'name'] as const;
+export const TICKET_STATUSES_EXPORT_COLUMNS = ['id', 'name', 'ticket_count'] as const;
 export const TICKET_STATUSES_EXPORT_FILE_STEM = 'ticket-statuses';

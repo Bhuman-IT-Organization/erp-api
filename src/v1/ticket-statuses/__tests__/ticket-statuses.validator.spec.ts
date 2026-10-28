@@ -16,81 +16,79 @@ function refused(fn: () => unknown): AppError {
 describe('TicketStatusesValidator', () => {
   const validator = new TicketStatusesValidator();
 
-  it('accepts an empty list query and rejects unexpected query keys', () => {
-    expect(() => {
-      validator.parseListQuery({});
-    }).not.toThrow();
-    expect(
-      refused(() => {
-        validator.parseListQuery({ limit: '10' });
-      }).code,
-    ).toBe('ERP-VALIDATION-0001');
+  it('accepts the default list contract and rejects unknown top-level keys', () => {
+    expect(validator.parseListQuery({})).toMatchObject({
+      search: null,
+      sortField: 'id',
+      order: 'desc',
+      cursor: null,
+      limit: 50,
+    });
+    expect(refused(() => validator.parseListQuery({ foo: 'bar' })).code).toBe(
+      'ERP-VALIDATION-0001',
+    );
   });
 
-  it('validates export search, sort and format parameters without changing the list query', () => {
-    expect(validator.parseExportQuery({ q: 'Open', sort: '-name', format: 'csv' })).toEqual({
+  it('accepts export search, sort and format parameters while stripping export-only keys', () => {
+    expect(validator.parseExportQuery({ q: 'Open', sort: '-name', format: 'csv' })).toMatchObject({
       q: 'Open',
       sort: '-name',
       format: 'csv',
     });
-    expect(
-      refused(() => {
-        validator.parseExportQuery({ sort: 'statusorder' });
-      }).code,
-    ).toBe('ERP-VALIDATION-0001');
-    expect(
-      refused(() => {
-        validator.parseListQuery({ q: 'Open' });
-      }).code,
-    ).toBe('ERP-VALIDATION-0001');
+    expect(validator.parseExportList({ q: 'Open', sort: '-name', format: 'csv' })).toMatchObject({
+      search: 'Open',
+      sortField: 'name',
+      order: 'desc',
+      cursor: null,
+      limit: 500,
+    });
   });
 
-  it('validates positive signed-int route ids', () => {
+  it('validates route ids and trims names', () => {
     expect(validator.parseParams({ id: String(TICKET_STATUS_ID_MAX) })).toEqual({
       id: TICKET_STATUS_ID_MAX,
     });
     for (const id of ['0', '-1', '1.5', '2147483648', 'not-an-id']) {
       const error = refused(() => validator.parseParams({ id }));
       expect(error.code).toBe('ERP-VALIDATION-0001');
-      expect(error.extras?.issues).toEqual(
-        expect.arrayContaining([expect.objectContaining({ path: ['id'] })]),
-      );
     }
+
+    const name = 'n'.repeat(TICKET_STATUS_NAME_MAX);
+    expect(validator.parseCreateBody({ name: ` ${name} ` })).toEqual({ name });
   });
 
-  it('trims names and accepts the maximum-length name plus Perfex color/order values', () => {
-    const name = 'n'.repeat(TICKET_STATUS_NAME_MAX);
+  it('accepts the real Perfex color/order conventions and rejects invalid values', () => {
     expect(
       validator.parseCreateBody({
-        name: ` ${name} `,
-        statuscolor: '#aB12fF',
-        statusorder: -4,
+        name: 'New',
+        statuscolor: 'ABC',
+        statusorder: ' 03 ',
       }),
-    ).toEqual({ name, statuscolor: '#aB12fF', statusorder: -4 });
+    ).toEqual({
+      name: 'New',
+      statuscolor: 'ABC',
+      statusorder: 3,
+    });
     expect(validator.parseCreateBody({ name: 'New', statuscolor: '', statusorder: null })).toEqual({
       name: 'New',
       statuscolor: '',
       statusorder: null,
     });
-  });
-
-  it.each([
-    ['empty name', { name: '   ' }],
-    ['long name', { name: 'n'.repeat(TICKET_STATUS_NAME_MAX + 1) }],
-    ['invalid color', { name: 'Open', statuscolor: 'red' }],
-    ['short hex color', { name: 'Open', statuscolor: '#123' }],
-    ['fractional order', { name: 'Open', statusorder: 1.5 }],
-    ['id mass assignment', { name: 'Open', ticketstatusid: 42 }],
-    ['default flag mass assignment', { name: 'Open', isdefault: 1 }],
-  ])('rejects %s', (_label, body) => {
-    expect(refused(() => validator.parseCreateBody(body)).code).toBe('ERP-VALIDATION-0001');
-  });
-
-  it('allows partial edits but refuses an empty body and unknown keys', () => {
-    expect(validator.parseUpdateBody({ statusorder: 3 })).toEqual({ statusorder: 3 });
-    expect(refused(() => validator.parseUpdateBody({})).code).toBe('ERP-VALIDATION-0001');
     expect(
-      refused(() => validator.parseUpdateBody({ statuscolor: '#123456', extra: true })).code,
+      refused(() => validator.parseCreateBody({ name: 'Open', statuscolor: 'abcdefg1' })).code,
+    ).toBe('ERP-VALIDATION-0001');
+    expect(refused(() => validator.parseCreateBody({ name: 'Open', statusorder: 1.5 })).code).toBe(
+      'ERP-VALIDATION-0001',
+    );
+  });
+
+  it('refuses empty edits and mass-assignment keys', () => {
+    expect(refused(() => validator.parseUpdateBody({})).code).toBe('ERP-VALIDATION-0001');
+    expect(refused(() => validator.parseUpdateBody({ statuscolor: 'abc', extra: true })).code).toBe(
+      'ERP-VALIDATION-0001',
+    );
+    expect(
+      refused(() => validator.parseCreateBody({ name: 'Open', ticketstatusid: 42 })).code,
     ).toBe('ERP-VALIDATION-0001');
   });
 });

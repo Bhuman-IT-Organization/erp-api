@@ -11,42 +11,54 @@ import {
   exportTitleField,
   exportYesField,
 } from '../../../shared/http/export.js';
+import { listPageMetaSchema } from '../../../shared/http/keyset.js';
+import { LIST_QUERY_LIMITS } from '../../../shared/http/pagination.js';
 
 /** MySQL `INT` is a signed 32-bit value in the existing Prisma schema. */
 export const TICKET_STATUS_ID_MAX = 2_147_483_647;
 export const TICKET_STATUS_NAME_MAX = 50;
+export const TICKET_STATUSES_SEARCH_MAX = 100;
 
-const TICKET_STATUS_ORDER_MIN = -TICKET_STATUS_ID_MAX - 1;
-const TICKET_STATUS_COLOR_MAX = '#ffffff'.length;
+const TICKET_STATUS_COLOR_MAX = 7;
 
 const statusColorSchema = z
-  .union([z.literal(''), z.string().regex(/^#[\da-f]{6}$/i, 'expected a six-digit hex color')])
-  .nullable();
-const statusOrderSchema = z
-  .number()
-  .int()
-  .min(TICKET_STATUS_ORDER_MIN)
-  .max(TICKET_STATUS_ID_MAX)
+  .union([z.literal(''), z.string().max(TICKET_STATUS_COLOR_MAX)])
   .nullable();
 
-/** The list has no filters or pagination; unexpected query keys are refused. */
-export const ticketStatusesListQuerySchema = z.strictObject({});
+const statusOrderSchema = z.preprocess((value) => {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed === '') return null;
+    const numeric = Number(trimmed);
+    return Number.isInteger(numeric) ? numeric : value;
+  }
+  return value;
+}, z.number().int().nullable());
 
-/** The list's local search and sort, plus the shared export format parameters. */
-export const exportTicketStatusesQuerySchema = z.strictObject({
-  q: z.string().optional(),
-  sort: z.enum(['id', '-id', 'name', '-name']).optional(),
-  header: exportHeaderField,
-  format: exportFormatField,
-  column: exportColumnField,
-  title: exportTitleField,
-  yes: exportYesField,
-  no: exportNoField,
-  blank: exportBlankField,
-  dateFormat: exportDateFormatField,
-  timeFormat: exportTimeFormatField,
-  timeZone: exportTimeZoneField,
+/** Standard BE-19 list query parameters. */
+export const ticketStatusesListQuerySchema = z.strictObject({
+  limit: z.coerce.number().int().min(LIST_QUERY_LIMITS.min).max(LIST_QUERY_LIMITS.max).optional(),
+  cursor: z.string().min(1).optional(),
+  q: z.string().max(TICKET_STATUSES_SEARCH_MAX).optional(),
+  sort: z.string().optional(),
 });
+
+/** Export query uses the same search and sort parameters, without pagination controls. */
+export const exportTicketStatusesQuerySchema = ticketStatusesListQuerySchema
+  .omit({ limit: true, cursor: true })
+  .extend({
+    header: exportHeaderField,
+    format: exportFormatField,
+    column: exportColumnField,
+    title: exportTitleField,
+    yes: exportYesField,
+    no: exportNoField,
+    blank: exportBlankField,
+    dateFormat: exportDateFormatField,
+    timeFormat: exportTimeFormatField,
+    timeZone: exportTimeZoneField,
+  });
 
 /** A positive signed `INT`; malformed ids are 400s, not 404 probes. */
 export const ticketStatusesParamsSchema = z.strictObject({
@@ -68,7 +80,6 @@ export const updateTicketStatusBodySchema = createTicketStatusBodySchema
   .refine((body) => Object.keys(body).length > 0, 'send at least one field');
 
 /** Response fields mirror `tbltickets_status`, with its integer key stringified on the wire. */
-/** Response fields mirror `tbltickets_status`, with its integer key stringified on the wire. */
 export const ticketStatusResponseSchema = z
   .strictObject({
     ticketstatusid: z.string(),
@@ -80,8 +91,15 @@ export const ticketStatusResponseSchema = z
   })
   .readonly();
 
+/** Standard BE-19 paged list response. */
 export const ticketStatusesListResponseSchema = z
-  .strictObject({ data: z.array(ticketStatusResponseSchema) })
+  .strictObject({
+    data: z.array(ticketStatusResponseSchema),
+    meta: listPageMetaSchema.extend({
+      exportLimit: z.number().int().positive(),
+      printLimit: z.number().int().positive(),
+    }),
+  })
   .readonly();
 
 export type TicketStatusesParams = z.infer<typeof ticketStatusesParamsSchema>;
@@ -89,4 +107,5 @@ export type CreateTicketStatusBody = z.infer<typeof createTicketStatusBodySchema
 export type UpdateTicketStatusBody = z.infer<typeof updateTicketStatusBodySchema>;
 export type TicketStatusResponseDto = z.infer<typeof ticketStatusResponseSchema>;
 export type TicketStatusesListResponseDto = z.infer<typeof ticketStatusesListResponseSchema>;
+export type ListTicketStatusesQuery = z.infer<typeof ticketStatusesListQuerySchema>;
 export type ExportTicketStatusesQuery = z.infer<typeof exportTicketStatusesQuerySchema>;

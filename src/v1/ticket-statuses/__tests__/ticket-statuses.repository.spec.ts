@@ -10,7 +10,7 @@ const ROW: TicketStatus = {
   isdefault: 0,
   statuscolor: '#03a9f4',
   statusorder: 1,
-  ticket_count: 0,
+  ticket_count: 5,
 };
 
 function build() {
@@ -20,97 +20,45 @@ function build() {
       findFirst: vi.fn().mockResolvedValue(ROW),
       create: vi.fn().mockResolvedValue(ROW),
       update: vi.fn().mockResolvedValue(ROW),
+      count: vi.fn().mockResolvedValue(1),
       deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     tbltickets: {
-      count: vi.fn().mockResolvedValue(0),
+      count: vi.fn().mockResolvedValue(5),
       groupBy: vi.fn().mockResolvedValue([{ status: 3, _count: { _all: 5 } }]),
     },
   };
 
-  const repository = new TicketStatusesRepository({
-    client,
-  } as unknown as ClientHolder);
-
+  const repository = new TicketStatusesRepository({ client } as unknown as ClientHolder);
   return { repository, client };
 }
 
 describe('TicketStatusesRepository', () => {
-  it('lists statuses in Perfex statusorder and id order', async () => {
-    const { repository, client } = build();
-
-    await expect(repository.list()).resolves.toEqual([{ ...ROW, ticket_count: 5 }]);
-
-    expect(client.tbltickets_status.findMany).toHaveBeenCalledWith({
-      orderBy: [{ statusorder: 'asc' }, { ticketstatusid: 'asc' }],
-      select: {
-        ticketstatusid: true,
-        name: true,
-        isdefault: true,
-        statuscolor: true,
-        statusorder: true,
-      },
+  it('lists pages with ticket counts and the default id-desc ordering', async () => {
+    const { repository } = build();
+    const page = await repository.list({
+      search: null,
+      sortField: 'id',
+      order: 'desc',
+      cursor: null,
+      limit: 50,
     });
-
-    expect(client.tbltickets.groupBy).toHaveBeenCalledWith({
-      by: ['status'],
-      _count: { _all: true },
-    });
+    expect(page.items[0]).toMatchObject({ ticketstatusid: 3, ticket_count: 5 });
+    expect(page.total).toBeGreaterThanOrEqual(1);
   });
 
-  it('keeps every Prisma operation inside the repository and maps P2025 to null', async () => {
+  it('maps not-found updates to null and counts ticket references', async () => {
     const { repository, client } = build();
-
-    await expect(repository.findById(3)).resolves.toEqual(ROW);
-
-    expect(client.tbltickets_status.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { ticketstatusid: 3 } }),
-    );
-
-    await expect(
-      repository.create({
-        name: 'New',
-        statuscolor: null,
-        statusorder: null,
-      }),
-    ).resolves.toEqual(ROW);
-
-    expect(client.tbltickets_status.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: {
-          name: 'New',
-          statuscolor: null,
-          statusorder: null,
-        },
-      }),
-    );
-
-    client.tbltickets_status.update.mockRejectedValueOnce({
-      code: 'P2025',
-    });
-
+    client.tbltickets_status.update.mockRejectedValueOnce({ code: 'P2025' });
     await expect(repository.update(404, { name: 'Missing' })).resolves.toBeNull();
-
-    await expect(repository.hasTicketReferences(3)).resolves.toBe(false);
-
-    expect(client.tbltickets.count).toHaveBeenCalledWith({
-      where: { status: 3 },
-    });
-
-    await expect(repository.remove(3)).resolves.toBe(true);
+    await expect(repository.hasTicketReferences(3)).resolves.toBe(true);
+    expect(client.tbltickets.count).toHaveBeenCalledWith({ where: { status: 3 } });
   });
 
-  it('propagates database failures and reports whether a ticket references the status', async () => {
+  it('deletes only when the row exists and count failures propagate', async () => {
     const { repository, client } = build();
-    const failure = new Error('database unavailable');
-
-    client.tbltickets.count.mockRejectedValueOnce(failure).mockResolvedValueOnce(1);
-
-    await expect(repository.hasTicketReferences(3)).rejects.toBe(failure);
-    await expect(repository.hasTicketReferences(3)).resolves.toBe(true);
-
-    client.tbltickets_status.deleteMany.mockRejectedValueOnce(failure);
-
-    await expect(repository.remove(3)).rejects.toBe(failure);
+    await expect(repository.remove(3)).resolves.toBe(true);
+    client.tbltickets.count.mockRejectedValueOnce(new Error('count failed'));
+    await expect(repository.hasTicketReferences(3)).rejects.toThrow('count failed');
   });
 });

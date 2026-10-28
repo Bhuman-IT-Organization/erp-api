@@ -1,109 +1,142 @@
 import 'reflect-metadata';
-import type { ExecutionContext } from '@nestjs/common';
-import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
-import { Test } from '@nestjs/testing';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { JwtAuthGuard } from '../../../shared/http/guards/jwt-auth.guard.js';
-import { PermissionGuard } from '../../../shared/http/guards/permission.guard.js';
-import type { AuthenticatedUser } from '../../../shared/http/auth/access-token-verifier.js';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { API_PREFIX } from '../../../shared/http/api-prefix.js';
-import { TicketStatusesController } from '../controller/ticket-statuses.controller.js';
+import { ticketStatusesListResponseSchema } from '../dto/ticket-statuses.dto.js';
 import { TICKET_STATUSES_ROUTES } from '../ticket-statuses.routes.js';
-import { TicketStatusesService } from '../service/ticket-statuses.service.js';
+import {
+  createTicketStatusesTestApp,
+  TEST_BEARERS,
+  type TicketStatusesTestApp,
+} from './create-ticket-statuses-test-app.js';
 
-const ADMIN: AuthenticatedUser = {
-  staffId: 1,
-  sessionId: 'sid',
-  jti: 'jti',
-  isAdmin: true,
-  roleId: null,
-  tokenVersion: 0,
-  expiresAt: 4_102_444_800,
-};
-const STATUS = {
-  ticketstatusid: '2',
-  name: 'Open',
-  isdefault: 0,
-  statuscolor: '#03a9f4',
-  statusorder: 1,
-};
+const LIST = `/${API_PREFIX}/${TICKET_STATUSES_ROUTES.base}`;
+const record = (id: string | number): string => `${LIST}/${String(id)}`;
+
+function bearer(token: string): { authorization: string } {
+  return { authorization: `Bearer ${token}` };
+}
 
 describe('TicketStatusesController HTTP contract', () => {
-  let app: NestFastifyApplication;
-  const service = {
-    list: vi.fn().mockResolvedValue({ data: [STATUS] }),
-    exportCsv: vi.fn().mockResolvedValue({
-      filename: 'ticket-statuses-2026-10-26.csv',
-      contentType: 'text/csv; charset=utf-8',
-      body: 'id,name\r\n11,Open\r\n',
-    }),
-    get: vi.fn().mockResolvedValue(STATUS),
-    create: vi.fn().mockResolvedValue(STATUS),
-    update: vi.fn().mockResolvedValue(STATUS),
-    remove: vi.fn().mockResolvedValue(undefined),
-  };
+  let ctx: TicketStatusesTestApp;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({
-      controllers: [TicketStatusesController],
-      providers: [{ provide: TicketStatusesService, useValue: service }],
-    })
-      .overrideGuard(JwtAuthGuard)
-      .useValue({
-        canActivate(context: ExecutionContext): boolean {
-          context.switchToHttp().getRequest<{ user: AuthenticatedUser }>().user = ADMIN;
-          return true;
-        },
-      })
-      .overrideGuard(PermissionGuard)
-      .useValue({ canActivate: () => true })
-      .compile();
-    app = moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
-    app.setGlobalPrefix(API_PREFIX);
-    await app.init();
-    await app.getHttpAdapter().getInstance().ready();
+    ctx = await createTicketStatusesTestApp();
   });
 
-  afterAll(async () => app.close());
+  afterAll(async () => {
+    await ctx.close();
+  });
 
-  const base = `/${API_PREFIX}/${TICKET_STATUSES_ROUTES.base}`;
+  it('returns 401 without a bearer', async () => {
+    const res = await ctx.app.inject({ method: 'GET', url: LIST });
+    expect(res.statusCode).toBe(401);
+  });
 
-  it('serves list, export, get, create, update and delete on the declared paths and statuses', async () => {
-    const list = await app.inject({ method: 'GET', url: base });
-    expect(list.statusCode).toBe(200);
-    expect(JSON.parse(list.payload)).toEqual({ data: [STATUS] });
+  it('returns 403 for an authenticated non-administrator', async () => {
+    const res = await ctx.app.inject({
+      method: 'GET',
+      url: LIST,
+      headers: bearer(TEST_BEARERS.everyCode),
+    });
+    expect(res.statusCode).toBe(403);
+  });
 
-    const exported = await app.inject({ method: 'GET', url: `${base}/export?format=csv` });
-    expect(exported.statusCode).toBe(200);
-    expect(exported.payload).toBe('id,name\r\n11,Open\r\n');
-    expect(exported.headers['content-disposition']).toContain('ticket-statuses-2026-10-26.csv');
+  it('returns 400 for an invalid query key', async () => {
+    const res = await ctx.app.inject({
+      method: 'GET',
+      url: `${LIST}?foo=bar`,
+      headers: bearer(TEST_BEARERS.admin),
+    });
+    expect(res.statusCode).toBe(400);
+  });
 
-    expect((await app.inject({ method: 'GET', url: `${base}/2` })).statusCode).toBe(200);
-    expect(
-      (
-        await app.inject({
-          method: 'POST',
-          url: base,
-          payload: { name: 'Open' },
-        })
-      ).statusCode,
-    ).toBe(201);
-    expect(
-      (
-        await app.inject({
-          method: 'PATCH',
-          url: `${base}/2`,
-          payload: { statusorder: 2 },
-        })
-      ).statusCode,
-    ).toBe(200);
-    expect((await app.inject({ method: 'DELETE', url: `${base}/2` })).statusCode).toBe(204);
+  it('returns 400 for an invalid path id', async () => {
+    const res = await ctx.app.inject({
+      method: 'GET',
+      url: record('not-an-id'),
+      headers: bearer(TEST_BEARERS.admin),
+    });
+    expect(res.statusCode).toBe(400);
+  });
 
-    expect(service.list).toHaveBeenCalledWith(ADMIN, {});
-    expect(service.exportCsv).toHaveBeenCalledWith(ADMIN, { format: 'csv' });
-    expect(service.get).toHaveBeenCalledWith(ADMIN, { id: '2' });
-    expect(service.create).toHaveBeenCalledWith(ADMIN, { name: 'Open' });
-    expect(service.update).toHaveBeenCalledWith(ADMIN, { id: '2' }, { statusorder: 2 });
-    expect(service.remove).toHaveBeenCalledWith(ADMIN, { id: '2' });
+  it('returns 404 for a missing status', async () => {
+    const res = await ctx.app.inject({
+      method: 'GET',
+      url: record(999),
+      headers: bearer(TEST_BEARERS.admin),
+    });
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('returns 409 when deleting the built-in default status', async () => {
+    const res = await ctx.app.inject({
+      method: 'DELETE',
+      url: record(1),
+      headers: bearer(TEST_BEARERS.admin),
+    });
+    expect(res.statusCode).toBe(409);
+  });
+
+  it('returns 409 when deleting a referenced status', async () => {
+    ctx.repo.ticketReferences.add(2);
+    try {
+      const res = await ctx.app.inject({
+        method: 'DELETE',
+        url: record(2),
+        headers: bearer(TEST_BEARERS.admin),
+      });
+      expect(res.statusCode).toBe(409);
+    } finally {
+      ctx.repo.ticketReferences.delete(2);
+    }
+  });
+
+  it('returns 409 when deleting the configured default reply status', async () => {
+    ctx.setDefaultReplyStatus('2');
+    try {
+      const res = await ctx.app.inject({
+        method: 'DELETE',
+        url: record(2),
+        headers: bearer(TEST_BEARERS.admin),
+      });
+      expect(res.statusCode).toBe(409);
+    } finally {
+      ctx.setDefaultReplyStatus(null);
+    }
+  });
+
+  it('returns 400 for an invalid create body', async () => {
+    const res = await ctx.app.inject({
+      method: 'POST',
+      url: LIST,
+      headers: bearer(TEST_BEARERS.admin),
+      payload: {},
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('serves the list for an administrator', async () => {
+    const res = await ctx.app.inject({
+      method: 'GET',
+      url: `${LIST}?limit=50`,
+      headers: bearer(TEST_BEARERS.admin),
+    });
+    expect(res.statusCode).toBe(200);
+    const response = ticketStatusesListResponseSchema.parse(JSON.parse(res.payload));
+    expect(response).toMatchObject({
+      data: [
+        { ticketstatusid: '3', ticket_count: 0 },
+        { ticketstatusid: '2', ticket_count: 0 },
+        { ticketstatusid: '1', ticket_count: 0 },
+      ],
+      meta: {
+        nextCursor: null,
+        prevCursor: null,
+        total: 3,
+        rangeStart: 1,
+      },
+    });
+    expect(response.meta.exportLimit).toBeGreaterThan(0);
+    expect(response.meta.printLimit).toBeGreaterThan(0);
   });
 });
