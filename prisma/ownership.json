@@ -8362,8 +8362,8 @@
     "table": "tbltickets_priorities"
   },
   {
-    "decided_by": null,
-    "decided_on": null,
+    "decided_by": "migration lead",
+    "decided_on": "2026-10-27",
     "evidence": {
       "ddl": [],
       "forms": [
@@ -8378,8 +8378,8 @@
       ]
     },
     "evidence_changed": false,
-    "note": "",
-    "owner": "perfex-core",
+    "note": "Written by v1/ticket-statuses; Perfex's status add, edit and delete are closed at Nginx.",
+    "owner": "node",
     "owner_confidence": "write-single",
     "table": "tbltickets_status"
   },
