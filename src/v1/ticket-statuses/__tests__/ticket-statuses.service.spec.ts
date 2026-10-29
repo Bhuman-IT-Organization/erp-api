@@ -13,6 +13,7 @@ import type {
   NewTicketStatus,
   TicketStatus,
   TicketStatusPatch,
+  TicketStatusesListRequest,
   TicketStatusesPage,
 } from '../model/ticket-statuses.model.js';
 import { TicketStatusesFacade } from '../facade/ticket-statuses.facade.js';
@@ -64,7 +65,7 @@ const ROWS: readonly TicketStatus[] = [
 
 type RepositoryPort = Pick<
   TicketStatusesRepository,
-  'list' | 'findById' | 'create' | 'update' | 'hasTicketReferences' | 'remove'
+  'list' | 'count' | 'listAll' | 'findById' | 'create' | 'update' | 'hasTicketReferences' | 'remove'
 >;
 
 class MemoryRepository implements RepositoryPort {
@@ -75,19 +76,46 @@ class MemoryRepository implements RepositoryPort {
   removals = 0;
   referenceFailure: Error | null = null;
 
-  list(): Promise<TicketStatusesPage> {
-    const items = [...this.rows.values()].sort(
-      (left, right) =>
-        (left.statusorder ?? 0) - (right.statusorder ?? 0) ||
-        left.ticketstatusid - right.ticketstatusid,
+  private matching(request: TicketStatusesListRequest): TicketStatus[] {
+    if (request.search === null) return [...this.rows.values()];
+    const search = request.search.toLowerCase();
+    const id = /^\d+$/.test(request.search) ? Number(request.search) : null;
+    return [...this.rows.values()].filter(
+      (row) =>
+        row.name.toLowerCase().includes(search) || (id !== null && row.ticketstatusid === id),
     );
+  }
+
+  list(request: TicketStatusesListRequest): Promise<TicketStatusesPage> {
+    const items = this.matching(request)
+      .sort((left, right) => {
+        const comparison =
+          request.sortField === 'name'
+            ? left.name.localeCompare(right.name)
+            : left.ticketstatusid - right.ticketstatusid;
+        return (
+          (request.order === 'asc' ? comparison : -comparison) ||
+          (request.order === 'asc'
+            ? left.ticketstatusid - right.ticketstatusid
+            : right.ticketstatusid - left.ticketstatusid)
+        );
+      })
+      .slice(0, request.limit);
     return Promise.resolve({
       items,
       nextCursor: null,
       prevCursor: null,
-      total: items.length,
+      total: this.matching(request).length,
       rangeStart: items.length === 0 ? 0 : 1,
     });
+  }
+
+  count(request: TicketStatusesListRequest): Promise<number> {
+    return Promise.resolve(this.matching(request).length);
+  }
+
+  listAll(): Promise<readonly TicketStatus[]> {
+    return Promise.resolve([...this.rows.values()]);
   }
 
   findById(id: number): Promise<TicketStatus | null> {
@@ -185,7 +213,7 @@ describe('TicketStatusesService: CRUD', () => {
   it('lists pages and reads a status by id', async () => {
     const { service } = build();
     const list = await service.list(ADMIN, {});
-    expect(list.data.map((row) => row.ticketstatusid)).toEqual(['1', '2', '3']);
+    expect(list.data.map((row) => row.ticketstatusid)).toEqual(['3', '2', '1']);
     expect(await service.get(ADMIN, { id: '2' })).toMatchObject({
       ticketstatusid: '2',
       name: 'In progress',

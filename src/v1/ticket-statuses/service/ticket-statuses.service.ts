@@ -11,11 +11,7 @@ import type {
   TicketStatusResponseDto,
   TicketStatusesListResponseDto,
 } from '../dto/ticket-statuses.dto.js';
-import type {
-  TicketStatus,
-  TicketStatusPatch,
-  TicketStatusesPage,
-} from '../model/ticket-statuses.model.js';
+import type { TicketStatus, TicketStatusPatch } from '../model/ticket-statuses.model.js';
 import { TicketStatusesRepository } from '../repository/ticket-statuses.repository.js';
 import {
   TicketStatusCreatedV1,
@@ -69,18 +65,10 @@ export class TicketStatusesService {
     private readonly logger: LoggerService,
   ) {}
 
-  private normalizePage(data: TicketStatusesPage | null | undefined): TicketStatusesPage {
-    if (data === null || data === undefined) {
-      return { items: [], nextCursor: null, prevCursor: null, total: 0, rangeStart: 0 };
-    }
-
-    return data;
-  }
-
   async list(actor: AuthenticatedUser, query: unknown): Promise<TicketStatusesListResponseDto> {
     this.assertAdministrator(actor);
     const request = this.validator.parseListQuery(query);
-    const page = this.normalizePage(await this.repository.list(request));
+    const page = await this.repository.list(request);
     return this.transformer.toListResponse(page);
   }
 
@@ -99,15 +87,9 @@ export class TicketStatusesService {
       cells: TICKET_STATUSES_EXPORT_CELLS,
       options,
       request,
-      count: async (list) => {
-        if (typeof this.repository.count === 'function') {
-          return this.repository.count(list);
-        }
-        const page = this.normalizePage(await this.repository.list(list));
-        return page.total;
-      },
+      count: (list) => this.repository.count(list),
       page: async (list) => {
-        const page = this.normalizePage(await this.repository.list(list));
+        const page = await this.repository.list(list);
         return {
           items: page.items.map((row) => this.transformer.toExportRow(row)),
           nextCursor: page.nextCursor,
@@ -193,19 +175,8 @@ export class TicketStatusesService {
   }
 
   /** Full list for internal consumers that require every status. */
-  async listAll(): Promise<readonly TicketStatus[]> {
-    if (typeof this.repository.listAll === 'function') {
-      return this.repository.listAll();
-    }
-
-    const fallback = await this.repository.list({
-      search: null,
-      sortField: 'id',
-      order: 'desc',
-      cursor: null,
-      limit: Number.MAX_SAFE_INTEGER,
-    });
-    return this.normalizePage(fallback).items;
+  listAll(): Promise<readonly TicketStatus[]> {
+    return this.repository.listAll();
   }
 
   private assertAdministrator(actor: AuthenticatedUser): void {

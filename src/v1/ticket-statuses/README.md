@@ -36,7 +36,7 @@ List rows, record responses, and export rows include `ticket_count`, computed fr
 
 Names are trimmed and limited to 50 characters. Colors accept any text up to 7 characters, including empty string and `null`, matching the Perfex `VARCHAR(7)` column. Order accepts empty or `null` values and whole numbers; fractional values are rejected. Request bodies are strict; generated `ticketstatusid` and `isdefault` are not mass assignable.
 
-Delete refusals use `ERP-TICKETSTATUSES-0002` for built-in statuses, `ERP-TICKETSTATUSES-0001` for ticket references or an unavailable ticket count, and `ERP-TICKETSTATUSES-0003` when the status is the configured default reply status. The setting is parsed as an integer before comparison; non-numeric values do not match a status id. Every failed count refuses deletion with the 409 detail `its use could not be counted`.
+Perfex lets an administrator delete the status configured as `default_ticket_reply_status`. Node refuses that deletion with `ERP-TICKETSTATUSES-0003`, so the setting never points to a deleted status. Other delete refusals use `ERP-TICKETSTATUSES-0002` for built-in statuses and `ERP-TICKETSTATUSES-0001` for ticket references or an unavailable ticket count. The setting is parsed as an integer before comparison; non-numeric values do not match a status id. Every failed count refuses deletion with the 409 detail `its use could not be counted`.
 
 ## Events published
 
