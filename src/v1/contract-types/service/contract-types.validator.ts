@@ -5,14 +5,13 @@
  *
  * The list is parsed by `shared/http/pagination.ts`'s `parseListQuery` (BE-19: `limit`, `cursor`,
  * `sort`; `page`/`size` refused), then this file adds what a keyset list needs: ONE sort segment
- * from `CONTRACT_TYPES_SORT_FIELDS` (default `-id`, Perfex's inline table `[0, 'desc']`), the opaque
+ * from `CONTRACT_TYPES_SORT_FIELDS` (default `-name`, Perfex's order), the opaque
  * cursor decoded for that sort (`shared/http/keyset.ts`) with the right kind of value, and `?q=`
- * bounded. This list takes no filter: any `filter[...]` is a 400 on `filter`. `dateCreated` is not
- * a sort: `datecreated` is nullable and the shared keyset admits only NOT NULL columns.
+ * bounded. This list takes no filter: any `filter[...]` is a 400 on `filter`.
  *
  * `?q=` is matched by the repository: the name contains it (case per the column's collation); when
  * it is all digits and fits the unsigned id column, also the id equal to it. Perfex's inline table
- * searched every cell's text (the date included); the difference is in the README's parity table.
+ * searched every cell's text; the difference is in the README's parity table.
  */
 import { Injectable } from '@nestjs/common';
 import type { z } from 'zod';
@@ -33,14 +32,14 @@ import type {
   ContractTypesSortField,
 } from '../model/contract-types.model.js';
 
-/** The columns `?sort=` accepts. With no `sort`, the list reads `id` descending (Perfex's order). */
+/** The columns `?sort=` accepts. With no `sort`, the list reads `name` descending (Perfex's order). */
 export const CONTRACT_TYPES_SORT_FIELDS = [
   'id',
   'name',
 ] as const satisfies readonly ContractTypesSortField[];
 
-/** The sort with no `?sort=`: the id descending, Perfex's inline table `[0, 'desc']` (`assets/js/app.js:693`). */
-const DEFAULT_SORT = { field: 'id', direction: 'desc' } as const;
+/** The sort with no `?sort=`: the name descending, Perfex's order (`manage_types.php`). */
+const DEFAULT_SORT = { field: 'name', direction: 'desc' } as const;
 
 /** The kind of value each sort column's cursor must carry: a decoded cursor is checked, not trusted. */
 const SORT_KINDS = { id: 'number', name: 'string' } as const satisfies Record<

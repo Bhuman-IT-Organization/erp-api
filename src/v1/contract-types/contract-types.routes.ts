@@ -18,11 +18,9 @@ export const CONTRACT_TYPES_ROUTES = {
 // declares the three `/setup/contract-types` screens `'admin'`.
 
 /**
- * The export's columns, in order: Perfex's three list columns (ID, Name, Date Created). Every format
- * writes them as text, escaped against formulas in CSV and Excel by the shared core; PDF and Print
- * show `dateCreated` as the date and time in the reader's format and zone. The usage counts are never exported.
+ * The export's columns, in order: Name and the number of contracts.
  */
-export const CONTRACT_TYPES_EXPORT_COLUMNS = ['id', 'name', 'dateCreated'] as const;
+export const CONTRACT_TYPES_EXPORT_COLUMNS = ['name', 'contracts'] as const;
 
 /** The download's file-name stem: `<stem>-YYYY-MM-DD.<csv|xlsx|pdf>` (print rows carry no file name). */
 export const CONTRACT_TYPES_EXPORT_FILE_STEM = 'contract-types';

@@ -44,17 +44,10 @@ const MAX_UNSIGNED_INT_ID = 4_294_967_295;
 /** The two columns of the table; nothing else is selected. */
 const COLUMNS = { id: true, name: true } as const;
 
-const rowSchema = z
-  .object({
-    id: z.number().int(),
-    name: z.string(),
-  })
-  .transform((row): ContractTypeRow => ({
-    id: row.id,
-    name: row.name,
-    createdBy: null,
-    datecreated: null,
-  }));
+const rowSchema = z.object({
+  id: z.number().int(),
+  name: z.string(),
+});
 const rowsSchema = z.array(rowSchema);
 
 /** `COUNT(*)` arrives from MySQL as a bigint; a driver may hand a number. */
@@ -73,7 +66,7 @@ type MutableUsage = Record<UsageGroup, number>;
 /** How a referencing column names a contract type: by its id, or by its name as text. */
 export type ContractTypeMatch = 'id' | 'name';
 
-/** One candidate of D-28: the group it counts toward, where it lives, how it matches, its statement. */
+/** One candidate: the group it counts toward, where it lives, how it matches, its statement. */
 export interface ContractTypeReference {
   readonly group: UsageGroup;
   readonly table: string;
@@ -83,58 +76,22 @@ export interface ContractTypeReference {
   readonly count: (client: RawClient, ids: Prisma.Sql) => Promise<unknown>;
 }
 
-/**
- * The declared candidates of D-28. A column a later finding adds joins here in the same shape;
- * the probe decides at every read whether it runs.
- */
 export const CONTRACT_TYPE_REFERENCES: readonly ContractTypeReference[] = Object.freeze([
   {
-    group: 'purchaseRequests',
-    table: 'tblpur_request',
+    group: 'contracts',
+    table: 'tblcontracts',
     column: 'contract_type',
     match: 'id',
     count: (client, ids) =>
-      client.$queryRaw`SELECT r.contract_type AS id, COUNT(*) AS n FROM tblpur_request r WHERE r.contract_type IN (${ids}) GROUP BY r.contract_type`,
+      client.$queryRaw`SELECT r.contract_type AS id, COUNT(*) AS n FROM tblcontracts r WHERE r.contract_type IN (${ids}) GROUP BY r.contract_type`,
   },
   {
-    group: 'purchaseOrders',
-    table: 'tblpur_orders',
+    group: 'contracts',
+    table: 'tblgoals',
     column: 'contract_type',
     match: 'id',
     count: (client, ids) =>
-      client.$queryRaw`SELECT r.contract_type AS id, COUNT(*) AS n FROM tblpur_orders r WHERE r.contract_type IN (${ids}) GROUP BY r.contract_type`,
-  },
-  {
-    group: 'purchaseQuotations',
-    table: 'tblpur_estimates',
-    column: 'contract_type',
-    match: 'id',
-    count: (client, ids) =>
-      client.$queryRaw`SELECT r.contract_type AS id, COUNT(*) AS n FROM tblpur_estimates r WHERE r.contract_type IN (${ids}) GROUP BY r.contract_type`,
-  },
-  {
-    group: 'shippingCharges',
-    table: 'tblinv_shipping_charges',
-    column: 'contract_type',
-    match: 'id',
-    count: (client, ids) =>
-      client.$queryRaw`SELECT r.contract_type AS id, COUNT(*) AS n FROM tblinv_shipping_charges r WHERE r.contract_type IN (${ids}) GROUP BY r.contract_type`,
-  },
-  {
-    group: 'expenses',
-    table: 'tblexpenses',
-    column: 'contract_type',
-    match: 'id',
-    count: (client, ids) =>
-      client.$queryRaw`SELECT r.contract_type AS id, COUNT(*) AS n FROM tblexpenses r WHERE r.contract_type IN (${ids}) GROUP BY r.contract_type`,
-  },
-  {
-    group: 'assets',
-    table: 'tblfe_asset_creation',
-    column: 'contract_type',
-    match: 'id',
-    count: (client, ids) =>
-      client.$queryRaw`SELECT r.contract_type AS id, COUNT(*) AS n FROM tblfe_asset_creation r WHERE r.contract_type IN (${ids}) GROUP BY r.contract_type`,
+      client.$queryRaw`SELECT r.contract_type AS id, COUNT(*) AS n FROM tblgoals r WHERE r.contract_type IN (${ids}) GROUP BY r.contract_type`,
   },
 ]);
 

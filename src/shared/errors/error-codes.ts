@@ -56,7 +56,7 @@ export const ERROR_CODES = {
   },
   'ERP-TAXES-0003': { status: 409, title: 'A tax with that name already exists' },
   'ERP-TAXES-0004': { status: 409, title: 'The tax is a default tax in Settings' },
-  // v1/contract-types (plan 04.1-18): 0001 refuses a delete while any referencing column still names the contract type (D-07, D-28).
+  // v1/contract-types (Task card 04): 0001 refuses a delete while any contract (or goal) still names the contract type.
   'ERP-CONTRACTTYPES-0001': { status: 409, title: 'The contract type is still in use' },
   // v1/cost-centers (plan 04.1-18): 0001 refuses a delete while any referencing column still names the cost center (D-07, D-28).
   'ERP-COSTCENTERS-0001': { status: 409, title: 'The cost center is still in use' },

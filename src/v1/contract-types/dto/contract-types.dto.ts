@@ -12,7 +12,7 @@
  * applies; the transformer writes `String(row.id)`.
  *
  * Node keeps Perfex's business outcomes (D-29): the name is required (Perfex's form requires it),
- * trimmed, 1 to `CONTRACT_TYPES_NAME_MAX` characters (the `VARCHAR(255)` column), every character
+ * trimmed, stored in the `LONGTEXT` column with no length limit, every character
  * accepted and stored as text (`<` and `>` included), and a name another contract type holds is
  * accepted (Perfex has no uniqueness check). The body is strict: Perfex saved every posted field,
  * Node saves only the name (D-26), so any other key is a 400. `created_by` is never answered.
@@ -33,8 +33,6 @@ import {
 import { listPageMetaSchema } from '../../../shared/http/keyset.js';
 import { LIST_QUERY_LIMITS } from '../../../shared/http/pagination.js';
 
-/** The longest name a body may carry: Perfex's `VARCHAR(255)` column (the int spec reads it). */
-export const CONTRACT_TYPES_NAME_MAX = 255;
 /** The longest `?q=`; a longer one is a 400 on `q`. */
 export const CONTRACT_TYPES_SEARCH_MAX = 100;
 
@@ -51,7 +49,7 @@ export const listContractTypesQuerySchema = z.object({
    * fits the unsigned id column, also the id equal to it.
    */
   q: z.string().max(CONTRACT_TYPES_SEARCH_MAX).optional(),
-  /** `-id` (default, Perfex's order), `id`, `name` or `-name`; a leading `-` is descending. */
+  /** `-name` (default, Perfex's order), `name`, `id` or `-id`; a leading `-` is descending. */
   sort: z.string().optional(),
 });
 
@@ -83,32 +81,24 @@ export const contractTypesParamsSchema = z.object({ id: z.coerce.number().int().
  * (D-26). Every character of the name is accepted and stored as text.
  */
 export const createContractTypesBodySchema = z.strictObject({
-  name: z.string().trim().min(1).max(CONTRACT_TYPES_NAME_MAX),
+  name: z.string().trim().min(1),
 });
 
 /** `PATCH :id`: the same body; the form always sends the name, so `{}` is a 400 on `['name']`. */
 export const updateContractTypesBodySchema = createContractTypesBodySchema;
 
-/** What refers to the contract type, per group; never exported. */
+/** What refers to the contract type: contracts. */
 export const contractTypeUsageSchema = z.object({
-  purchaseRequests: z.number().int().nonnegative(),
-  purchaseOrders: z.number().int().nonnegative(),
-  purchaseQuotations: z.number().int().nonnegative(),
-  shippingCharges: z.number().int().nonnegative(),
-  expenses: z.number().int().nonnegative(),
-  assets: z.number().int().nonnegative(),
+  contracts: z.number().int().nonnegative(),
 });
 
 /**
- * One contract type: the name as stored, `dateCreated` as the ISO instant of Perfex's wall clock in
- * the company zone (`null` when the column is NULL), and what uses it (the screen's delete dialog
- * reads it). `created_by` is never answered.
+ * One contract type: the name as stored, and usage.
  */
 export const contractTypesResponseSchema = z
   .object({
     id: z.string(),
     name: z.string(),
-    dateCreated: z.iso.datetime().nullable(),
     usage: contractTypeUsageSchema,
   })
   .readonly();

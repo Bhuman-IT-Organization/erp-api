@@ -1,43 +1,26 @@
 /**
- * Domain entity types of the module; nothing here is a DTO. The entity is one `tblcontract_types`
- * row in its STORED form: `id` (`INT UNSIGNED`, assigned by the database), `name` (`VARCHAR(255)`),
- * `created_by` (`INT`, nullable: the staff id that created it) and `datecreated` (`DATETIME`,
- * nullable). `datecreated` is a NAIVE wall clock: Perfex writes PHP's `date('Y-m-d H:i:s')` in the
- * zone of its `default_timezone` setting, and Node writes the same (D-31). Prisma reads and writes a
- * `DATETIME` as UTC, so the `Date` held here carries the wall-clock fields in its UTC fields; the
- * transformer turns it into an instant with the company zone.
+ * Domain entity types of the module; nothing here is a DTO. The entity is one `tblcontracts_types`
+ * row in its STORED form: `id` (`INT`, assigned by the database) and `name` (`LongText`).
  */
 import type { DecodedCursor, ListPageMeta } from '../../../shared/http/keyset.js';
 
-/** One `tblcontract_types` row, stored form. */
+/** One `tblcontracts_types` row, stored form. */
 export interface ContractTypeRow {
   /** The table's unsigned integer key; `String(id)` on the wire. */
   readonly id: number;
   readonly name: string;
-  /** `created_by`: the staff id that created the row (Perfex's and Node's create), `null` when unset. */
-  readonly createdBy: number | null;
-  /** `datecreated`: the naive wall clock, its UTC fields ARE the wall-clock fields; `null` when unset. */
-  readonly datecreated: Date | null;
 }
 
-/** What `create` stores (D-31): the trimmed name, the signed-in staff id and the packed wall clock. */
+/** What `create` stores: the trimmed name. */
 export interface NewContractType {
   readonly name: string;
-  readonly createdBy: number;
-  readonly datecreated: Date;
 }
 
 /**
- * What refers to a contract type, one count per group of `CONTRACT_TYPE_REFERENCES` (the
- * repository's docblock): a delete must find every group empty (D-07, D-28).
+ * What refers to a contract type: contracts (tblcontracts.contract_type).
  */
 export interface ContractTypeUsage {
-  readonly purchaseRequests: number;
-  readonly purchaseOrders: number;
-  readonly purchaseQuotations: number;
-  readonly shippingCharges: number;
-  readonly expenses: number;
-  readonly assets: number;
+  readonly contracts: number;
 }
 
 /** The facade's public shape. */

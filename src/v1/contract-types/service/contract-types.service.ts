@@ -1,39 +1,28 @@
 /**
- * Use-case orchestrator of the module. Every step is a call into a rule layer (validator,
- * transformer), the repository or the transport; nothing here touches a database client, `fetch`
- * or a breaker directly, and the controller receives the DTO from here: it never imports the
- * transformer (BE-08). Failures are `AppError`s the shared filter maps to problem details.
+ * Service: the module's business rules (BE-07). All six use cases assert the administrator flag
+ * (D-06, D-26) before touching a layer or returning anything.
  *
- * Administrators only (D-06, D-26, BE-25). Every use case a handler calls asserts the administrator
- * flag as its FIRST statement, before the input is parsed, a row is read or the settings facade is
- * asked, so a refused caller learns nothing: `PermissionGuard` admits a handler that declares no
- * code, and this assertion is the only gate (T-4.1-79; `__tests__/route-gates.spec.ts` reads it from
- * each method's source). Perfex's own screen had no check at all (D-26). The facade reads
- * (`findById`, `listAll`, `findByIds`) assert nothing: a module-to-module read has no actor.
+ * D-31: a create writes `name`. A PATCH changes only the name; `created_by` is never modified.
  *
- * Perfex's Contract Types flow, reproduced (D-29): the list in Perfex's order (the id descending),
- * each row with its usage; a create writes `created_by` (the signed-in staff id) and `datecreated`
- * (Perfex's wall clock in the `default_timezone` zone, D-31); an update changes the name only, with
- * no duplicate check and no lock (Perfex has neither); a delete is refused while anything in
- * `CONTRACT_TYPE_REFERENCES` holds the contract type (`ERP-CONTRACTTYPES-0001`, D-07 and D-28), and when
- * its use cannot be counted. The 409 detail names counts only, never a name (T-4.1-89).
+ * Delete refuses (409 `ERP-CONTRACTTYPES-0001`) while any group in `CONTRACT_TYPE_REFERENCES` is
+ * non-zero or its use cannot be counted.
  *
- * Every change publishes its event through the transport AFTER the write, then writes one `log`
- * line with the id only (D-08; BE-10 merges `requestId` and `staffId` from the request context).
- * Node writes nothing to Perfex's activity log, and neither did Perfex's screen (D-18).
+ * Writes publish their domain event (ADR-0029) and log one line through `LoggerService` (BE-14).
+ * Everything is an in-process call, so no breaker and no retry.
  */
 import { Injectable } from '@nestjs/common';
 import { AppError } from '../../../shared/errors/app-error.js';
+import { runExport, type ExportFile } from '../../../shared/http/export.js';
 import type { AuthenticatedUser } from '../../../shared/http/auth/access-token-verifier.js';
-import { parseExportOptions, runExport, type ExportFile } from '../../../shared/http/export.js';
+import { parseExportOptions } from '../../../shared/http/export.js';
 import { LoggerService } from '../../../shared/logger/logger.service.js';
 import {
   CONTRACT_TYPES_EXPORT_COLUMNS,
   CONTRACT_TYPES_EXPORT_FILE_STEM,
 } from '../contract-types.routes.js';
-import type {
-  ContractTypesListResponseDto,
-  ContractTypesResponseDto,
+import {
+  type ContractTypesListResponseDto,
+  type ContractTypesResponseDto,
 } from '../dto/contract-types.dto.js';
 import {
   ContractTypesCreatedV1,
@@ -47,12 +36,11 @@ import type {
 } from '../model/contract-types.model.js';
 import { ContractTypesRepository } from '../repository/contract-types.repository.js';
 import {
-  companyZone,
   CONTRACT_TYPES_EXPORT_CELLS,
   ContractTypesTransformer,
+  NO_CONTRACT_TYPE_USAGE,
   toContractType,
   toExportRow,
-  wallClockAt,
 } from './contract-types.transformer.js';
 import { ContractTypesTransport } from './contract-types.transport.js';
 import { ContractTypesValidator } from './contract-types.validator.js';
@@ -65,18 +53,14 @@ export interface ContractTypesDescription {
 /** The detail of every administrator refusal: plain, and the same for every use case. */
 const ADMIN_ONLY = 'contract types are managed by administrators only';
 
-/** The detail when the usage answer does not name the id: an unknown count refuses. */
+/** The detail when the usage answer does not name the id or fails: an unknown count refuses. */
 const NOT_COUNTED = 'its use could not be counted';
 
 /** Each usage group's words in a 409 detail, in the order the detail lists them. */
-const GROUP_WORDS = [
-  ['purchaseRequests', 'purchase request(s)'],
-  ['purchaseOrders', 'purchase order(s)'],
-  ['purchaseQuotations', 'purchase quotation(s)'],
-  ['shippingCharges', 'shipping charge(s)'],
-  ['expenses', 'expense(s)'],
-  ['assets', 'asset(s)'],
-] as const satisfies readonly (readonly [keyof ContractTypeUsage, string])[];
+const GROUP_WORDS = [['contracts', 'contract(s)']] as const satisfies readonly (readonly [
+  keyof ContractTypeUsage,
+  string,
+])[];
 
 function notFound(): AppError {
   return new AppError('ERP-CORE-0004', 'Resource not found');
@@ -115,16 +99,15 @@ export class ContractTypesService {
   }
 
   /**
-   * `GET /api/v1/contract-types?limit&cursor&q&sort`: one keyset page (the id descending by default),
-   * the page's usage read once and the company zone read once.
+   * `GET /api/v1/contract-types?limit&cursor&q&sort`: one keyset page (the name descending by default),
+   * the page's usage read once.
    */
   async list(actor: AuthenticatedUser, input: unknown): Promise<ContractTypesListResponseDto> {
     this.assertAdministrator(actor, ADMIN_ONLY);
     const request = this.validator.parseListQuery(input);
     const page = await this.repository.list(request);
     const usage = await this.repository.usageByContractType(page.items.map((row) => row.id));
-    const zone = await this.zone();
-    return this.transformer.toListResponse(page.items, usage, zone, page);
+    return this.transformer.toListResponse(page.items, usage, page);
   }
 
   /** `GET /api/v1/contract-types/:id`: the contract type with its usage; a missing id is `ERP-CORE-0004`. */
@@ -137,29 +120,24 @@ export class ContractTypesService {
   }
 
   /**
-   * `POST /api/v1/contract-types`: the strict body; `created_by` is the actor and `datecreated` the
-   * wall clock of the company zone now, as Perfex's `add` writes them (D-31). One
-   * `ContractTypesCreatedV1` after the write, then the log line; the new row's usage is zero.
+   * `POST /api/v1/contract-types`: the strict body.
+   * One `ContractTypesCreatedV1` after the write, then the log line; the new row's usage is zero.
    */
   async create(actor: AuthenticatedUser, body: unknown): Promise<ContractTypesResponseDto> {
     this.assertAdministrator(actor, ADMIN_ONLY);
     const input = this.validator.parseCreateBody(body);
-    const zone = await this.zone();
     const now = this.now();
     const row = await this.repository.create({
       name: input.name,
-      createdBy: actor.staffId,
-      datecreated: wallClockAt(now, zone),
     });
     await this.transport.publish(new ContractTypesCreatedV1({ id: row.id, at: now.toISOString() }));
     this.logger.log('contract type created', { id: row.id });
-    return this.transformer.toResponse(row, new Map(), zone);
+    return this.transformer.toResponse(row, new Map());
   }
 
   /**
-   * `PATCH /api/v1/contract-types/:id`: the name and nothing else (`created_by` and `datecreated` are
-   * never changed, D-31); no duplicate check and no lock, as in Perfex. A missing id is
-   * `ERP-CORE-0004`. One `ContractTypesUpdatedV1` after the write, then the log line.
+   * `PATCH /api/v1/contract-types/:id`: the name and nothing else; no duplicate check and no lock, as in Perfex.
+   * A missing id is `ERP-CORE-0004`. One `ContractTypesUpdatedV1` after the write, then the log line.
    */
   async update(
     actor: AuthenticatedUser,
@@ -187,7 +165,12 @@ export class ContractTypesService {
     this.assertAdministrator(actor, ADMIN_ONLY);
     const { id } = this.validator.parseParams(params);
     if ((await this.repository.findById(id)) === null) throw notFound();
-    const usage = await this.repository.usageByContractType([id]);
+    let usage: ReadonlyMap<number, ContractTypeUsage>;
+    try {
+      usage = await this.repository.usageByContractType([id]);
+    } catch {
+      throw new AppError('ERP-CONTRACTTYPES-0001', NOT_COUNTED);
+    }
     const refusal = inUse(usage.get(id));
     if (refusal !== null) throw refusal;
     const at = this.now().toISOString();
@@ -199,8 +182,7 @@ export class ContractTypesService {
   /**
    * `GET /api/v1/contract-types/export?format&column&header&q&sort`: every row the list's query
    * matches, as CSV, Excel, PDF or print rows (ADR-0043). **Administrators first**, for every format,
-   * before any parse or count. No row selection here: a `key` is a 400. The cells are the id, the
-   * name and the date created; the usage is never read. The generated handler name is kept.
+   * before any parse or count. No row selection here: a `key` is a 400.
    */
   async exportCsv(actor: AuthenticatedUser, input: unknown): Promise<ExportFile> {
     this.assertAdministrator(actor, ADMIN_ONLY);
@@ -209,7 +191,6 @@ export class ContractTypesService {
       keys: 'refuse',
     });
     const request = this.validator.parseExportList(input);
-    const zone = await this.zone();
     return runExport({
       stem: CONTRACT_TYPES_EXPORT_FILE_STEM,
       cells: CONTRACT_TYPES_EXPORT_CELLS,
@@ -218,8 +199,11 @@ export class ContractTypesService {
       count: (list) => this.repository.count(list),
       page: async (list) => {
         const page = await this.repository.list(list);
+        const usage = await this.repository.usageByContractType(page.items.map((row) => row.id));
         return {
-          items: page.items.map((row) => toExportRow(row, zone)),
+          items: page.items.map((row) =>
+            toExportRow(row, usage.get(row.id) ?? NO_CONTRACT_TYPE_USAGE),
+          ),
           nextCursor: page.nextCursor,
         };
       },
@@ -248,15 +232,10 @@ export class ContractTypesService {
     });
   }
 
-  /** One record with its usage and the company zone. */
+  /** One record with its usage. */
   private async record(row: ContractTypeRow): Promise<ContractTypesResponseDto> {
     const usage = await this.repository.usageByContractType([row.id]);
-    return this.transformer.toResponse(row, usage, await this.zone());
-  }
-
-  /** Perfex's zone: `default_timezone` through the settings facade, `UTC` when unusable (D-31). */
-  private async zone(): Promise<string> {
-    return companyZone(await this.transport.companyTimeZone());
+    return this.transformer.toResponse(row, usage);
   }
 
   /** D-06: the administrator flag, never a permission code; `ERP-AUTH-0005` (never identity's code). */
