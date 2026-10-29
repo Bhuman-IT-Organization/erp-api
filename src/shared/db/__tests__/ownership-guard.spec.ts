@@ -488,6 +488,7 @@ describe('the committed register, today', () => {
     // `tbldepartments`, `tblcustomfields` and `tblcustomfieldsvalues` are Perfex's again: this copy
     // removed the Departments and Custom Fields write routes, so v1/departments and v1/custom-fields
     // only read them.
+    // Ticket Statuses claimed tbltickets_status for v1/ticket-statuses.
     // Update this expectation in the same PR that changes either register.
     const nodeOwned = [...map.entries()]
       .filter(([, o]) => o === 'node')
@@ -507,6 +508,7 @@ describe('the committed register, today', () => {
       'tblstaff_departments',
       'tblstaff_permissions',
       'tbltaxes',
+      'tbltickets_status',
     ]);
     const tables = loadModelTableMap();
     for (const table of map.keys()) {

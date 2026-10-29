@@ -12,6 +12,7 @@ import { MailModule } from './mail/mail.module.js';
 import { PaymentModesModule } from './payment-modes/payment-modes.module.js';
 import { SettingsModule } from './settings/settings.module.js';
 import { TaxesModule } from './taxes/taxes.module.js';
+import { TicketStatusesModule } from './ticket-statuses/ticket-statuses.module.js';
 
 /** Registers every v1 module. Route prefix `api/v1` is applied globally in main.ts. */
 @Module({
@@ -29,6 +30,7 @@ import { TaxesModule } from './taxes/taxes.module.js';
     DepartmentsModule,
     SettingsModule,
     CustomFieldsModule,
+    TicketStatusesModule,
   ],
 })
 export class V1Module {}
