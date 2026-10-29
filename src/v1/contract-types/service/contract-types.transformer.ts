@@ -56,10 +56,7 @@ export function toResponse(
 }
 
 /** One exported row: the name and contracts count. */
-export function toExportRow(
-  row: ContractTypeRow,
-  usage: ContractTypeUsage,
-): ContractTypeExportRow {
+export function toExportRow(row: ContractTypeRow, usage: ContractTypeUsage): ContractTypeExportRow {
   return {
     name: row.name,
     contracts: usage.contracts,

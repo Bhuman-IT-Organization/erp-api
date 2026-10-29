@@ -22,9 +22,7 @@ import { ContractTypesService } from '../service/contract-types.service.js';
 import { ContractTypesTransformer } from '../service/contract-types.transformer.js';
 import { ContractTypesTransport } from '../service/contract-types.transport.js';
 import { ContractTypesValidator } from '../service/contract-types.validator.js';
-import {
-  TEST_NOW,
-} from './create-contract-types-test-app.js';
+import { TEST_NOW } from './create-contract-types-test-app.js';
 import {
   asRepository,
   seededStore,

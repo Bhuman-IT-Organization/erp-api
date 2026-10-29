@@ -400,7 +400,9 @@ describe('ContractTypesController (Fastify inject, no network)', () => {
         /^attachment; filename="contract-types-\d{4}-\d{2}-\d{2}\.csv"$/,
       );
       expect(res.headers['cache-control']).toBe('no-store');
-      expect(res.payload.startsWith(`${CSV_BOM}name,contracts\r\nHead Office,0\r\nWarehouse,0\r\n`)).toBe(true);
+      expect(
+        res.payload.startsWith(`${CSV_BOM}name,contracts\r\nHead Office,0\r\nWarehouse,0\r\n`),
+      ).toBe(true);
     });
 
     it.each([

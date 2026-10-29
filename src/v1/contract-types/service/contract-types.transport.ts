@@ -11,9 +11,7 @@ import {
 
 @Injectable()
 export class ContractTypesTransport {
-  constructor(
-    @Inject(DOMAIN_EVENT_PUBLISHER) private readonly publisher: DomainEventPublisher,
-  ) {}
+  constructor(@Inject(DOMAIN_EVENT_PUBLISHER) private readonly publisher: DomainEventPublisher) {}
 
   /** Forwards a domain event to the port (ADR-0029). */
   publish(event: DomainEvent): Promise<void> {
