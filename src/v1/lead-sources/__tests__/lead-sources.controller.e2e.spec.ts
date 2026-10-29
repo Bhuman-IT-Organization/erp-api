@@ -10,6 +10,7 @@ import {
   LeadSourcesDeletedV1,
   LeadSourcesUpdatedV1,
 } from '../events/published.js';
+import type { LeadSourceUsage } from '../model/lead-sources.model.js';
 import {
   createLeadSourcesTestApp,
   TEST_BEARERS,
@@ -125,15 +126,19 @@ describe('LeadSourcesController (Fastify inject)', () => {
   );
 
   it('lists source usage and sends request ids', async () => {
-    context.repo.usage.set(3, { leads: 2 });
+    context.repo.usage.set(3, { ...ZERO_USAGE, leads: 2 });
     const response = await send('GET', LIST, TEST_BEARERS.admin);
     expect(response.statusCode).toBe(HTTP.ok);
     expect(response.headers['x-request-id']).toBeTruthy();
     const body = JSON.parse(response.payload) as {
-      data: { id: string; usage: { leads: number } }[];
+      data: { id: string; usage: LeadSourceUsage }[];
     };
     expect(body.data.map((row) => row.id)).toEqual(['2', '1', '3']);
-    expect(body.data[2]).toEqual({ id: '3', name: 'Website', usage: { leads: 2 } });
+    expect(body.data[2]).toEqual({
+      id: '3',
+      name: 'Website',
+      usage: { ...ZERO_USAGE, leads: 2 },
+    });
   });
 
   it('creates, updates and deletes with events and expected status codes', async () => {
@@ -175,7 +180,7 @@ describe('LeadSourcesController (Fastify inject)', () => {
     const absent = await send('GET', record(404), TEST_BEARERS.admin);
     expect(absent.statusCode).toBe(HTTP.notFound);
     expect(problem(absent).code).toBe('ERP-CORE-0004');
-    context.repo.usage.set(1, { leads: 1 });
+    context.repo.usage.set(1, { ...ZERO_USAGE, leads: 1 });
     const conflict = await send('DELETE', record(1), TEST_BEARERS.admin);
     expect(conflict.statusCode).toBe(HTTP.conflict);
     expect(problem(conflict).code).toBe('ERP-LEADSOURCES-0001');
@@ -193,6 +198,6 @@ describe('LeadSourcesController (Fastify inject)', () => {
       const response = await send(route.method, url, TEST_BEARERS.admin, route.payload);
       expect(response.statusCode).toBe(route.admin);
     }
-    expect(ZERO_USAGE).toEqual({ leads: 0 });
+    expect(ZERO_USAGE).toEqual({ leads: 0, emailIntegrations: 0, webToLeadForms: 0 });
   });
 });

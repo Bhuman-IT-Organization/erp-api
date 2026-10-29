@@ -145,7 +145,7 @@ describe.skipIf(!process.env.DATABASE_URL)('LeadSourcesRepository against the lo
       webToLeadIds.push(webToLead.id);
 
       await expect(repository.usageByLeadSource([id])).resolves.toEqual(
-        new Map([[id, { leads: 3 }]]),
+        new Map([[id, { leads: 3, emailIntegrations: 0, webToLeadForms: 0 }]]),
       );
 
       const testService = new LeadSourcesService(

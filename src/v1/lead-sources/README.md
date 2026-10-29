@@ -16,13 +16,14 @@ Perfex.
 Before returning usage or deleting a source, the repository discovers which of these references
 exist in the connected schema, then counts matching IDs in each present table:
 
-| Table                        | Column        | Count represented by |
-| :--------------------------- | :------------ | :------------------- |
-| `tblleads`                   | `source`      | `usage.leads`        |
-| `tblleads_email_integration` | `lead_source` | `usage.leads`        |
-| `tblweb_to_lead`             | `lead_source` | `usage.leads`        |
+| Table                        | Column        | Count represented by      |
+| :--------------------------- | :------------ | :------------------------ |
+| `tblleads`                   | `source`      | `usage.leads`             |
+| `tblleads_email_integration` | `lead_source` | `usage.emailIntegrations` |
+| `tblweb_to_lead`             | `lead_source` | `usage.webToLeadForms`    |
 
-Counts are summed into the existing `usage.leads` response field to preserve the API output shape.
+Each reference has its own usage response field. The `totalLeads` export column remains the sum of
+all three reference counts.
 The discovered table and column names are selected from this fixed list; IDs are bound query
 parameters. A missing reference column contributes zero. If any probe or count fails during delete,
 the delete is refused with HTTP 409 rather than allowing an unverified delete.
@@ -39,14 +40,14 @@ through `SettingsFacade`; this module does not read or write `tbloptions` direct
 
 All endpoints are administrator-only.
 
-| Method   | Path                          | Success                                                                  | Relevant errors                                                        |
-| :------- | :---------------------------- | :----------------------------------------------------------------------- | :--------------------------------------------------------------------- |
-| `GET`    | `/api/v1/lead-sources`        | Paginated `{ data, meta }`; each row is `{ id, name, usage: { leads } }` | 400 invalid query                                                      |
-| `GET`    | `/api/v1/lead-sources/:id`    | `{ id, name, usage: { leads } }`                                         | 404 missing source                                                     |
-| `POST`   | `/api/v1/lead-sources`        | 201 with the new source                                                  | 400 invalid body                                                       |
-| `PATCH`  | `/api/v1/lead-sources/:id`    | 200 with the renamed source                                              | 400 invalid body; 404 missing source                                   |
-| `DELETE` | `/api/v1/lead-sources/:id`    | 204, no body                                                             | 404 missing source; 409 default or in use / usage could not be counted |
-| `GET`    | `/api/v1/lead-sources/export` | CSV, Excel, PDF, or print rows                                           | 400 invalid export options                                             |
+| Method   | Path                          | Success                                                                                             | Relevant errors                                                        |
+| :------- | :---------------------------- | :-------------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------- |
+| `GET`    | `/api/v1/lead-sources`        | Paginated `{ data, meta }`; each row includes `usage: { leads, emailIntegrations, webToLeadForms }` | 400 invalid query                                                      |
+| `GET`    | `/api/v1/lead-sources/:id`    | `{ id, name, usage: { leads, emailIntegrations, webToLeadForms } }`                                 | 404 missing source                                                     |
+| `POST`   | `/api/v1/lead-sources`        | 201 with the new source                                                                             | 400 invalid body                                                       |
+| `PATCH`  | `/api/v1/lead-sources/:id`    | 200 with the renamed source                                                                         | 400 invalid body; 404 missing source                                   |
+| `DELETE` | `/api/v1/lead-sources/:id`    | 204, no body                                                                                        | 404 missing source; 409 default or in use / usage could not be counted |
+| `GET`    | `/api/v1/lead-sources/export` | CSV, Excel, PDF, or print rows                                                                      | 400 invalid export options                                             |
 
 The list defaults to `name` ascending, with `id` as the tie-breaker. It also accepts `sort=name`,
 `sort=-name`, `sort=id` and `sort=-id`; `q` searches the name and an all-digit query can also match

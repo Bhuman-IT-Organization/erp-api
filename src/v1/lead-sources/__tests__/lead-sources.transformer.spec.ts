@@ -12,7 +12,7 @@ import {
 } from '../service/lead-sources.transformer.js';
 
 const ROW: LeadSourceRow = { id: 7, name: 'Web site' };
-const USED: LeadSourceUsage = { leads: 3 };
+const USED: LeadSourceUsage = { leads: 3, emailIntegrations: 0, webToLeadForms: 0 };
 const META = { nextCursor: 'next', prevCursor: null, total: 3, rangeStart: 1 };
 
 describe('LeadSourcesTransformer', () => {

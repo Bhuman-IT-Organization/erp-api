@@ -73,7 +73,7 @@ export const LEAD_SOURCE_REFERENCES: readonly LeadSourceReference[] = Object.fre
       client.$queryRaw`SELECT r.source AS id, COUNT(*) AS n FROM tblleads r WHERE r.source IN (${ids}) GROUP BY r.source`,
   },
   {
-    group: 'leads',
+    group: 'emailIntegrations',
     table: 'tblleads_email_integration',
     column: 'lead_source',
     match: 'id',
@@ -81,7 +81,7 @@ export const LEAD_SOURCE_REFERENCES: readonly LeadSourceReference[] = Object.fre
       client.$queryRaw`SELECT r.lead_source AS id, COUNT(*) AS n FROM tblleads_email_integration r WHERE r.lead_source IN (${ids}) GROUP BY r.lead_source`,
   },
   {
-    group: 'leads',
+    group: 'webToLeadForms',
     table: 'tblweb_to_lead',
     column: 'lead_source',
     match: 'id',

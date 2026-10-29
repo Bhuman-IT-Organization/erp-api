@@ -97,7 +97,7 @@ describe('LeadSourcesService: administrator access', () => {
 describe('LeadSourcesService: reads', () => {
   it('lists in name-ascending order with usage for each row', async () => {
     const { service, repo } = build();
-    repo.usage.set(1, { leads: 2 });
+    repo.usage.set(1, { ...ZERO_USAGE, leads: 2 });
     const response = await service.list(ADMIN, {});
     expect(response.data.map((row) => [row.id, row.usage.leads])).toEqual([
       ['2', 0],
@@ -109,18 +109,18 @@ describe('LeadSourcesService: reads', () => {
 
   it('gets one record with its usage and returns not found for a missing id', async () => {
     const { service, repo } = build();
-    repo.usage.set(1, { leads: 2 });
+    repo.usage.set(1, { ...ZERO_USAGE, leads: 2 });
     expect(await service.get(ADMIN, { id: '1' })).toEqual({
       id: '1',
       name: 'Website',
-      usage: { leads: 2 },
+      usage: { ...ZERO_USAGE, leads: 2 },
     });
     expect((await refusal(service.get(ADMIN, { id: '404' }))).code).toBe('ERP-CORE-0004');
   });
 
   it('exports id, name and total lead count', async () => {
     const { service, repo } = build();
-    repo.usage.set(3, { leads: 3 });
+    repo.usage.set(3, { leads: 1, emailIntegrations: 1, webToLeadForms: 1 });
     const { body } = await service.exportCsv(ADMIN, {});
     if (typeof body !== 'string') throw new Error('the export answered no CSV text');
     expect(body).toContain('id,name,totalLeads');
@@ -143,11 +143,11 @@ describe('LeadSourcesService: writes', () => {
 
   it('updates the name, preserves usage, and publishes one update event', async () => {
     const { service, repo, events, logger } = build();
-    repo.usage.set(1, { leads: 1 });
+    repo.usage.set(1, { ...ZERO_USAGE, leads: 1 });
     expect(await service.update(ADMIN, { id: '1' }, { name: 'New name' })).toEqual({
       id: '1',
       name: 'New name',
-      usage: { leads: 1 },
+      usage: { ...ZERO_USAGE, leads: 1 },
     });
     expect(events.drain()).toMatchObject([
       { name: LeadSourcesUpdatedV1.NAME, payload: { id: 1, at: AT } },
@@ -157,13 +157,20 @@ describe('LeadSourcesService: writes', () => {
 
   it('refuses deletion while in use and publishes nothing', async () => {
     const { service, repo, events, logger } = build();
-    repo.usage.set(1, { leads: 2 });
+    repo.usage.set(1, { ...ZERO_USAGE, leads: 2 });
     const error = await refusal(service.remove(ADMIN, { id: '1' }));
     expect(error.code).toBe('ERP-LEADSOURCES-0001');
     expect(error.message).toBe('used by 2 lead(s)');
     expect(events.count).toBe(0);
     expect(logger.lines).toEqual([]);
     expect(await repo.findById(1)).not.toBeNull();
+  });
+
+  it('names the specific reference group in the delete refusal', async () => {
+    const { service, repo } = build();
+    repo.usage.set(1, { ...ZERO_USAGE, emailIntegrations: 1 });
+    const error = await refusal(service.remove(ADMIN, { id: '1' }));
+    expect(error.message).toBe('used by 1 email integration(s)');
   });
 
   it('refuses deletion of the configured default source', async () => {

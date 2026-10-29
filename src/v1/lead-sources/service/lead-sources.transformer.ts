@@ -20,6 +20,8 @@ import type { LeadSource, LeadSourceRow, LeadSourceUsage } from '../model/lead-s
 /** The counts a lead source answers when the usage map has no entry for its id. */
 export const NO_LEAD_SOURCE_USAGE: LeadSourceUsage = {
   leads: 0,
+  emailIntegrations: 0,
+  webToLeadForms: 0,
 };
 
 /** One exported row: the export columns. */
@@ -59,7 +61,7 @@ export function toExportRow(
   return {
     id: String(row.id),
     name: row.name,
-    totalLeads: usage.leads,
+    totalLeads: usage.leads + usage.emailIntegrations + usage.webToLeadForms,
   };
 }
 

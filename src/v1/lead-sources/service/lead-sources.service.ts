@@ -49,10 +49,11 @@ const ADMIN_ONLY = 'lead sources are managed by administrators only';
 const NOT_COUNTED = 'its use could not be counted';
 
 /** Each usage group's words in a 409 detail, in the order the detail lists them. */
-const GROUP_WORDS = [['leads', 'lead(s)']] as const satisfies readonly (readonly [
-  keyof LeadSourceUsage,
-  string,
-])[];
+const GROUP_WORDS = [
+  ['leads', 'lead(s)'],
+  ['emailIntegrations', 'email integration(s)'],
+  ['webToLeadForms', 'web-to-lead form(s)'],
+] as const satisfies readonly (readonly [keyof LeadSourceUsage, string])[];
 
 function notFound(): AppError {
   return new AppError('ERP-CORE-0004', 'Resource not found');

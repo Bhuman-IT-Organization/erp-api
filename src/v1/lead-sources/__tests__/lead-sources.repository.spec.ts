@@ -136,7 +136,11 @@ describe('LeadSourcesRepository', () => {
   it('counts references from all three tables and keeps ids bound as parameters', async () => {
     const { repository, rawCalls } = stub({ raw: [{ id: 7, n: 2n }] });
     const usage = await repository.usageByLeadSource([7, 9]);
-    expect(usage.get(7)).toEqual({ leads: 6 });
+    expect(usage.get(7)).toEqual({
+      leads: 2,
+      emailIntegrations: 2,
+      webToLeadForms: 2,
+    });
     expect(usage.get(9)).toEqual(NO_LEAD_SOURCE_USAGE);
     expect(rawCalls).toHaveLength(4);
     expect(rawCalls[0]?.sql).toContain('information_schema.COLUMNS');

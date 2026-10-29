@@ -22,6 +22,8 @@ export interface NewLeadSource {
  */
 export interface LeadSourceUsage {
   readonly leads: number;
+  readonly emailIntegrations: number;
+  readonly webToLeadForms: number;
 }
 
 /** The facade's public shape: what the leads module migrations read. */

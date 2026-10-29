@@ -92,6 +92,8 @@ export const updateLeadSourcesBodySchema = createLeadSourcesBodySchema;
 /** What refers to the lead source, per group (the repository's `LEAD_SOURCE_REFERENCES`); never exported. */
 export const leadSourceUsageSchema = z.object({
   leads: z.number().int().nonnegative(),
+  emailIntegrations: z.number().int().nonnegative(),
+  webToLeadForms: z.number().int().nonnegative(),
 });
 
 /**
