@@ -1396,8 +1396,8 @@
     "table": "tblcustomer_admins"
   },
   {
-    "decided_by": "challaramJanaki",
-    "decided_on": "2026-10-28",
+    "decided_by": null,
+    "decided_on": null,
     "evidence": {
       "ddl": [],
       "forms": [

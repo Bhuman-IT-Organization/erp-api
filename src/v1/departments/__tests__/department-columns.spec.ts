@@ -83,8 +83,6 @@ const WRITE_METHODS = [
 /** A raw statement keyword that writes or alters a table. */
 const RAW_WRITE = /\b(INSERT|UPDATE|DELETE|REPLACE|TRUNCATE|ALTER|DROP)\b/i;
 
-const sourceCache = new Map<string, Source[]>();
-
 /**
  * A path under identity's repository folder, joined from its segments: module-shape refuses the
  * literal folder path in any file outside identity (ADR-0034 decision 1).
@@ -112,9 +110,7 @@ function stripComments(source: string): string {
 
 /** Every non-test `.ts` file under `root`, the generated Prisma client excluded. */
 function sourcesUnder(root: string): Source[] {
-  const cached = sourceCache.get(root);
-  if (cached !== undefined) return cached;
-  const sources = readdirSync(root, { withFileTypes: true, recursive: true })
+  return readdirSync(root, { withFileTypes: true, recursive: true })
     .filter((entry) => entry.isFile() && entry.name.endsWith('.ts'))
     .map((entry) => relative(root, join(entry.parentPath, entry.name)).split(sep).join('/'))
     .filter(
@@ -124,8 +120,6 @@ function sourcesUnder(root: string): Source[] {
         !file.startsWith('shared/db/generated/'),
     )
     .map((file) => ({ file, code: stripComments(readFileSync(join(root, file), 'utf8')) }));
-  sourceCache.set(root, sources);
-  return sources;
 }
 
 /** One reach of the delegate: where, and the method called on it (`null` when taken whole). */
@@ -312,7 +306,7 @@ describe('D-48, the credential guard over src/', () => {
     expect(offences, offences.join('\n')).toEqual([]);
     const reached = sourcesUnder(SRC).flatMap(accessesIn);
     expect(reached.filter((access) => access.file === REPOSITORY).length).toBeGreaterThan(5);
-  });
+  }, 60_000);
 
   it('nothing in src/ writes tbldepartments (Perfex owns it; Node only reads it)', () => {
     const offences = writeOffences(SRC);

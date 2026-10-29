@@ -47,9 +47,7 @@ export const SEED_PERMISSIONS: readonly StaffPermissionRow[] = [
   { feature: 'edit', capability: 'tasks' }, // Perfex's one swapped-order row: unmapped, dropped
 ];
 
-let cachedSeedStaff: StaffIdentity[] | undefined;
-
-/** The four seed identities with stable `$2y$10$` hashes, generated once per test module. */
+/** The four seed identities with fresh `$2y$10$` hashes (about 60 ms each at cost 10). */
 export function seedStaff(): StaffIdentity[] {
   const base = {
     firstName: 'Seed',
@@ -58,7 +56,7 @@ export function seedStaff(): StaffIdentity[] {
     isAdmin: false,
     locale: null,
   } as const;
-  cachedSeedStaff ??= [
+  return [
     {
       ...base,
       staffId: SEED_STAFF_IDS.active,
@@ -95,7 +93,6 @@ export function seedStaff(): StaffIdentity[] {
       passwordHash: legacyStyleHash(SEED_PASSWORDS.twoFactor),
     },
   ];
-  return cachedSeedStaff.map((row) => ({ ...row }));
 }
 
 export interface TouchRecord {

@@ -12,6 +12,9 @@ export default defineConfig({
   ],
   test: {
     ...test,
+    // Structural scans and bcrypt-backed auth tests can exceed five seconds when the full suite
+    // starts one isolated worker per file. Keep the default worker strategy unchanged.
+    testTimeout: 15_000,
     // packages/** so the workspace packages' own suites (`@erp/contracts`) run in `yarn test`.
     include: ['src/**/*.spec.ts', 'packages/*/__tests__/**/*.spec.ts'],
     exclude: ['src/**/*.int.spec.ts', 'node_modules/**', 'dist/**', 'packages/*/dist/**'],

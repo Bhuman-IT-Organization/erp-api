@@ -32,23 +32,20 @@ function sourceFiles(): string[] {
   return listed.split('\n').filter((file) => file !== '' && file !== SELF);
 }
 
-// This is an immutable repository snapshot for the assertion below. Do the filesystem walk while
-// the test module is loading, rather than spending the Vitest test timeout on synchronous I/O.
-const OFFENDING: string[] = [];
-for (const file of sourceFiles()) {
-  let text: string;
-  try {
-    text = readFileSync(join(ROOT, file), 'utf8');
-  } catch {
-    continue;
-  }
-  text.split('\n').forEach((line, index) => {
-    if (LICENCE.test(line)) OFFENDING.push(`${file}:${String(index + 1)}`);
-  });
-}
-
 describe('no vendor licence check (ADR-0042, T-4.2-14)', () => {
   it('names no licence server, licence key, LB-* header or vendorLicence breaker anywhere', () => {
-    expect(OFFENDING, OFFENDING.join('\n')).toEqual([]);
+    const offending: string[] = [];
+    for (const file of sourceFiles()) {
+      let text: string;
+      try {
+        text = readFileSync(join(ROOT, file), 'utf8');
+      } catch {
+        continue; // listed by git but deleted in the working tree
+      }
+      text.split('\n').forEach((line, index) => {
+        if (LICENCE.test(line)) offending.push(`${file}:${String(index + 1)}`);
+      });
+    }
+    expect(offending, offending.join('\n')).toEqual([]);
   });
 });
