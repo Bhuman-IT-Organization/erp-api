@@ -6,6 +6,11 @@ export interface PredefinedReply {
   readonly message: string;
 }
 
+export interface PredefinedReplyListItem {
+  readonly id: number;
+  readonly name: string;
+}
+
 export type PredefinedReplyId = PredefinedReply['id'];
 export type PredefinedRepliesSortField = 'name' | 'id';
 
@@ -18,7 +23,7 @@ export interface PredefinedRepliesListRequest {
 }
 
 export interface PredefinedRepliesPage extends ListPageMeta {
-  readonly items: readonly PredefinedReply[];
+  readonly items: readonly PredefinedReplyListItem[];
 }
 
 export interface NewPredefinedReply {
@@ -27,6 +32,6 @@ export interface NewPredefinedReply {
 }
 
 export interface UpdatePredefinedReply {
-  readonly name: string;
-  readonly message: string;
+  readonly name?: string;
+  readonly message?: string;
 }

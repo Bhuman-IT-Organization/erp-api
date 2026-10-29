@@ -2,9 +2,10 @@ import { Injectable } from '@nestjs/common';
 import type { z } from 'zod';
 import { AppError } from '../../../shared/errors/app-error.js';
 import { decodeCursor } from '../../../shared/http/keyset.js';
-import { parseListQuery } from '../../../shared/http/pagination.js';
+import { LIST_QUERY_LIMITS, parseListQuery } from '../../../shared/http/pagination.js';
 import {
   createPredefinedReplyBodySchema,
+  exportPredefinedRepliesQuerySchema,
   listPredefinedRepliesQuerySchema,
   PREDEFINED_REPLIES_SEARCH_MAX,
   predefinedReplyParamsSchema,
@@ -93,7 +94,7 @@ export class PredefinedRepliesValidator {
     }
 
     const sortField = first?.field ?? PREDEFINED_REPLIES_SORT_FIELDS[0];
-    const sortDirection = first === undefined ? 'asc' : first.direction;
+    const sortDirection = first === undefined ? 'desc' : first.direction;
     const cursor = decodeCursor(query.cursor, sortField);
 
     if (cursor !== null && typeof cursor.key[0] !== SORT_KINDS[sortField]) {
@@ -107,6 +108,11 @@ export class PredefinedRepliesValidator {
       cursor,
       limit: query.limit,
     };
+  }
+
+  parseExportList(input: unknown): PredefinedRepliesListRequest {
+    parse(exportPredefinedRepliesQuerySchema, input, 'Query is invalid');
+    return { ...this.parseListQuery(input), cursor: null, limit: LIST_QUERY_LIMITS.max };
   }
 
   parseParams(input: unknown): PredefinedReplyParams {

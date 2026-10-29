@@ -4,10 +4,11 @@ import { PrismaService } from '../../../shared/db/prisma.service.js';
 import { encodeCursor, keysetWhere, type KeyValue } from '../../../shared/http/keyset.js';
 import type {
   NewPredefinedReply,
-  PredefinedReply,
+  PredefinedReplyListItem,
   PredefinedRepliesListRequest,
   PredefinedRepliesPage,
   PredefinedRepliesSortField,
+  UpdatePredefinedReply,
 } from '../model/predefined-replies.model.js';
 
 const predefinedReplyRowSchema = z.object({
@@ -16,7 +17,11 @@ const predefinedReplyRowSchema = z.object({
   message: z.string(),
 });
 
-const rowsSchema = z.array(predefinedReplyRowSchema);
+const listRowSchema = z.object({
+  id: z.number().int(),
+  name: z.string(),
+});
+const listRowsSchema = z.array(listRowSchema);
 
 export type PredefinedReplyRow = z.infer<typeof predefinedReplyRowSchema>;
 
@@ -24,14 +29,19 @@ type WhereValue = Record<string, unknown>;
 type Key = readonly [KeyValue, number];
 
 function matchOf(search: string | null): WhereValue {
-  return search === null
-    ? {}
-    : {
-        OR: [{ name: { contains: search } }, { message: { contains: search } }],
-      };
+  if (search === null) return {};
+
+  const conditions: WhereValue[] = [{ name: { contains: search } }];
+
+  if (/^\d+$/.test(search)) {
+    const id = Number(search);
+    if (Number.isSafeInteger(id) && id > 0) conditions.push({ id });
+  }
+
+  return { OR: conditions };
 }
 
-function keyOf(row: PredefinedReply, sortField: PredefinedRepliesSortField): Key {
+function keyOf(row: PredefinedReplyListItem, sortField: PredefinedRepliesSortField): Key {
   return sortField === 'name' ? [row.name, row.id] : [row.id, row.id];
 }
 
@@ -68,6 +78,12 @@ function pageMeta(
 export class PredefinedRepliesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  async count(request: PredefinedRepliesListRequest): Promise<number> {
+    return this.prisma.client.tbltickets_predefined_replies.count({
+      where: matchOf(request.search),
+    });
+  }
+
   async list(request: PredefinedRepliesListRequest): Promise<PredefinedRepliesPage> {
     const { sortField, order, cursor, limit } = request;
     const match = matchOf(request.search);
@@ -82,19 +98,17 @@ export class PredefinedRepliesRepository {
             },
       orderBy: [{ [sortField]: read }, { id: read }],
       take: limit,
-      select: { id: true, name: true, message: true },
+      select: { id: true, name: true },
     });
 
-    const items = rowsSchema.parse(rows);
+    const items = listRowsSchema.parse(rows);
     if (read !== order) items.reverse();
 
     const keys = items.map((row) => keyOf(row, sortField));
     const first = keys[0];
 
     const [total, before] = await Promise.all([
-      this.prisma.client.tbltickets_predefined_replies.count({
-        where: match,
-      }),
+      this.prisma.client.tbltickets_predefined_replies.count({ where: match }),
       first === undefined
         ? Promise.resolve(0)
         : this.prisma.client.tbltickets_predefined_replies.count({
@@ -119,6 +133,26 @@ export class PredefinedRepliesRepository {
     return { items, ...pageMeta(sortField, keys, total, before) };
   }
 
+  async listAll(): Promise<PredefinedReplyRow[]> {
+    const rows = await this.prisma.client.tbltickets_predefined_replies.findMany({
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
+      select: { id: true, name: true, message: true },
+    });
+
+    return z.array(predefinedReplyRowSchema).parse(rows);
+  }
+
+  async findByIds(ids: readonly number[]): Promise<PredefinedReplyRow[]> {
+    if (ids.length === 0) return [];
+
+    const rows = await this.prisma.client.tbltickets_predefined_replies.findMany({
+      where: { id: { in: [...ids] } },
+      select: { id: true, name: true, message: true },
+    });
+
+    return z.array(predefinedReplyRowSchema).parse(rows);
+  }
+
   async findById(id: number): Promise<PredefinedReplyRow | null> {
     const row = await this.prisma.client.tbltickets_predefined_replies.findUnique({
       where: { id },
@@ -137,7 +171,7 @@ export class PredefinedRepliesRepository {
     return predefinedReplyRowSchema.parse(row);
   }
 
-  async update(id: number, input: NewPredefinedReply): Promise<PredefinedReplyRow | null> {
+  async update(id: number, input: UpdatePredefinedReply): Promise<PredefinedReplyRow | null> {
     const existing = await this.findById(id);
     if (existing === null) return null;
 

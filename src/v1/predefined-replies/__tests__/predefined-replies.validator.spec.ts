@@ -57,19 +57,19 @@ describe('PredefinedRepliesValidator', () => {
     ).toThrow(AppError);
   });
 
-  it('rejects a missing or empty message', () => {
-    expect(() =>
-      validator.parseCreateBody({
-        name: 'Welcome',
-      }),
-    ).toThrow(AppError);
+  it('allows a missing message', () => {
+    expect(validator.parseCreateBody({ name: 'Welcome' })).toEqual({
+      name: 'Welcome',
+    });
+  });
 
-    expect(() =>
+  it('preserves message whitespace', () => {
+    expect(
       validator.parseCreateBody({
         name: 'Welcome',
-        message: '   ',
-      }),
-    ).toThrow(AppError);
+        message: '  Hello\\n\\nthere  ',
+      }).message,
+    ).toBe('  Hello\\n\\nthere  ');
   });
 
   it('rejects unexpected fields', () => {

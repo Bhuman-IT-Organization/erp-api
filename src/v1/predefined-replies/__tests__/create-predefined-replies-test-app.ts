@@ -4,7 +4,11 @@ import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fa
 import { Test, type TestingModule } from '@nestjs/testing';
 import { PERMISSION_CODES } from '@erp/contracts';
 import { ProblemDetailsFilter } from '../../../shared/errors/problem-details.filter.js';
-import { LoggerService } from '../../../shared/logger/logger.service.js';
+import {
+  DOMAIN_EVENT_PUBLISHER,
+  RecordingDomainEventPublisher,
+} from '../../../shared/events/domain-event.publisher.js';
+import { EventsModule } from '../../../shared/events/events.module.js';
 import { API_PREFIX, UNPREFIXED_ROUTES } from '../../../shared/http/api-prefix.js';
 import {
   ACCESS_TOKEN_VERIFIER,
@@ -12,6 +16,8 @@ import {
   type AuthenticatedUser,
 } from '../../../shared/http/auth/access-token-verifier.js';
 import { registerRequestId } from '../../../shared/http/request-id.js';
+import { LoggerModule } from '../../../shared/logger/logger.module.js';
+import { LoggerService } from '../../../shared/logger/logger.service.js';
 import { PredefinedRepliesModule } from '../predefined-replies.module.js';
 import { PredefinedRepliesRepository } from '../repository/predefined-replies.repository.js';
 import { asRepository, InMemoryPredefinedRepliesRepository } from './fakes.js';
@@ -51,6 +57,7 @@ class StubAccessTokenVerifier implements AccessTokenVerifier {
     if (staffId === 1 || staffId === 2) {
       return Promise.resolve(PERMISSION_CODES.includes(code));
     }
+
     return Promise.resolve(false);
   }
 }
@@ -67,6 +74,7 @@ export interface PredefinedRepliesTestApp {
   readonly moduleRef: TestingModule;
   readonly routes: readonly string[];
   readonly repo: InMemoryPredefinedRepliesRepository;
+  readonly events: RecordingDomainEventPublisher;
   close(): Promise<void>;
 }
 
@@ -74,29 +82,48 @@ export async function createPredefinedRepliesTestApp(): Promise<PredefinedReplie
   const repo = new InMemoryPredefinedRepliesRepository();
   await repo.seed();
 
+  const events = new RecordingDomainEventPublisher();
+  const logger = new LoggerService();
+
   const moduleRef = await Test.createTestingModule({
-    imports: [StubVerifierModule, PredefinedRepliesModule],
+    imports: [LoggerModule, EventsModule, StubVerifierModule, PredefinedRepliesModule],
   })
+    .overrideProvider(DOMAIN_EVENT_PUBLISHER)
+    .useValue(events)
     .overrideProvider(PredefinedRepliesRepository)
     .useValue(asRepository(repo))
+    .overrideProvider(LoggerService)
+    .useValue(logger)
     .compile();
 
   const app = moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
+
   registerRequestId(app);
   app.setGlobalPrefix(API_PREFIX, { exclude: [...UNPREFIXED_ROUTES] });
-  app.useGlobalFilters(new ProblemDetailsFilter(new LoggerService()));
+  app.useGlobalFilters(new ProblemDetailsFilter(logger));
 
   const routes: string[] = [];
+
   app
     .getHttpAdapter()
     .getInstance()
     .addHook('onRoute', (route) => {
       const methods = Array.isArray(route.method) ? route.method : [route.method];
-      for (const method of methods) routes.push(`${method} ${route.url}`);
+
+      for (const method of methods) {
+        routes.push(`${method} ${route.url}`);
+      }
     });
 
   await app.init();
   await app.getHttpAdapter().getInstance().ready();
 
-  return { app, moduleRef, routes, repo, close: () => app.close() };
+  return {
+    app,
+    moduleRef,
+    routes,
+    repo,
+    events,
+    close: () => app.close(),
+  };
 }

@@ -1,31 +1,35 @@
-/**
- * Versioned domain events published by the predefined-replies module.
- */
 import { DomainEvent } from '../../../shared/events/domain-event.js';
 
-export interface PredefinedReplyEventPayload {
+export interface PredefinedRepliesEventPayload {
   readonly id: number;
-  /** ISO timestamp. */
-  readonly at: string;
 }
 
-export class PredefinedReplyCreatedV1 extends DomainEvent<
-  'predefined-reply.record.created',
-  PredefinedReplyEventPayload
+export class PredefinedRepliesCreatedV1 extends DomainEvent<
+  'predefined-replies.record.created',
+  PredefinedRepliesEventPayload
 > {
-  static readonly NAME = 'predefined-reply.record.created' as const;
-  readonly name = PredefinedReplyCreatedV1.NAME;
+  static readonly NAME = 'predefined-replies.record.created' as const;
+  readonly name = PredefinedRepliesCreatedV1.NAME;
 }
 
-export class PredefinedReplyUpdatedV1 extends DomainEvent<
-  'predefined-reply.record.updated',
-  PredefinedReplyEventPayload
+export class PredefinedRepliesUpdatedV1 extends DomainEvent<
+  'predefined-replies.record.updated',
+  PredefinedRepliesEventPayload
 > {
-  static readonly NAME = 'predefined-reply.record.updated' as const;
-  readonly name = PredefinedReplyUpdatedV1.NAME;
+  static readonly NAME = 'predefined-replies.record.updated' as const;
+  readonly name = PredefinedRepliesUpdatedV1.NAME;
 }
 
-export const PREDEFINED_REPLY_PUBLISHED_EVENTS = [
-  PredefinedReplyCreatedV1,
-  PredefinedReplyUpdatedV1,
+export class PredefinedRepliesDeletedV1 extends DomainEvent<
+  'predefined-replies.record.deleted',
+  PredefinedRepliesEventPayload
+> {
+  static readonly NAME = 'predefined-replies.record.deleted' as const;
+  readonly name = PredefinedRepliesDeletedV1.NAME;
+}
+
+export const PREDEFINED_REPLIES_PUBLISHED_EVENTS = [
+  PredefinedRepliesCreatedV1,
+  PredefinedRepliesUpdatedV1,
+  PredefinedRepliesDeletedV1,
 ] as const;

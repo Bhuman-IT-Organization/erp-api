@@ -2,6 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import type { AuthenticatedUser } from '../../../shared/http/auth/access-token-verifier.js';
 import type { PredefinedRepliesRepository } from '../repository/predefined-replies.repository.js';
 import { PredefinedRepliesService } from '../service/predefined-replies.service.js';
+import { PredefinedRepliesTransport } from '../service/predefined-replies.transport.js';
+import { RecordingDomainEventPublisher } from '../../../shared/events/domain-event.publisher.js';
+import { LoggerService } from '../../../shared/logger/logger.service.js';
 import { PredefinedRepliesValidator } from '../service/predefined-replies.validator.js';
 
 const NOW = 1_800_000_000;
@@ -25,6 +28,7 @@ const reply = {
   id: 1,
   name: 'Greeting',
   message: 'Hello, how can we help?',
+  hasOtherFormatting: false,
 };
 
 function build() {
@@ -50,12 +54,18 @@ function build() {
     remove: vi.fn().mockResolvedValue(true),
   };
 
+  const publisher = new RecordingDomainEventPublisher();
+  const transport = new PredefinedRepliesTransport(publisher);
+  const logger = { log: vi.fn() } as unknown as LoggerService;
+
   const service = new PredefinedRepliesService(
     repository as unknown as PredefinedRepliesRepository,
     new PredefinedRepliesValidator(),
+    transport,
+    logger,
   );
 
-  return { service, repository };
+  return { service, repository, publisher, logger };
 }
 
 describe('PredefinedRepliesService', () => {
@@ -74,9 +84,7 @@ describe('PredefinedRepliesService', () => {
 
     const result = await service.list(ADMIN, {});
 
-    expect(result.data).toEqual([
-      { id: '1', name: 'Greeting', message: 'Hello, how can we help?' },
-    ]);
+    expect(result.data).toEqual([{ id: '1', name: 'Greeting' }]);
     expect(result.meta).toMatchObject({
       total: 1,
       rangeStart: 1,
@@ -108,8 +116,12 @@ describe('PredefinedRepliesService', () => {
     await expect(service.create(ADMIN, input)).resolves.toEqual({
       id: '2',
       ...input,
+      hasOtherFormatting: false,
     });
-    expect(repository.create).toHaveBeenCalledWith(input);
+    expect(repository.create).toHaveBeenCalledWith({
+      name: input.name,
+      message: '<p>Thank you!</p>',
+    });
   });
 
   it('updates an existing reply', async () => {
@@ -119,8 +131,12 @@ describe('PredefinedRepliesService', () => {
     await expect(service.update(ADMIN, 1, input)).resolves.toEqual({
       id: '1',
       ...input,
+      hasOtherFormatting: false,
     });
-    expect(repository.update).toHaveBeenCalledWith(1, input);
+    expect(repository.update).toHaveBeenCalledWith(1, {
+      name: input.name,
+      message: '<p>Updated message</p>',
+    });
   });
 
   it('returns an error when updating a missing reply', async () => {
@@ -135,9 +151,7 @@ describe('PredefinedRepliesService', () => {
   it('deletes a reply', async () => {
     const { service, repository } = build();
 
-    await expect(service.remove(ADMIN, 1)).resolves.toEqual({
-      success: true,
-    });
+    await expect(service.remove(ADMIN, 1)).resolves.toBeUndefined();
     expect(repository.remove).toHaveBeenCalledWith(1);
   });
 

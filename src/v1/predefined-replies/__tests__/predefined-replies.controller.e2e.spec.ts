@@ -32,7 +32,7 @@ const ROUTES: readonly { method: Method; url: string; payload?: object; status: 
     payload: { name: 'Updated reply', message: 'Updated text' },
     status: 200,
   },
-  { method: 'DELETE', url: record(3), status: 200 },
+  { method: 'DELETE', url: record(3), status: 204 },
 ];
 
 function bearer(token: string): Record<string, string> {
@@ -139,17 +139,28 @@ describe('PredefinedRepliesController (Fastify inject)', () => {
       expect.objectContaining({
         id: '1',
         name: 'First',
-        message: 'First reply message',
       }),
     );
     expect(body.meta.total).toBeGreaterThanOrEqual(3);
   });
 
-  it('searches by name or message', async () => {
-    const res = await send('GET', `${LIST}?q=Second%20reply`, TEST_BEARERS.admin);
-    expect(res.statusCode).toBe(200);
-    const body = predefinedRepliesListResponseSchema.parse(JSON.parse(res.payload));
-    expect(body.data.map((reply) => reply.name)).toEqual(['Second']);
+  it('searches by name and exact numeric ID, never by message', async () => {
+    const nameSearch = await send('GET', `${LIST}?q=Second`, TEST_BEARERS.admin);
+    expect(nameSearch.statusCode).toBe(200);
+    const nameBody = predefinedRepliesListResponseSchema.parse(JSON.parse(nameSearch.payload));
+    expect(nameBody.data.map((reply) => reply.name)).toContain('Second');
+
+    const idSearch = await send('GET', `${LIST}?q=1`, TEST_BEARERS.admin);
+    expect(idSearch.statusCode).toBe(200);
+    const idBody = predefinedRepliesListResponseSchema.parse(JSON.parse(idSearch.payload));
+    expect(idBody.data.map((reply) => reply.id)).toContain('1');
+
+    const messageSearch = await send('GET', `${LIST}?q=Original%20message`, TEST_BEARERS.admin);
+    expect(messageSearch.statusCode).toBe(200);
+    const messageBody = predefinedRepliesListResponseSchema.parse(
+      JSON.parse(messageSearch.payload),
+    );
+    expect(messageBody.data.map((reply) => reply.name)).not.toContain('New reply');
   });
 
   it('creates, reads, updates, and deletes a reply', async () => {
@@ -176,8 +187,8 @@ describe('PredefinedRepliesController (Fastify inject)', () => {
     });
 
     const deleted = await send('DELETE', record(dto.id), TEST_BEARERS.admin);
-    expect(deleted.statusCode).toBe(200);
-    expect(JSON.parse(deleted.payload)).toEqual({ success: true });
+    expect(deleted.statusCode).toBe(204);
+    expect(deleted.payload).toBe('');
 
     const missing = await send('GET', record(dto.id), TEST_BEARERS.admin);
     expect(missing.statusCode).toBe(404);

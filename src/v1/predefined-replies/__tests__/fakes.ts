@@ -33,12 +33,17 @@ export class InMemoryPredefinedRepliesRepository {
     const needle = search?.toLowerCase() ?? null;
     const key = (row: PredefinedReply): Key => keyOf(row, sortField);
 
+    const numericId = needle !== null && /^\d+$/.test(needle) ? Number(needle) : null;
+
     const sorted = [...this.rows.values()]
       .filter(
         (row) =>
           needle === null ||
           row.name.toLowerCase().includes(needle) ||
-          row.message.toLowerCase().includes(needle),
+          (numericId !== null &&
+            Number.isSafeInteger(numericId) &&
+            numericId > 0 &&
+            row.id === numericId),
       )
       .sort((a, b) => compareKeys(key(a), key(b), order));
 
