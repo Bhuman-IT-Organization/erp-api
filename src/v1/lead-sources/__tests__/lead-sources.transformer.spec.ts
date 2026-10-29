@@ -21,7 +21,7 @@ describe('LeadSourcesTransformer', () => {
   });
 
   it('builds export rows and the matching column cells', () => {
-    const row = toExportRow(ROW, USED);
+    const row = toExportRow(ROW, { ...USED, emailIntegrations: 4, webToLeadForms: 2 });
     expect(row).toEqual({ id: '7', name: 'Web site', totalLeads: 3 });
     expect(LEAD_SOURCES_EXPORT_CELLS.id.value(row)).toBe('7');
     expect(LEAD_SOURCES_EXPORT_CELLS.name.value(row)).toBe('Web site');

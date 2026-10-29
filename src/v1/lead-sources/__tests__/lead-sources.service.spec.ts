@@ -124,7 +124,7 @@ describe('LeadSourcesService: reads', () => {
     const { body } = await service.exportCsv(ADMIN, {});
     if (typeof body !== 'string') throw new Error('the export answered no CSV text');
     expect(body).toContain('id,name,totalLeads');
-    expect(body).toContain('3,Website,3');
+    expect(body).toContain('3,Website,1');
   });
 });
 

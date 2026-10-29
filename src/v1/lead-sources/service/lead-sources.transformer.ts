@@ -61,7 +61,7 @@ export function toExportRow(
   return {
     id: String(row.id),
     name: row.name,
-    totalLeads: usage.leads + usage.emailIntegrations + usage.webToLeadForms,
+    totalLeads: usage.leads,
   };
 }
 

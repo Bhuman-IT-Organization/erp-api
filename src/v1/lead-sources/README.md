@@ -22,8 +22,8 @@ exist in the connected schema, then counts matching IDs in each present table:
 | `tblleads_email_integration` | `lead_source` | `usage.emailIntegrations` |
 | `tblweb_to_lead`             | `lead_source` | `usage.webToLeadForms`    |
 
-Each reference has its own usage response field. The `totalLeads` export column remains the sum of
-all three reference counts.
+Each reference has its own usage response field. The `totalLeads` export column counts leads only
+(`usage.leads`), matching the list's lead count.
 The discovered table and column names are selected from this fixed list; IDs are bound query
 parameters. A missing reference column contributes zero. If any probe or count fails during delete,
 the delete is refused with HTTP 409 rather than allowing an unverified delete.

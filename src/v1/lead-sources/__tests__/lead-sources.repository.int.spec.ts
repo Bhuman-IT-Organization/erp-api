@@ -145,7 +145,7 @@ describe.skipIf(!process.env.DATABASE_URL)('LeadSourcesRepository against the lo
       webToLeadIds.push(webToLead.id);
 
       await expect(repository.usageByLeadSource([id])).resolves.toEqual(
-        new Map([[id, { leads: 3, emailIntegrations: 0, webToLeadForms: 0 }]]),
+        new Map([[id, { leads: 1, emailIntegrations: 1, webToLeadForms: 1 }]]),
       );
 
       const testService = new LeadSourcesService(
@@ -178,7 +178,7 @@ describe.skipIf(!process.env.DATABASE_URL)('LeadSourcesRepository against the lo
       expect(error).toMatchObject({
         code: 'ERP-LEADSOURCES-0001',
         status: 409,
-        message: 'used by 3 lead(s)',
+        message: 'used by 1 lead(s), 1 email integration(s) and 1 web-to-lead form(s)',
       });
       await expect(repository.findById(id)).resolves.not.toBeNull();
     } finally {
