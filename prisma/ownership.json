@@ -8334,8 +8334,8 @@
       ]
     },
     "evidence_changed": false,
-    "note": "",
-    "owner": "perfex-core",
+    "note": "Written by v1/predefined-replies; Perfex's delete is closed at Nginx; 'save as predefined reply' on a ticket stays on Perfex.",
+    "owner": "node",
     "owner_confidence": "write-single",
     "table": "tbltickets_predefined_replies"
   },

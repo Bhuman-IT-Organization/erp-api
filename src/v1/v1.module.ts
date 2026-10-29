@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from './auth/auth.module.js';
 import { BrandingModule } from './branding/branding.module.js';
 import { CostCentersModule } from './cost-centers/cost-centers.module.js';
+import { PredefinedRepliesModule } from './predefined-replies/predefined-replies.module.js';
 import { CurrenciesModule } from './currencies/currencies.module.js';
 import { CustomFieldsModule } from './custom-fields/custom-fields.module.js';
 import { DepartmentsModule } from './departments/departments.module.js';
@@ -24,6 +25,7 @@ import { TaxesModule } from './taxes/taxes.module.js';
     MailModule,
     TaxesModule,
     CostCentersModule,
+    PredefinedRepliesModule,
     PaymentModesModule,
     CurrenciesModule,
     DepartmentsModule,
