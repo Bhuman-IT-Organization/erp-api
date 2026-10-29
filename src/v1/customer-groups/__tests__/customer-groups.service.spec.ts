@@ -156,6 +156,22 @@ describe('CustomerGroupsService.remove', () => {
     expect(logger.log).not.toHaveBeenCalled();
   });
 
+  it('refuses with ERP-CUSTOMERGROUPS-0001 when customer use cannot be counted, and deletes nothing', async () => {
+    const { service, repository, logger } = build();
+    repository.findById.mockResolvedValueOnce({ id: 5, name: 'VIP' });
+    repository.countCustomers.mockRejectedValueOnce(new Error('database unavailable'));
+
+    const error = await service.remove(admin, { id: '5' }).catch((e: unknown) => e);
+
+    expect(error).toMatchObject({
+      code: 'ERP-CUSTOMERGROUPS-0001',
+      message: 'its use could not be counted',
+      status: 409,
+    });
+    expect(repository.remove).not.toHaveBeenCalled();
+    expect(logger.log).not.toHaveBeenCalled();
+  });
+
   it('answers not found when the group does not exist, and counts and deletes nothing', async () => {
     const { service, repository } = build();
     repository.findById.mockResolvedValueOnce(null);

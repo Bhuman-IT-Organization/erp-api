@@ -306,7 +306,7 @@ describe('D-48, the credential guard over src/', () => {
     expect(offences, offences.join('\n')).toEqual([]);
     const reached = sourcesUnder(SRC).flatMap(accessesIn);
     expect(reached.filter((access) => access.file === REPOSITORY).length).toBeGreaterThan(5);
-  }, 60_000);
+  });
 
   it('nothing in src/ writes tbldepartments (Perfex owns it; Node only reads it)', () => {
     const offences = writeOffences(SRC);
