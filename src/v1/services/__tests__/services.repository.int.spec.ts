@@ -218,8 +218,13 @@ describe.skipIf(!process.env.DATABASE_URL)('ServicesRepository against the local
      * is an extension of `service.client`, so it (rightly) refuses a write to `tbltickets`; this plain
      * client is outside it, is never used by the module, and is closed in `afterAll`.
      */
+
+    const databaseUrl = process.env.DATABASE_URL;
+    if (!databaseUrl) {
+      throw new Error('DATABASE_URL must be set for integration tests');
+    }
     const fixtures = new PrismaClient({
-      datasourceUrl: process.env.DATABASE_URL,
+      datasourceUrl: databaseUrl,
     });
 
     /** Tickets first: a service is never deleted while a ticket of this spec still uses it. */
