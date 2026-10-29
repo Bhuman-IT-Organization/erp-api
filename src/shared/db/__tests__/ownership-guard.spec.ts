@@ -498,6 +498,7 @@ describe('the committed register, today', () => {
       .map(([t]) => t)
       .sort();
     expect(nodeOwned).toEqual([
+      // Keep this list sorted alphabetically
       'tblcost_centers',
       'tblcurrencies',
       'tblcustomers_groups',

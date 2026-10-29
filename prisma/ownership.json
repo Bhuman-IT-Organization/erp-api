@@ -8352,11 +8352,11 @@
         "perfex-core"
       ],
       "writers": [
-        "node"
+        "perfex-core"
       ]
     },
     "evidence_changed": false,
-    "note": "Ticket Priority claimed tbltickets_priorities for v1/ticket-priorities.",
+    "note": "Ticket Priority claimed tbltickets_priorities for v1/ticket-priorities. Perfex's screen is closed at Nginx.",
     "owner": "node",
     "owner_confidence": "write-single",
     "table": "tbltickets_priorities"

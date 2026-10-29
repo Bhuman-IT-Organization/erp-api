@@ -171,6 +171,9 @@ describe('ROUTE_GATES is a well-formed declaration', () => {
       '/setup/ticket-statuses',
       '/setup/ticket-statuses/:id',
       '/setup/ticket-statuses/new',
+      '/setup/ticket-priorities',
+      '/setup/ticket-priorities/:id',
+      '/setup/ticket-priorities/new',
     ]);
     for (const route of GATED_ROUTES) {
       expect(route.startsWith('/'), route).toBe(true);
