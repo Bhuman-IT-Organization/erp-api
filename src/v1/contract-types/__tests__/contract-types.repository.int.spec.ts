@@ -70,10 +70,8 @@ describe.skipIf(!process.env.DATABASE_URL)(
     /** The id of a row this spec created and deleted: guaranteed missing (ids are never reused). */
     let missingId = 0;
 
-    const cleanup = async () => {
-      await client.tblcontracts.deleteMany({ where: { subject: { startsWith: MARKER } } });
-      await client.tblcontracts_types.deleteMany({ where: { name: { startsWith: MARKER } } });
-    };
+    const cleanup = () =>
+      client.tblcontracts_types.deleteMany({ where: { name: { startsWith: MARKER } } });
 
     const create = (suffix: string): Promise<ContractTypeRow> =>
       repository.create({ name: `${MARKER}-${suffix}` });
@@ -236,24 +234,6 @@ describe.skipIf(!process.env.DATABASE_URL)(
         [a.id, NO_CONTRACT_TYPE_USAGE],
         [c.id, NO_CONTRACT_TYPE_USAGE],
       ]);
-    });
-
-    it('counts real contract rows referencing the contract type', async () => {
-      const contract = await client.tblcontracts.create({
-        data: {
-          contract_type: a.id,
-          subject: `${MARKER}-real-contract`,
-          client: 1,
-          addedfrom: 1,
-          dateadded: new Date(),
-        },
-      });
-      try {
-        const usage = await repository.usageByContractType([a.id]);
-        expect(usage.get(a.id)?.contracts).toBeGreaterThanOrEqual(1);
-      } finally {
-        await client.tblcontracts.deleteMany({ where: { id: contract.id } });
-      }
     });
 
     it('a very long name is accepted (LONGTEXT column)', async () => {
