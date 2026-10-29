@@ -33,14 +33,10 @@ import {
   ContractTypesRepository,
   referenceKey,
 } from '../repository/contract-types.repository.js';
-import { NO_CONTRACT_TYPE_USAGE, wallClockAt } from '../service/contract-types.transformer.js';
+import { NO_CONTRACT_TYPE_USAGE } from '../service/contract-types.transformer.js';
 
 /** Every row this spec creates carries this prefix, so the cleanup deletes exactly its own rows. */
 const MARKER = 'int-spec-04.1-18-ct';
-
-/** D-31's wall clock for the marker rows: 2026-10-03 00:30:15 in Asia/Dubai. */
-const STORED = wallClockAt(new Date('2026-10-02T20:30:15.250Z'), 'Asia/Dubai');
-const CREATOR = 1;
 
 const numberSchema = z.union([z.bigint(), z.number()]).transform(Number);
 const oneCountSchema = z.tuple([z.object({ n: numberSchema })]);
@@ -74,11 +70,13 @@ describe.skipIf(!process.env.DATABASE_URL)(
     /** The id of a row this spec created and deleted: guaranteed missing (ids are never reused). */
     let missingId = 0;
 
-    const cleanup = () =>
-      client.tblcontracts_types.deleteMany({ where: { name: { startsWith: MARKER } } });
+    const cleanup = async () => {
+      await client.tblcontracts.deleteMany({ where: { subject: { startsWith: MARKER } } });
+      await client.tblcontracts_types.deleteMany({ where: { name: { startsWith: MARKER } } });
+    };
 
     const create = (suffix: string): Promise<ContractTypeRow> =>
-      repository.create({ name: `${MARKER}-${suffix}`, createdBy: CREATOR, datecreated: STORED });
+      repository.create({ name: `${MARKER}-${suffix}` });
 
     /** Whether the connected schema has `table.column`, read directly (the probe's independent twin). */
     async function hasColumn(table: string, column: string): Promise<boolean> {
@@ -108,8 +106,6 @@ describe.skipIf(!process.env.DATABASE_URL)(
       expect(await repository.findById(a.id)).toEqual({
         id: a.id,
         name: `${MARKER}-a <b>`,
-        createdBy: null,
-        datecreated: null,
       });
       expect(await repository.findById(missingId)).toBeNull();
     });
@@ -126,8 +122,6 @@ describe.skipIf(!process.env.DATABASE_URL)(
       expect(updated).toEqual({
         id: b.id,
         name: `${MARKER}-b2`,
-        createdBy: null,
-        datecreated: null,
       });
       expect(await repository.findById(b.id)).toEqual(updated);
       expect(await repository.update(missingId, { name: `${MARKER}-nobody` })).toBeNull();
@@ -207,40 +201,16 @@ describe.skipIf(!process.env.DATABASE_URL)(
 
       const groupBys: readonly (readonly [keyof ContractTypeUsage, string, GroupBy])[] = [
         [
-          'purchaseRequests',
-          'tblpur_request.contract_type',
+          'contracts',
+          'tblcontracts.contract_type',
           (in_) =>
-            client.$queryRaw`SELECT contract_type, COUNT(*) AS n FROM tblpur_request WHERE contract_type IN (${Prisma.join(in_)}) GROUP BY contract_type`,
+            client.$queryRaw`SELECT contract_type, COUNT(*) AS n FROM tblcontracts WHERE contract_type IN (${Prisma.join(in_)}) GROUP BY contract_type`,
         ],
         [
-          'purchaseOrders',
-          'tblpur_orders.contract_type',
+          'contracts',
+          'tblgoals.contract_type',
           (in_) =>
-            client.$queryRaw`SELECT contract_type, COUNT(*) AS n FROM tblpur_orders WHERE contract_type IN (${Prisma.join(in_)}) GROUP BY contract_type`,
-        ],
-        [
-          'purchaseQuotations',
-          'tblpur_estimates.contract_type',
-          (in_) =>
-            client.$queryRaw`SELECT contract_type, COUNT(*) AS n FROM tblpur_estimates WHERE contract_type IN (${Prisma.join(in_)}) GROUP BY contract_type`,
-        ],
-        [
-          'shippingCharges',
-          'tblinv_shipping_charges.contract_type',
-          (in_) =>
-            client.$queryRaw`SELECT contract_type, COUNT(*) AS n FROM tblinv_shipping_charges WHERE contract_type IN (${Prisma.join(in_)}) GROUP BY contract_type`,
-        ],
-        [
-          'expenses',
-          'tblexpenses.contract_type',
-          (in_) =>
-            client.$queryRaw`SELECT contract_type, COUNT(*) AS n FROM tblexpenses WHERE contract_type IN (${Prisma.join(in_)}) GROUP BY contract_type`,
-        ],
-        [
-          'assets',
-          'tblfe_asset_creation.contract_type',
-          (in_) =>
-            client.$queryRaw`SELECT contract_type, COUNT(*) AS n FROM tblfe_asset_creation WHERE contract_type IN (${Prisma.join(in_)}) GROUP BY contract_type`,
+            client.$queryRaw`SELECT contract_type, COUNT(*) AS n FROM tblgoals WHERE contract_type IN (${Prisma.join(in_)}) GROUP BY contract_type`,
         ],
       ];
 
@@ -266,6 +236,33 @@ describe.skipIf(!process.env.DATABASE_URL)(
         [a.id, NO_CONTRACT_TYPE_USAGE],
         [c.id, NO_CONTRACT_TYPE_USAGE],
       ]);
+    });
+
+    it('counts real contract rows referencing the contract type', async () => {
+      const contract = await client.tblcontracts.create({
+        data: {
+          contract_type: a.id,
+          subject: `${MARKER}-real-contract`,
+          client: 1,
+          addedfrom: 1,
+          dateadded: new Date(),
+        },
+      });
+      try {
+        const usage = await repository.usageByContractType([a.id]);
+        expect(usage.get(a.id)?.contracts).toBeGreaterThanOrEqual(1);
+      } finally {
+        await client.tblcontracts.deleteMany({ where: { id: contract.id } });
+      }
+    });
+
+    it('a very long name is accepted (LONGTEXT column)', async () => {
+      const longName = `${MARKER}-${'a'.repeat(5000)}`;
+      const createdRow = await repository.create({ name: longName });
+      expect(createdRow.name).toBe(longName);
+      const found = await repository.findById(createdRow.id);
+      expect(found?.name).toBe(longName);
+      await repository.remove(createdRow.id);
     });
 
     it('the exact bytes match, a case variant does not', async () => {

@@ -33,19 +33,9 @@ import { NO_CONTRACT_TYPE_USAGE } from '../service/contract-types.transformer.js
  * By the default `-id` they read 3, 2, 1; by name 1, 3, 2.
  */
 export const SEED_CONTRACT_TYPES: readonly ContractTypeRow[] = [
-  {
-    id: 1,
-    name: 'Head Office',
-    createdBy: 1,
-    datecreated: new Date(Date.UTC(2026, 0, 5, 9, 0, 0)),
-  },
-  { id: 2, name: 'Warehouse', createdBy: 1, datecreated: null },
-  {
-    id: 3,
-    name: 'Head Office',
-    createdBy: 4,
-    datecreated: new Date(Date.UTC(2026, 1, 10, 14, 30, 0)),
-  },
+  { id: 1, name: 'Head Office' },
+  { id: 2, name: 'Warehouse' },
+  { id: 3, name: 'Head Office' },
 ];
 
 /** Nothing refers to the contract type. */
@@ -136,14 +126,12 @@ export class InMemoryContractTypesRepository implements ContractTypesRepositoryP
     const row: ContractTypeRow = {
       id: this.lastId,
       name: input.name,
-      createdBy: input.createdBy,
-      datecreated: input.datecreated,
     };
     this.rows.set(row.id, row);
     return Promise.resolve(row);
   }
 
-  /** The name only: `createdBy` and `datecreated` stay as they were (D-31). */
+  /** The name only (D-31). */
   update(id: number, patch: { readonly name: string }): Promise<ContractTypeRow | null> {
     const row = this.rows.get(id);
     if (row === undefined) return Promise.resolve(null);

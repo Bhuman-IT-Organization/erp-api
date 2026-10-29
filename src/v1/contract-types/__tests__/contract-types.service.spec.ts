@@ -1,34 +1,29 @@
 /**
- * ContractTypesService over the real layers, the seeded in-memory fake, a fixed clock and the settings
- * fake answering `default_timezone`. Administrators first: on a 403 neither the repository nor the
- * settings facade is called. D-31: a create writes `createdBy` = the actor's staff id and
- * `datecreated` = `wallClockAt(clock, zone)`, `UTC` when the setting is absent or unusable; an
- * update calls `update(id, { name })` and nothing else. Each change publishes exactly one event
- * AFTER the write and writes exactly one `log` line with `{ id }` (D-08, F1: `log`, never `info`); a
- * 400, 403, 404 or 409 publishes and logs nothing. The delete refuses with 409
- * `ERP-CONTRACTTYPES-0001` while any group is in use, naming the non-zero groups in order, and fails
- * closed when the usage answer does not name the id. The facade reads assert nothing.
+ * ContractTypesService over the real layers, the seeded in-memory fake, a fixed clock.
+ * Administrators first: on a 403 neither the repository nor transport is called.
+ * A create writes `name`; an update calls `update(id, { name })` and nothing else.
+ * Each change publishes exactly one event AFTER the write and writes exactly one `log` line with `{ id }`
+ * (D-08, F1: `log`, never `info`); a 400, 403, 404 or 409 publishes and logs nothing.
+ * The delete refuses with 409 `ERP-CONTRACTTYPES-0001` while any group is in use,
+ * naming the non-zero groups in order, and fails closed when the usage count fails or does not name the id.
+ * The facade reads assert nothing.
  */
 import { describe, expect, it, vi } from 'vitest';
 import { AppError } from '../../../shared/errors/app-error.js';
 import { RecordingDomainEventPublisher } from '../../../shared/events/domain-event.publisher.js';
 import type { AuthenticatedUser } from '../../../shared/http/auth/access-token-verifier.js';
 import { CSV_BOM } from '../../../shared/http/csv.js';
-import type { SettingsFacade } from '../../settings/index.js';
 import {
   ContractTypesCreatedV1,
   ContractTypesDeletedV1,
   ContractTypesUpdatedV1,
 } from '../events/published.js';
 import { ContractTypesService } from '../service/contract-types.service.js';
-import { ContractTypesTransformer, wallClockAt } from '../service/contract-types.transformer.js';
+import { ContractTypesTransformer } from '../service/contract-types.transformer.js';
 import { ContractTypesTransport } from '../service/contract-types.transport.js';
 import { ContractTypesValidator } from '../service/contract-types.validator.js';
 import {
-  RecordingLogger,
-  settingsWithZone,
   TEST_NOW,
-  TEST_ZONE,
 } from './create-contract-types-test-app.js';
 import {
   asRepository,
@@ -36,6 +31,27 @@ import {
   ZERO_USAGE,
   type InMemoryContractTypesRepository,
 } from './fakes.js';
+import { LoggerService, type LogMeta } from '../../../shared/logger/logger.service.js';
+
+class RecordingLogger extends LoggerService {
+  readonly lines: { readonly message: string; readonly meta?: LogMeta }[] = [];
+
+  override log(message: string, meta?: LogMeta): void {
+    this.lines.push({ message, ...(meta === undefined ? {} : { meta }) });
+  }
+
+  override error(): void {
+    /* silent */
+  }
+
+  override warn(): void {
+    /* silent */
+  }
+
+  override debug(): void {
+    /* silent */
+  }
+}
 
 const AT = TEST_NOW.toISOString();
 const EXPIRY_S = 4_102_444_800;
@@ -56,20 +72,19 @@ function actor(isAdmin: boolean): AuthenticatedUser {
 const ADMIN = actor(true);
 const MEMBER = actor(false);
 
-function build(zone: string | null = TEST_ZONE) {
+function build() {
   const repo = seededStore();
   const events = new RecordingDomainEventPublisher();
   const logger = new RecordingLogger();
-  const settings = settingsWithZone(zone);
   const service = new ContractTypesService(
     new ContractTypesValidator(),
     asRepository(repo),
     new ContractTypesTransformer(),
-    new ContractTypesTransport(events, settings as unknown as SettingsFacade),
+    new ContractTypesTransport(events),
     logger,
   );
   service.now = () => TEST_NOW;
-  return { service, repo, events, logger, settings };
+  return { service, repo, events, logger };
 }
 
 async function refusal(promise: Promise<unknown>): Promise<AppError> {
@@ -109,15 +124,14 @@ describe('ContractTypesService: administrators only (D-06, D-26)', () => {
     ];
 
   it.each(calls)(
-    '%s refuses a non-administrator with ERP-AUTH-0005 before any repository or settings call, publishing and logging nothing',
+    '%s refuses a non-administrator with ERP-AUTH-0005 before any repository call, publishing and logging nothing',
     async (_name, call) => {
-      const { service, repo, events, logger, settings } = build();
+      const { service, repo, events, logger } = build();
       const spies = spyAll(repo);
       const error = await refusal(call(service));
       expect(error.code).toBe('ERP-AUTH-0005');
       expect(error.message).toBe('contract types are managed by administrators only');
       for (const spy of spies) expect(spy).not.toHaveBeenCalled();
-      expect(settings.calls).toEqual([]);
       expect(events.count).toBe(0);
       expect(logger.lines).toEqual([]);
     },
@@ -125,62 +139,56 @@ describe('ContractTypesService: administrators only (D-06, D-26)', () => {
 });
 
 describe('ContractTypesService: reads', () => {
-  it('lists the id descending with each row usage, reading the usage and the zone once', async () => {
-    const { service, repo, settings } = build();
-    repo.usage.set(1, { ...ZERO_USAGE, purchaseRequests: 2 });
+  it('lists the name descending with each row usage by default', async () => {
+    const { service, repo } = build();
+    repo.usage.set(1, { ...ZERO_USAGE, contracts: 2 });
     const usage = vi.spyOn(repo, 'usageByContractType');
     const page = await service.list(ADMIN, {});
-    expect(page.data.map((row) => [row.id, row.usage.purchaseRequests])).toEqual([
-      ['3', 0],
-      ['2', 0],
-      ['1', 2],
+    expect(page.data.map((row) => [row.name, row.usage.contracts])).toEqual([
+      ['Warehouse', 0],
+      ['Head Office', 0],
+      ['Head Office', 2],
     ]);
     expect(usage).toHaveBeenCalledTimes(1);
-    expect(usage).toHaveBeenCalledWith([3, 2, 1]);
-    expect(settings.calls).toEqual([['default_timezone']]);
   });
 
-  it('get answers the record with its usage and its date in the company zone, or ERP-CORE-0004', async () => {
+  it('get answers the record with its usage, or ERP-CORE-0004', async () => {
     const { service, repo } = build();
-    repo.usage.set(1, { ...ZERO_USAGE, purchaseRequests: 4 });
+    repo.usage.set(1, { ...ZERO_USAGE, contracts: 4 });
     expect(await service.get(ADMIN, { id: '1' })).toEqual({
       id: '1',
       name: 'Head Office',
-      dateCreated: '2026-01-05T05:00:00.000Z',
-      usage: { ...ZERO_USAGE, purchaseRequests: 4 },
+      usage: { contracts: 4 },
     });
     expect((await refusal(service.get(ADMIN, { id: '404' }))).code).toBe('ERP-CORE-0004');
   });
 
-  it('exports the id, the name and the date created in the list order, never reading the usage', async () => {
+  it('exports name and contracts in the list order', async () => {
     const { service, repo } = build();
+    repo.usage.set(1, { ...ZERO_USAGE, contracts: 2 });
     const usage = vi.spyOn(repo, 'usageByContractType');
     const { body } = await service.exportCsv(ADMIN, {});
     if (typeof body !== 'string') throw new Error('the export answered no CSV text');
     expect(body.replace(CSV_BOM, '').split('\r\n').slice(0, 4)).toEqual([
-      'id,name,dateCreated',
-      '3,Head Office,2026-02-10T10:30:00.000Z',
-      '2,Warehouse,',
-      '1,Head Office,2026-01-05T05:00:00.000Z',
+      'name,contracts',
+      'Warehouse,0',
+      'Head Office,0',
+      'Head Office,2',
     ]);
-    expect(usage).not.toHaveBeenCalled();
+    expect(usage).toHaveBeenCalled();
   });
 });
 
 describe('ContractTypesService: create (D-29, D-31)', () => {
-  it('writes createdBy = the actor and datecreated = the wall clock in the company zone; one event after the write, one log line', async () => {
+  it('stores the name; one event after the write, one log line', async () => {
     const { service, repo, events, logger } = build();
     const create = vi.spyOn(repo, 'create');
     const created = await service.create(ADMIN, { name: 'Fixed-Term < 6 months' });
     expect(create).toHaveBeenCalledWith({
       name: 'Fixed-Term < 6 months',
-      createdBy: ACTOR_ID,
-      datecreated: wallClockAt(TEST_NOW, TEST_ZONE),
     });
-    expect(wallClockAt(TEST_NOW, TEST_ZONE).toISOString()).toBe('2026-10-03T00:30:15.000Z');
     expect(created).toMatchObject({
       name: 'Fixed-Term < 6 months',
-      dateCreated: '2026-10-02T20:30:15.000Z',
       usage: ZERO_USAGE,
     });
     const id = Number(created.id);
@@ -190,20 +198,6 @@ describe('ContractTypesService: create (D-29, D-31)', () => {
     expect(published[0]?.payload).toEqual({ id, at: AT });
     expect(logger.lines).toEqual([{ message: 'contract type created', meta: { id } }]);
   });
-
-  it.each([[null], [''], ['Not/AZone']])(
-    'with default_timezone %o the wall clock is UTC',
-    async (zone) => {
-      const { service, repo } = build(zone);
-      const create = vi.spyOn(repo, 'create');
-      await service.create(ADMIN, { name: 'Ops' });
-      expect(create).toHaveBeenCalledWith({
-        name: 'Ops',
-        createdBy: ACTOR_ID,
-        datecreated: new Date('2026-10-02T20:30:15.000Z'),
-      });
-    },
-  );
 
   it('a name another contract type holds is accepted (Perfex has no uniqueness check)', async () => {
     const { service } = build();
@@ -227,7 +221,6 @@ describe('ContractTypesService: update (D-31: the name only)', () => {
     const update = vi.spyOn(repo, 'update');
     expect(await service.update(ADMIN, { id: '1' }, { name: 'Renamed' })).toMatchObject({
       name: 'Renamed',
-      dateCreated: '2026-01-05T05:00:00.000Z',
     });
     expect(update).toHaveBeenCalledWith(1, { name: 'Renamed' });
     expect(Object.keys(update.mock.calls[0]?.[1] ?? {})).toEqual(['name']);
@@ -279,23 +272,27 @@ describe('ContractTypesService: remove (D-07, D-28)', () => {
     expect(logger.lines).toEqual([]);
   });
 
-  it('a usage read that rejects refuses too: nothing deleted', async () => {
-    const { service, repo } = build();
+  it('a usage read that rejects answers 409 its use could not be counted: nothing deleted', async () => {
+    const { service, repo, events, logger } = build();
     vi.spyOn(repo, 'usageByContractType').mockRejectedValueOnce(new Error('lock wait timeout'));
     const remove = vi.spyOn(repo, 'remove');
-    await expect(service.remove(ADMIN, { id: '2' })).rejects.toThrow('lock wait timeout');
+    const error = await refusal(service.remove(ADMIN, { id: '2' }));
+    expect(error.code).toBe('ERP-CONTRACTTYPES-0001');
+    expect(error.message).toBe('its use could not be counted');
     expect(remove).not.toHaveBeenCalled();
+    expect(events.count).toBe(0);
+    expect(logger.lines).toEqual([]);
   });
 
   it('in use: 409 naming only the non-zero groups, in order; nothing deleted', async () => {
     const { service, repo, events } = build();
     repo.usage.set(2, {
       ...ZERO_USAGE,
-      purchaseRequests: 1,
+      contracts: 1,
     });
     const res = await refusal(service.remove(ADMIN, { id: '2' }));
     expect(res.code).toBe('ERP-CONTRACTTYPES-0001');
-    expect(res.message).toBe('used by 1 purchase request(s)');
+    expect(res.message).toBe('used by 1 contract(s)');
     expect(await repo.findById(2)).not.toBeNull();
     expect(events.count).toBe(0);
   });
@@ -314,7 +311,7 @@ describe('ContractTypesService: remove (D-07, D-28)', () => {
 
 describe('ContractTypesService: the facade reads assert nothing', () => {
   it('findById, listAll and findByIds answer { id, name } without an actor', async () => {
-    const { service, settings } = build();
+    const { service } = build();
     expect(service.describe()).toEqual({ module: 'contract-types', version: 1 });
     expect(await service.findById(2)).toEqual({ id: 2, name: 'Warehouse' });
     expect(await service.findById(404)).toBeNull();
@@ -324,6 +321,5 @@ describe('ContractTypesService: the facade reads assert nothing', () => {
       { id: 2, name: 'Warehouse' },
     ]);
     expect(await service.findByIds([])).toEqual([]);
-    expect(settings.calls).toEqual([]);
   });
 });

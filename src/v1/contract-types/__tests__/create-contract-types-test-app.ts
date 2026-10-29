@@ -1,11 +1,10 @@
 /**
  * The module inside a real Nest + Fastify application, without a network or a database: the
  * repository is `InMemoryContractTypesRepository` (`fakes.ts`) seeded with `SEED_CONTRACT_TYPES` (its
- * usage answer settable), `SettingsModule` is replaced whole by `stubSettingsModule` with a
- * `FakeSettingsFacade` answering `default_timezone` (`Asia/Dubai`, settable), the access-token
+ * usage answer settable), the access-token
  * verifier is a stub with three known bearers, the domain-event publisher is the recording one, the
  * logger records its `log` lines and the service's clock is fixed (`TEST_NOW`), so a spec can
- * assert the events, the log lines and D-31's `datecreated`. Everything else (the module wiring,
+ * assert the events and log lines. Everything else (the module wiring,
  * the guards, the request-id hook, the global prefix, the problem-details filter) is the production
  * code path, so `app.inject` proves the HTTP contract `main.ts` serves.
  *
@@ -32,8 +31,6 @@ import {
 import { registerRequestId } from '../../../shared/http/request-id.js';
 import { LoggerModule } from '../../../shared/logger/logger.module.js';
 import { LoggerService, type LogMeta } from '../../../shared/logger/logger.service.js';
-import { FakeSettingsFacade, stubSettingsModule } from '../../settings/__tests__/fakes.js';
-import { SettingsModule } from '../../settings/settings.module.js';
 import { ContractTypesModule } from '../contract-types.module.js';
 import { ContractTypesRepository } from '../repository/contract-types.repository.js';
 import { ContractTypesService } from '../service/contract-types.service.js';
@@ -56,11 +53,8 @@ export const TEST_STAFF = {
   noPermission: 3,
 } as const;
 
-/** The service's fixed clock: 2026-10-03 00:30:15 on Perfex's wall clock in `Asia/Dubai`. */
+/** The service's fixed clock: 2026-10-03 00:30:15. */
 export const TEST_NOW = new Date('2026-10-02T20:30:15.250Z');
-
-/** The company zone the stub settings facade answers by default. */
-export const TEST_ZONE = 'Asia/Dubai';
 
 const FAR_FUTURE_EXPIRY_S = 4_102_444_800; // 2100-01-01T00:00:00Z
 
@@ -76,19 +70,15 @@ function userOf(staffId: number, isAdmin: boolean): AuthenticatedUser {
   };
 }
 
-const USERS: Readonly<Record<string, AuthenticatedUser>> = {
-  [TEST_BEARERS.admin]: userOf(TEST_STAFF.admin, true),
-  [TEST_BEARERS.everyCode]: userOf(TEST_STAFF.everyCode, false),
-  [TEST_BEARERS.noPermission]: userOf(TEST_STAFF.noPermission, false),
-};
+const MEMBERS: ReadonlyMap<string, AuthenticatedUser> = new Map([
+  [TEST_BEARERS.admin, userOf(TEST_STAFF.admin, true)],
+  [TEST_BEARERS.everyCode, userOf(TEST_STAFF.everyCode, false)],
+  [TEST_BEARERS.noPermission, userOf(TEST_STAFF.noPermission, false)],
+]);
 
-/**
- * Three bearers; no cryptography: the real verifier is `v1/auth`'s facade. As there, an
- * administrator holds every code; the every-code member holds the catalogue's.
- */
-export class StubAccessTokenVerifier implements AccessTokenVerifier {
+class StubVerifier implements AccessTokenVerifier {
   verifyAccessToken(token: string): Promise<AuthenticatedUser | null> {
-    return Promise.resolve(USERS[token] ?? null);
+    return Promise.resolve(MEMBERS.get(token) ?? null);
   }
 
   hasPermission(staffId: number, code: string): Promise<boolean> {
@@ -100,41 +90,30 @@ export class StubAccessTokenVerifier implements AccessTokenVerifier {
 
 @Global()
 @Module({
-  providers: [{ provide: ACCESS_TOKEN_VERIFIER, useValue: new StubAccessTokenVerifier() }],
+  providers: [{ provide: ACCESS_TOKEN_VERIFIER, useClass: StubVerifier }],
   exports: [ACCESS_TOKEN_VERIFIER],
 })
 class StubVerifierModule {}
 
-/** One `log` call the service made: the message and its meta. */
-export interface LoggedLine {
-  readonly message: string;
-  readonly meta: LogMeta | undefined;
-}
-
-/**
- * Keeps the test output readable (no JSON log lines from the container) and records every `log`
- * call, so a spec can assert the D-08 line: its message and `{ id }`, and nothing else.
- */
-export class RecordingLogger extends LoggerService {
-  readonly lines: LoggedLine[] = [];
+/** A recording logger that keeps its lines in memory for assertion. */
+class RecordingLogger extends LoggerService {
+  readonly lines: { readonly message: string; readonly meta?: LogMeta }[] = [];
 
   override log(message: string, meta?: LogMeta): void {
-    this.lines.push({ message, meta });
+    this.lines.push({ message, ...(meta === undefined ? {} : { meta }) });
   }
-  override warn(): void {
-    /* silent */
-  }
+
   override error(): void {
     /* silent */
   }
+
+  override warn(): void {
+    /* silent */
+  }
+
   override debug(): void {
     /* silent */
   }
-}
-
-/** A settings facade answering `default_timezone` with `zone` (no row when `null`). */
-export function settingsWithZone(zone: string | null = TEST_ZONE): FakeSettingsFacade {
-  return new FakeSettingsFacade(zone === null ? [] : [{ name: 'default_timezone', value: zone }]);
 }
 
 export interface ContractTypesTestApp {
@@ -144,8 +123,6 @@ export interface ContractTypesTestApp {
   readonly routes: readonly string[];
   /** The repository's fake, seeded with `SEED_CONTRACT_TYPES` (ids 1 to 3), its usage settable. */
   readonly repo: InMemoryContractTypesRepository;
-  /** The settings facade's fake: `options` answers `default_timezone`. */
-  readonly settings: FakeSettingsFacade;
   /** Every domain event the module published. */
   readonly events: RecordingDomainEventPublisher;
   /** Every `log` line the module wrote. */
@@ -155,15 +132,12 @@ export interface ContractTypesTestApp {
 
 export async function createContractTypesTestApp(): Promise<ContractTypesTestApp> {
   const repo = seededStore();
-  const settings = settingsWithZone();
   const events = new RecordingDomainEventPublisher();
   const logger = new RecordingLogger();
 
   const moduleRef = await Test.createTestingModule({
     imports: [LoggerModule, EventsModule, StubVerifierModule, ContractTypesModule],
   })
-    .overrideModule(SettingsModule)
-    .useModule(stubSettingsModule(settings))
     .overrideProvider(ContractTypesRepository)
     .useValue(asRepository(repo))
     .overrideProvider(DOMAIN_EVENT_PUBLISHER)
@@ -191,5 +165,5 @@ export async function createContractTypesTestApp(): Promise<ContractTypesTestApp
   await app.init();
   await app.getHttpAdapter().getInstance().ready();
 
-  return { app, moduleRef, routes, repo, settings, events, logger, close: () => app.close() };
+  return { app, moduleRef, routes, repo, events, logger, close: () => app.close() };
 }

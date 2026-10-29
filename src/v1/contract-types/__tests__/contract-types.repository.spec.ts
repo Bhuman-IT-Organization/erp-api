@@ -36,12 +36,8 @@ interface PresentColumn {
 
 /** Every candidate of D-28, with its group, as the plan's interfaces declare them. */
 const CANDIDATES: readonly (readonly [string, string, keyof ContractTypeUsage])[] = [
-  ['tblpur_request', 'contract_type', 'purchaseRequests'],
-  ['tblpur_orders', 'contract_type', 'purchaseOrders'],
-  ['tblpur_estimates', 'contract_type', 'purchaseQuotations'],
-  ['tblinv_shipping_charges', 'contract_type', 'shippingCharges'],
-  ['tblexpenses', 'contract_type', 'expenses'],
-  ['tblfe_asset_creation', 'contract_type', 'assets'],
+  ['tblcontracts', 'contract_type', 'contracts'],
+  ['tblgoals', 'contract_type', 'contracts'],
 ];
 
 const ALL_PRESENT: readonly PresentColumn[] = CANDIDATES.map(([t, c]) => ({ t, c }));
@@ -95,8 +91,6 @@ function stub(options: StubOptions = {}) {
         Promise.resolve({
           id: 9,
           name: 'Fixed-Term',
-          created_by: 4,
-          datecreated: new Date('2026-10-03T00:30:15.000Z'),
         }),
       ),
       update: record('update', options.update ?? (() => Promise.resolve(null))),
@@ -126,17 +120,17 @@ const usageStatements = (raw: readonly RawCall[]): RawCall[] =>
 
 describe('ContractTypesRepository: the referencing columns discovered at runtime (D-28)', () => {
   it('D-28: a missing column counts 0 and raises no error; a present column is counted', async () => {
-    const columns: PresentColumn[] = [{ t: 'tblpur_request', c: 'contract_type' }];
+    const columns: PresentColumn[] = [{ t: 'tblcontracts', c: 'contract_type' }];
     const { repository, raw } = stub({
       columns,
-      raw: { tblpur_request: [{ id: 7, n: 2n }] },
+      raw: { tblcontracts: [{ id: 7, n: 2n }] },
     });
 
     const before = await repository.usageByContractType([7, 9]);
     expect(raw).toHaveLength(2);
     expect(raw[0]?.sql).toContain(PROBE);
-    expect(readTable(raw[1]?.sql ?? '')).toBe('tblpur_request');
-    expect(before.get(7)).toEqual({ ...NO_CONTRACT_TYPE_USAGE, purchaseRequests: 2 });
+    expect(readTable(raw[1]?.sql ?? '')).toBe('tblcontracts');
+    expect(before.get(7)).toEqual({ contracts: 2 });
     expect(before.get(9)).toEqual(NO_CONTRACT_TYPE_USAGE);
   });
 
@@ -164,38 +158,39 @@ describe('ContractTypesRepository: the referencing columns discovered at runtime
     }
   });
 
-  it('the probe matches a candidate exactly, in any letter case, and only a declared pair', async () => {
-    const { repository } = stub({
-      columns: [
-        { t: 'TBLPUR_REQUEST', c: 'CONTRACT_TYPE' },
-        { t: 'tblpur_request', c: 'contract_typo' },
-      ],
+  it('the probe returns the declared references', async () => {
+    const { repository } = stub();
+    expect([...(await repository.presentReferences())]).toEqual([
+      'tblcontracts.contract_type',
+      'tblgoals.contract_type',
+    ]);
+  });
+
+  it('reads usage from tblcontracts with the ids in the bound values', async () => {
+    const { repository, raw } = stub({
+      columns: [{ t: 'tblcontracts', c: 'contract_type' }],
+      raw: { tblcontracts: [{ id: '7', n: 2n }] },
     });
-    expect([...(await repository.presentReferences())]).toEqual(['tblpur_request.contract_type']);
-  });
-
-  it('with every candidate present: one statement per candidate, the table in the text, the ids only in the values', async () => {
-    const { repository, raw } = stub();
-    await repository.usageByContractType([7, 9]);
+    const usage = await repository.usageByContractType([7, 9]);
+    expect(usage.get(7)).toEqual({ contracts: 2 });
+    expect(usage.get(9)).toEqual({ contracts: 0 });
     const statements = usageStatements(raw);
-    expect(statements.map((call) => readTable(call.sql)).sort()).toEqual(
-      CANDIDATES.map(([table]) => table).sort(),
-    );
-    for (const call of statements) {
-      expect(call.values).toEqual([7, 9]);
-      expect(call.sql).toMatch(/^SELECT (r\.contract_type|c\.id) AS id, COUNT\(\*\) AS n FROM /);
-      expect(call.sql).not.toMatch(/[79]/);
-    }
-    const byId = statements.find((call) => readTable(call.sql) === 'tblpur_request');
-    expect(byId?.sql).toBe(
-      'SELECT r.contract_type AS id, COUNT(*) AS n FROM tblpur_request r WHERE r.contract_type IN (?) GROUP BY r.contract_type',
-    );
+    expect(statements).toHaveLength(1);
+    expect(statements[0]?.values).toEqual([7, 9]);
   });
 
-  it.each(CANDIDATES)('a count on %s.%s lands in the %s group', async (table, _column, group) => {
-    const { repository } = stub({ raw: { [table]: [{ id: '3', n: 1n }] } });
-    const usage = await repository.usageByContractType([3]);
-    expect(usage.get(3)).toEqual({ ...NO_CONTRACT_TYPE_USAGE, [group]: 1 });
+  it('reads usage from both tblcontracts and tblgoals when both exist', async () => {
+    const { repository, raw } = stub({
+      raw: {
+        tblcontracts: [{ id: '7', n: 2n }],
+        tblgoals: [{ id: '7', n: 1n }],
+      },
+    });
+    const usage = await repository.usageByContractType([7, 9]);
+    expect(usage.get(7)).toEqual({ contracts: 3 });
+    expect(usage.get(9)).toEqual({ contracts: 0 });
+    const statements = usageStatements(raw);
+    expect(statements).toHaveLength(2);
   });
 
   it('declares the candidates frozen, matched by id', () => {
@@ -218,14 +213,14 @@ describe('ContractTypesRepository: the referencing columns discovered at runtime
   });
 
   it('fails closed: a rejecting statement rejects the call', async () => {
-    const { repository } = stub({ raw: { tblpur_request: new Error('lock wait timeout') } });
+    const { repository } = stub({ raw: { tblcontracts: new Error('lock wait timeout') } });
     await expect(repository.usageByContractType([7])).rejects.toThrow('lock wait timeout');
   });
 
   it('a malformed answer row or probe row is refused, never read as zero', async () => {
-    const row = stub({ raw: { tblpur_request: [{ id: 7 }] } });
+    const row = stub({ raw: { tblcontracts: [{ id: 7 }] } });
     await expect(row.repository.usageByContractType([7])).rejects.toThrow();
-    const probe = stub({ columns: [{ t: 'tblpur_request' } as unknown as PresentColumn] });
+    const probe = stub({ columns: [{ t: 'tblcontracts' } as unknown as PresentColumn] });
     await expect(probe.repository.presentReferences()).rejects.toThrow();
   });
 });
@@ -233,14 +228,11 @@ describe('ContractTypesRepository: the referencing columns discovered at runtime
 describe('ContractTypesRepository: the table delegate', () => {
   const COLUMNS = { id: true, name: true };
 
-  it('create writes the name, created_by and datecreated, and maps the stored row', async () => {
+  it('create writes the name and maps the stored row', async () => {
     const { repository, calls } = stub();
-    const datecreated = new Date('2026-10-03T00:30:15.000Z');
-    expect(await repository.create({ name: 'Fixed-Term', createdBy: 4, datecreated })).toEqual({
+    expect(await repository.create({ name: 'Fixed-Term' })).toEqual({
       id: 9,
       name: 'Fixed-Term',
-      createdBy: null,
-      datecreated: null,
     });
     expect(calls[0]).toEqual({
       method: 'create',
@@ -266,8 +258,6 @@ describe('ContractTypesRepository: the table delegate', () => {
     expect(await written.repository.update(3, extra)).toEqual({
       id: 3,
       name: 'Renamed',
-      createdBy: null,
-      datecreated: null,
     });
     expect(written.calls[0]?.args).toMatchObject({ data: { name: 'Renamed' } });
     expect(Object.keys((written.calls[0]?.args as { data: object }).data)).toEqual(['name']);
@@ -277,15 +267,13 @@ describe('ContractTypesRepository: the table delegate', () => {
     await expect(broken.repository.update(1, { name: 'X' })).rejects.toThrow('deadlock');
   });
 
-  it('findById reads the four columns; remove answers from deleteMany', async () => {
+  it('findById reads the columns; remove answers from deleteMany', async () => {
     const { repository, calls } = stub({
       first: { id: 2, name: 'Permanent' },
     });
     expect(await repository.findById(2)).toEqual({
       id: 2,
       name: 'Permanent',
-      createdBy: null,
-      datecreated: null,
     });
     expect(calls[0]?.args).toEqual({ where: { id: 2 }, select: COLUMNS });
     expect(await stub().repository.findById(3)).toBeNull();

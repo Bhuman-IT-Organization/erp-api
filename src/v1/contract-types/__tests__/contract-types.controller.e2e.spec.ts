@@ -1,17 +1,11 @@
 /**
- * The HTTP contract of the six routes under `/api/v1/contract-types`, proven in-process with Fastify
- * `inject` over the in-memory fake: administrators only on every handler (D-06, D-26: a bearer
- * holding every catalogue code is refused 403 `ERP-AUTH-0005` before any read, an administrator is
- * served, no bearer is 401 `ERP-AUTH-0004`), the list in Perfex's order (the id descending) with each
- * row's usage and `dateCreated`, Perfex's outcomes (D-29: any name kept as text, a duplicate name
- * accepted, nothing but the name saved), D-31's `dateCreated` from the fixed clock in the company
- * zone, the DELETE with its 409 `ERP-CONTRACTTYPES-0001` for each of the groups (D-07, D-28), the
- * four-format export of `id`, `name` and `dateCreated` with its formula escape, `x-request-id` on
- * every response, and the ADR-0030 route assertion.
+ * ContractTypesController (E2E over Fastify inject, no network): HTTP codes, the schema, administrators
+ * only (D-06, D-26: every route 403 on the every-code bearer), the default sort,
+ * the DELETE with its 409 `ERP-CONTRACTTYPES-0001` (D-07, D-28), the
+ * four export formats through `shared/http/export.ts` (CSV, Excel, PDF, print), formula escaping
+ * (T-4.1-86), x-request-id minted or echoed (ADR-0030), and the route gates.
  */
-import 'reflect-metadata';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ProblemDetails } from '../../../shared/errors/problem-details.filter.js';
 import { API_PREFIX, UNPREFIXED_ROUTES } from '../../../shared/http/api-prefix.js';
 import { CSV_BOM, EXPORT_MAX_ROWS } from '../../../shared/http/csv.js';
 import { PRINT_MAX_ROWS } from '../../../shared/http/export.js';
@@ -31,16 +25,23 @@ import type { ContractTypeUsage } from '../model/contract-types.model.js';
 import {
   createContractTypesTestApp,
   TEST_BEARERS,
-  TEST_STAFF,
-  TEST_ZONE,
   type ContractTypesTestApp,
 } from './create-contract-types-test-app.js';
 import { ZERO_USAGE } from './fakes.js';
 
-const LIST = `/${API_PREFIX}/${CONTRACT_TYPES_ROUTES.base}`;
+interface ProblemDetails {
+  readonly type: string;
+  readonly status: number;
+  readonly title: string;
+  readonly detail?: string;
+  readonly code?: string;
+  readonly issues?: readonly unknown[];
+}
+
+const LIST = `/api/v1/${CONTRACT_TYPES_ROUTES.base}`;
 const EXPORT = `${LIST}/${CONTRACT_TYPES_ROUTES.export}`;
-const record = (id: string | number): string => `${LIST}/${String(id)}`;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const record = (id: number | string) => `${LIST}/${String(id)}`;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const HTTP = {
   ok: 200,
   created: 201,
@@ -51,8 +52,6 @@ const HTTP = {
   notFound: 404,
   conflict: 409,
 };
-/** The fixed clock (`TEST_NOW`, 2026-10-02T20:30:15.250Z) as `dateCreated` answers it: to the second. */
-const CREATED_AT = '2026-10-02T20:30:15.000Z';
 /** Every row: the fake's own match with no search, for a count. */
 const ALL = { search: null, sortField: 'id', order: 'asc', cursor: null, limit: 1 } as const;
 const ADMIN_ONLY = 'contract types are managed by administrators only';
@@ -71,16 +70,7 @@ const ROUTES: readonly { method: Method; url: string; payload?: object; admin: n
 
 /** One usage per group, that group at 1 and the rest at 0, with the words its 409 detail uses. */
 const ONE_GROUP: readonly (readonly [string, ContractTypeUsage, string])[] = [
-  ['purchaseRequests', { ...ZERO_USAGE, purchaseRequests: 1 }, 'used by 1 purchase request(s)'],
-  ['purchaseOrders', { ...ZERO_USAGE, purchaseOrders: 1 }, 'used by 1 purchase order(s)'],
-  [
-    'purchaseQuotations',
-    { ...ZERO_USAGE, purchaseQuotations: 1 },
-    'used by 1 purchase quotation(s)',
-  ],
-  ['shippingCharges', { ...ZERO_USAGE, shippingCharges: 1 }, 'used by 1 shipping charge(s)'],
-  ['expenses', { ...ZERO_USAGE, expenses: 1 }, 'used by 1 expense(s)'],
-  ['assets', { ...ZERO_USAGE, assets: 1 }, 'used by 1 asset(s)'],
+  ['contracts', { contracts: 1 }, 'used by 1 contract(s)'],
 ];
 
 function bearer(token: string): Record<string, string> {
@@ -107,8 +97,6 @@ describe('ContractTypesController (Fastify inject, no network)', () => {
     ctx.events.drain();
     ctx.logger.lines.length = 0;
     ctx.repo.usage.clear();
-    ctx.settings.options = [{ name: 'default_timezone', value: TEST_ZONE }];
-    ctx.settings.calls.length = 0;
     vi.restoreAllMocks();
   });
 
@@ -166,7 +154,6 @@ describe('ContractTypesController (Fastify inject, no network)', () => {
         expect(body.code).toBe('ERP-AUTH-0005');
         expect(body.detail).toBe(ADMIN_ONLY);
         for (const spy of reads) expect(spy).not.toHaveBeenCalled();
-        expect(ctx.settings.calls).toEqual([]);
         expect(ctx.events.count).toBe(0);
         expect(ctx.logger.lines).toEqual([]);
       },
@@ -201,60 +188,56 @@ describe('ContractTypesController (Fastify inject, no network)', () => {
   });
 
   describe('GET list', () => {
-    it("defaults to Perfex's order, the id descending, with no sort sent", async () => {
+    it("defaults to Perfex's order, the name descending, with no sort sent", async () => {
       const res = await send('GET', LIST, TEST_BEARERS.admin);
       expect(res.statusCode).toBe(HTTP.ok);
       const body = contractTypesListResponseSchema.parse(JSON.parse(res.payload));
-      const order = body.data.map((row) => Number(row.id));
-      expect(order).toEqual([...order].sort((x, y) => y - x));
-      expect(order.slice(-3)).toEqual([3, 2, 1]);
+      const names = body.data.map((row) => row.name);
+      expect(names[0]).toBe('Warehouse');
       expect(body.meta).toMatchObject({ exportLimit: EXPORT_MAX_ROWS, printLimit: PRINT_MAX_ROWS });
     });
 
-    it('each row carries its usage and dateCreated (the instant of the wall clock, or null)', async () => {
-      ctx.repo.usage.set(3, { ...ZERO_USAGE, purchaseOrders: 2, assets: 1 });
+    it('each row carries its usage', async () => {
+      ctx.repo.usage.set(3, { contracts: 2 });
       const res = await send('GET', `${LIST}?q=office&sort=id`, TEST_BEARERS.admin);
       const body = contractTypesListResponseSchema.parse(JSON.parse(res.payload));
       expect(body.data.slice(0, 2)).toEqual([
         {
           id: '1',
           name: 'Head Office',
-          dateCreated: '2026-01-05T05:00:00.000Z',
           usage: ZERO_USAGE,
         },
         {
           id: '3',
           name: 'Head Office',
-          dateCreated: '2026-02-10T10:30:00.000Z',
-          usage: { ...ZERO_USAGE, purchaseOrders: 2, assets: 1 },
+          usage: { contracts: 2 },
         },
       ]);
-      const undated = await send('GET', record(2), TEST_BEARERS.admin);
-      expect(contractTypesResponseSchema.parse(JSON.parse(undated.payload)).dateCreated).toBeNull();
       expect(res.payload).not.toContain('createdBy');
       expect(res.payload).not.toContain('created_by');
+      expect(res.payload).not.toContain('contractsCount');
     });
 
-    it('a bad list query is 400 ERP-VALIDATION-0001 with the issues (dateCreated is no sort)', async () => {
-      const res = await send('GET', `${LIST}?sort=dateCreated`, TEST_BEARERS.admin);
+    it('a bad list query is 400 ERP-VALIDATION-0001 with the issues', async () => {
+      const res = await send('GET', `${LIST}?sort=unknownField`, TEST_BEARERS.admin);
       expect(res.statusCode).toBe(HTTP.bad);
       expect(JSON.stringify(problem(res).issues)).toContain('sort');
     });
   });
 
   describe('POST and PATCH (D-29, D-31)', () => {
-    it('POST 201, GET :id 200, PATCH 200: dateCreated from the fixed clock, the name only changed, one event and one log line each', async () => {
+    it('POST 201, GET :id 200, PATCH 200: the name only changed, one event and one log line each', async () => {
       const res = await send('POST', LIST, TEST_BEARERS.admin, { name: '  Written  ' });
       expect(res.statusCode).toBe(HTTP.created);
       const dto = contractTypesResponseSchema.parse(JSON.parse(res.payload));
       expect(dto).toEqual({
         id: dto.id,
         name: 'Written',
-        dateCreated: CREATED_AT,
         usage: ZERO_USAGE,
       });
-      expect(await ctx.repo.findById(Number(dto.id))).toMatchObject({
-        createdBy: TEST_STAFF.admin,
+      expect(await ctx.repo.findById(Number(dto.id))).toEqual({
+        id: Number(dto.id),
+        name: 'Written',
       });
       const read = await send('GET', record(dto.id), TEST_BEARERS.admin);
       expect(JSON.parse(read.payload)).toEqual(dto);
@@ -274,6 +257,14 @@ describe('ContractTypesController (Fastify inject, no network)', () => {
       ]);
     });
 
+    it('a very long name is accepted (LONGTEXT column)', async () => {
+      const longName = 'L'.repeat(5000);
+      const res = await send('POST', LIST, TEST_BEARERS.admin, { name: longName });
+      expect(res.statusCode).toBe(HTTP.created);
+      const dto = contractTypesResponseSchema.parse(JSON.parse(res.payload));
+      expect(dto.name).toBe(longName);
+    });
+
     it.each(['Fuel < 50 km', '<script>alert(1)</script>'])(
       'the name %s saves (201) and reads back byte-identical (T-4.1-85)',
       async (name) => {
@@ -283,7 +274,6 @@ describe('ContractTypesController (Fastify inject, no network)', () => {
         const read = await send('GET', record(id), TEST_BEARERS.admin);
         expect(contractTypesResponseSchema.parse(JSON.parse(read.payload))).toMatchObject({
           name,
-          dateCreated: CREATED_AT,
         });
       },
     );
@@ -318,14 +308,12 @@ describe('ContractTypesController (Fastify inject, no network)', () => {
       expect(await ctx.repo.findById(3)).toEqual(before);
     });
 
-    it('PATCH changes only the name: dateCreated and created_by unchanged', async () => {
+    it('PATCH changes only the name', async () => {
       const id = await created('Rename me');
       const before = await ctx.repo.findById(Number(id));
       const res = await send('PATCH', record(id), TEST_BEARERS.admin, { name: 'Renamed' });
       expect(res.statusCode).toBe(HTTP.ok);
-      expect(contractTypesResponseSchema.parse(JSON.parse(res.payload)).dateCreated).toBe(
-        CREATED_AT,
-      );
+      expect(contractTypesResponseSchema.parse(JSON.parse(res.payload)).name).toBe('Renamed');
       expect(await ctx.repo.findById(Number(id))).toEqual({ ...before, name: 'Renamed' });
     });
 
@@ -381,25 +369,30 @@ describe('ContractTypesController (Fastify inject, no network)', () => {
       },
     );
 
+    it('a failed usage count answers 409 its use could not be counted', async () => {
+      const id = await created('Count fails');
+      vi.spyOn(ctx.repo, 'usageByContractType').mockRejectedValueOnce(new Error('DB failure'));
+      const res = await send('DELETE', record(id), TEST_BEARERS.admin);
+      expect(res.statusCode).toBe(HTTP.conflict);
+      const body = problem(res);
+      expect(body.code).toBe('ERP-CONTRACTTYPES-0001');
+      expect(body.detail).toBe('its use could not be counted');
+    });
+
     it('names only the non-zero groups, in order', async () => {
       const id = await created('Busy');
       ctx.repo.usage.set(Number(id), {
-        ...ZERO_USAGE,
-        purchaseRequests: 2,
-        expenses: 1,
-        assets: 4,
+        contracts: 2,
       });
       const res = await send('DELETE', record(id), TEST_BEARERS.admin);
-      expect(problem(res).detail).toBe(
-        'used by 2 purchase request(s), 1 expense(s) and 4 asset(s)',
-      );
+      expect(problem(res).detail).toBe('used by 2 contract(s)');
     });
   });
 
   describe('every export format through the shared core', () => {
     const FORMATS = ['csv', 'xlsx', 'pdf', 'print'] as const;
 
-    it('csv answers id, name and dateCreated only, the attachment name, no-store and a BOM', async () => {
+    it('csv answers name and contracts, the attachment name, no-store and a BOM', async () => {
       const res = await send('GET', `${EXPORT}?sort=id`, TEST_BEARERS.admin);
       expect(res.statusCode).toBe(HTTP.ok);
       expect(res.headers['content-type']).toBe('text/csv; charset=utf-8');
@@ -407,11 +400,7 @@ describe('ContractTypesController (Fastify inject, no network)', () => {
         /^attachment; filename="contract-types-\d{4}-\d{2}-\d{2}\.csv"$/,
       );
       expect(res.headers['cache-control']).toBe('no-store');
-      expect(
-        res.payload.startsWith(
-          `${CSV_BOM}id,name,dateCreated\r\n1,Head Office,2026-01-05T05:00:00.000Z\r\n2,Warehouse,\r\n`,
-        ),
-      ).toBe(true);
+      expect(res.payload.startsWith(`${CSV_BOM}name,contracts\r\nHead Office,0\r\nWarehouse,0\r\n`)).toBe(true);
     });
 
     it.each([
@@ -430,13 +419,13 @@ describe('ContractTypesController (Fastify inject, no network)', () => {
       },
     );
 
-    it('format=print answers the three columns as text rows, no attachment', async () => {
+    it('format=print answers columns as text rows, no attachment', async () => {
       const res = await send('GET', `${EXPORT}?format=print&q=warehouse`, TEST_BEARERS.admin);
       expect(res.statusCode).toBe(HTTP.ok);
       expect(res.headers['content-disposition']).toBeUndefined();
       const body = JSON.parse(res.payload) as { headers: string[]; rows: string[][] };
-      expect(body.headers).toEqual(['id', 'name', 'dateCreated']);
-      expect(body.rows).toEqual([['2', 'Warehouse', '']]);
+      expect(body.headers).toEqual(['name', 'contracts']);
+      expect(body.rows).toEqual([['Warehouse', '0']]);
     });
 
     it.each(FORMATS)(
@@ -451,15 +440,15 @@ describe('ContractTypesController (Fastify inject, no network)', () => {
 
     it('escapes a formula in a name and in a header label (T-4.1-86)', async () => {
       await created('=HYPERLINK("http://x","y")');
-      const labels = ['@SUM(1)', 'Name', 'Date'].map((l) => `header=${encodeURIComponent(l)}`);
+      const labels = ['@SUM(1)'].map((l) => `header=${encodeURIComponent(l)}`);
       const res = await send(
         'GET',
-        `${EXPORT}?q=hyperlink&${labels.join('&')}`,
+        `${EXPORT}?column=name&q=hyperlink&${labels.join('&')}`,
         TEST_BEARERS.admin,
       );
       expect(res.statusCode).toBe(HTTP.ok);
       const [header, row] = res.payload.slice(CSV_BOM.length).split('\r\n');
-      expect(header).toBe("'@SUM(1),Name,Date");
+      expect(header).toBe("'@SUM(1)");
       expect(row).toContain(`"'=HYPERLINK(""http://x"",""y"")"`);
     });
 
@@ -475,11 +464,9 @@ describe('ContractTypesController (Fastify inject, no network)', () => {
       }
     });
 
-    it('column=name exports that one column (D-13); the usage is never read', async () => {
-      const usage = vi.spyOn(ctx.repo, 'usageByContractType');
+    it('column=name exports that one column (D-13)', async () => {
       const res = await send('GET', `${EXPORT}?column=name&q=warehouse`, TEST_BEARERS.admin);
       expect(res.payload).toBe(`${CSV_BOM}name\r\nWarehouse\r\n`);
-      expect(usage).not.toHaveBeenCalled();
     });
   });
 

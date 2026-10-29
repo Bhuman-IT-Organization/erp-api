@@ -1,8 +1,8 @@
 /**
  * ContractTypesValidator: the list and export queries (BE-19's grammar through
- * `shared/http/pagination.ts`, one keyset sort defaulting to the id descending as Perfex's inline
- * table does, the opaque cursor bound to it, `q`), the path id and the strict body. The body keeps
- * Perfex's outcomes (D-29): a trimmed name of 1 to 255 characters, every character kept (`<` and
+ * `shared/http/pagination.ts`, one keyset sort defaulting to the name descending as Perfex
+ * does, the opaque cursor bound to it, `q`), the path id and the strict body. The body keeps
+ * Perfex's outcomes (D-29): a trimmed name with no length limit (LONGTEXT column), every character kept (`<` and
  * `>` included), and nothing but the name (D-26). Every refusal is a 400 `ERP-VALIDATION-0001`
  * whose issue names the path the caller got wrong (BE-09).
  */
@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
 import { AppError } from '../../../shared/errors/app-error.js';
 import { encodeCursor } from '../../../shared/http/keyset.js';
 import { LIST_QUERY_LIMITS } from '../../../shared/http/pagination.js';
-import { CONTRACT_TYPES_NAME_MAX, CONTRACT_TYPES_SEARCH_MAX } from '../dto/contract-types.dto.js';
+import { CONTRACT_TYPES_SEARCH_MAX } from '../dto/contract-types.dto.js';
 import {
   CONTRACT_TYPES_SORT_FIELDS,
   ContractTypesValidator,
@@ -41,11 +41,11 @@ const refusedOn = (fn: () => unknown): unknown => firstIssue(fn)?.path;
 describe('ContractTypesValidator: the list query (BE-19)', () => {
   const validator = new ContractTypesValidator();
 
-  it("defaults to the id descending (Perfex's [0, 'desc']), the default limit, no cursor and no search", () => {
+  it("defaults to the name descending (Perfex's order), the default limit, no cursor and no search", () => {
     expect(CONTRACT_TYPES_SORT_FIELDS).toEqual(['id', 'name']);
     expect(validator.parseListQuery({})).toEqual({
       search: null,
-      sortField: 'id',
+      sortField: 'name',
       order: 'desc',
       cursor: null,
       limit: LIST_QUERY_LIMITS.default,
@@ -87,12 +87,12 @@ describe('ContractTypesValidator: the list query (BE-19)', () => {
     ],
     [
       'a cursor of the other sort',
-      { cursor: encodeCursor('id', [3, 3], 'after'), sort: 'name' },
+      { cursor: encodeCursor('name', ['x', 3], 'after'), sort: 'id' },
       ['cursor'],
     ],
     [
-      'a name cursor under the default id sort',
-      { cursor: encodeCursor('id', ['x', 3], 'after') },
+      'an id cursor under the default name sort',
+      { cursor: encodeCursor('id', [3, 3], 'after') },
       ['cursor'],
     ],
   ])('refuses %s', (_label, query, path) => {
@@ -130,13 +130,12 @@ describe('ContractTypesValidator: the path id', () => {
 describe('ContractTypesValidator: the body (D-26, D-29)', () => {
   const validator = new ContractTypesValidator();
 
-  it('trims the name and accepts 255 characters', () => {
+  it('trims the name and accepts very long names (LONGTEXT)', () => {
     expect(validator.parseCreateBody({ name: '  Fixed-Term  ' })).toEqual({
       name: 'Fixed-Term',
     });
-    const longest = 'n'.repeat(CONTRACT_TYPES_NAME_MAX);
-    expect(validator.parseCreateBody({ name: longest })).toEqual({ name: longest });
-    expect(CONTRACT_TYPES_NAME_MAX).toBe(255);
+    const longName = 'n'.repeat(5000);
+    expect(validator.parseCreateBody({ name: longName })).toEqual({ name: longName });
   });
 
   it.each(['Fixed < 6 months', '<script>alert(1)</script>', 'R&D / 2026 "east"'])(
@@ -148,7 +147,6 @@ describe('ContractTypesValidator: the body (D-26, D-29)', () => {
   );
 
   it.each([
-    ['256 characters', { name: 'n'.repeat(CONTRACT_TYPES_NAME_MAX + 1) }],
     ['an empty name', { name: '' }],
     ['an all-space name', { name: '   ' }],
     ['a number', { name: 7 }],

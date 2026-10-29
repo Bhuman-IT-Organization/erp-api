@@ -6,21 +6,16 @@ The Contract Types list: list, read, create, update, delete and the four-format 
 
 ## Owned tables
 
-- `tblcontracts_types`: claimed for `node` in the ownership register (`prisma/ownership.json`), written here through Prisma's typed delegate, which the ownership guard admits because the register names `node`. Node writes `name` (`LongText`); `id` is assigned by the database. An update writes the name and nothing else. Perfex's delete is closed at Nginx.
+- `tblcontracts_types`: claimed for `node` in the ownership register (`prisma/ownership.json`), written here through Prisma's typed delegate, which the ownership guard admits because the register names `node`. Node writes `name` (`LONGTEXT`, no length limit); `id` is assigned by the database. An update writes the name and nothing else. Perfex's delete is closed at Nginx.
 
 Read only, never written (DB-03):
 
-- `tbloptions.default_timezone` (perfex-core), through `SettingsFacade` (`settings/index.js`) from the transport; never logged and never answered.
 - `CONTRACT_TYPE_REFERENCES` (the repository's docblock), what refers to a contract type, for each row's usage and the delete refusal. A declared candidate list (D-28); before every usage read ONE `information_schema.COLUMNS` probe answers which candidates the connected schema has, and only those run. A missing candidate counts 0 and raises no error.
 
-| Group                | Owner           | Table and column                        | Match  |
-| -------------------- | --------------- | --------------------------------------- | ------ |
-| `purchaseRequests`   | purchase        | `tblpur_request.contract_type`          | the id |
-| `purchaseOrders`     | purchase        | `tblpur_orders.contract_type`           | the id |
-| `purchaseQuotations` | purchase        | `tblpur_estimates.contract_type`        | the id |
-| `shippingCharges`    | (unregistered)  | `tblinv_shipping_charges.contract_type` | the id |
-| `expenses`           | perfex-core     | `tblexpenses.contract_type`             | the id |
-| `assets`             | fixed_equipment | `tblfe_asset_creation.contract_type`    | the id |
+| Group       | Owner   | Table and column            | Match  | Notes                                            |
+| ----------- | ------- | --------------------------- | ------ | ------------------------------------------------ |
+| `contracts` | contracts | `tblcontracts.contract_type` | the id | Active in Perfex core                            |
+| `contracts` | goals     | `tblgoals.contract_type`     | the id | Goals module candidate (when active in database) |
 
 ## Facade surface
 
@@ -37,16 +32,16 @@ Under `api/v1/contract-types` (`CONTRACT_TYPES_ROUTES` in `contract-types.routes
 
 | Method   | Path     | Success                                                                                                                                                                                                 | Errors beyond the three                                                                 |
 | -------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `GET`    | ``       | 200 `{ data, meta: { nextCursor, prevCursor, total, rangeStart, exportLimit, printLimit } }`, each row `{ id, name, dateCreated, usage }`; `?limit&cursor&q&sort` (`-id` default, `id`, `name`)         | none                                                                                    |
-| `GET`    | `export` | 200 by `?format=`: `csv` (absent), `xlsx`, `pdf` (each `attachment; filename="contract-types-YYYY-MM-DD.<ext>"`) or `print` (JSON rows, no attachment); `no-store`; columns `id`, `name`, `dateCreated` | 400 on `export` over the format's cap; on `key` (no row selection); on `font` for a PDF |
-| `GET`    | `:id`    | 200 `{ id, name, dateCreated, usage }`                                                                                                                                                                  | 404 `ERP-CORE-0004`                                                                     |
+| `GET`    | ``       | 200 `{ data, meta: { nextCursor, prevCursor, total, rangeStart, exportLimit, printLimit } }`, each row `{ id, name, usage }`; `?limit&cursor&q&sort` (`-name` default, `name`, `id`, `-id`)             | none                                                                                    |
+| `GET`    | `export` | 200 by `?format=`: `csv` (absent), `xlsx`, `pdf` (each `attachment; filename="contract-types-YYYY-MM-DD.<ext>"`) or `print` (JSON rows, no attachment); `no-store`; columns `name`, `contracts`    | 400 on `export` over the format's cap; on `key` (no row selection); on `font` for a PDF |
+| `GET`    | `:id`    | 200 `{ id, name, usage }`                                                                                                                                                                               | 404 `ERP-CORE-0004`                                                                     |
 | `POST`   | ``       | 201 the contract type                                                                                                                                                                                   | none                                                                                    |
 | `PATCH`  | `:id`    | 200 the contract type                                                                                                                                                                                   | 404 `ERP-CORE-0004`                                                                     |
 | `DELETE` | `:id`    | 204, no body                                                                                                                                                                                            | 404 `ERP-CORE-0004`; 409 `ERP-CONTRACTTYPES-0001`                                       |
 
-The body is `{ name }`, strict: the name is required, trimmed, 1 to 255 characters (`CONTRACT_TYPES_NAME_MAX`), every character accepted and stored as text, and a name another contract type holds is accepted (Perfex has no uniqueness check); any other key (`created_by`, `datecreated`, `id`, ...) is a 400 naming it, and `{}` on `PATCH` is a 400 on `['name']`. `usage` holds six counts (`purchaseRequests`, `purchaseOrders`, `purchaseQuotations`, `shippingCharges`, `expenses`, `assets`). `q` matches the name (contains, under the column's collation) and, when `q` is all digits up to 4294967295, the id.
+The body is `{ name }`, strict: the name is required, trimmed, min 1 character with no length limit (the column is `LONGTEXT`), every character accepted and stored as text, and a name another contract type holds is accepted (Perfex has no uniqueness check); any other key (`id`, ...) is a 400 naming it, and `{}` on `PATCH` is a 400 on `['name']`. `usage` holds `{ contracts: number }`. `q` matches the name (contains, under the column's collation) and, when `q` is all digits up to 4294967295, the id.
 
-`ERP-CONTRACTTYPES-0001` (DELETE): any group of `CONTRACT_TYPE_REFERENCES` is non-zero, or the usage answer does not name the id (`its use could not be counted`). Nothing is deleted and no event is published.
+`ERP-CONTRACTTYPES-0001` (DELETE): `contracts` is non-zero, or the usage count fails or does not name the id (`its use could not be counted`). Nothing is deleted and no event is published.
 
 ## Events published
 
@@ -68,24 +63,24 @@ None.
 
 ## Resilience
 
-- **Breaker:** none: no outbound HTTP, no vendor call; the settings facade is an in-process call.
+- **Breaker:** none: no outbound HTTP, no vendor call.
 - **Retry policy:** none on writes: an unkeyed `POST` retried could create two rows, and the events are in-process.
-- **Pool budget:** shares `POOL.db.api` (`connection_limit` in `DATABASE_URL`, asserted by `check:db`); a list page costs the page, two counts, the probe, one statement per present candidate (six at most) in one `Promise.all` and the `default_timezone` read; no extra DB or Redis client.
+- **Pool budget:** shares `POOL.db.api` (`connection_limit` in `DATABASE_URL`, asserted by `check:db`); a list page costs the page, two counts, the probe, one statement per present candidate in one `Promise.all`; no extra DB or Redis client.
 
 ## Layers
 
 | File                                          | Responsibility                                                                                                                                                                                                             |
 | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `contract-types.module.ts`                    | Wires every layer as a provider; imports `SettingsModule`; exports `ContractTypesFacade` only; not global                                                                                                                  |
+| `contract-types.module.ts`                    | Wires every layer as a provider; exports `ContractTypesFacade` only; not global                                                                                                                                            |
 | `contract-types.routes.ts`                    | `CONTRACT_TYPES_ROUTES` (`base`, `list`, `export`, `record`), `CONTRACT_TYPES_EXPORT_COLUMNS`, `CONTRACT_TYPES_EXPORT_FILE_STEM`; no permission map                                                                        |
 | `controller/contract-types.controller.ts`     | The six handlers, each `@UseGuards(JwtAuthGuard, PermissionGuard)` with no permission code, `@CurrentUser()` and `@ApiZod`; the DELETE answers 204                                                                         |
-| `service/contract-types.service.ts`           | `assertAdministrator` first in `list`, `get`, `create`, `update`, `remove` and `exportCsv`; D-31's two columns; the 409; the event after a write, then the `log` line; the facade reads                                    |
-| `service/contract-types.validator.ts`         | `parseListQuery` (one sort from `CONTRACT_TYPES_SORT_FIELDS`, default `-id`), `parseExportList`, `parseParams`, `parseCreateBody`, `parseUpdateBody`                                                                       |
-| `service/contract-types.transformer.ts`       | `companyZone`, `wallClockAt`, `instantOf` (D-31), `toResponse`, `toExportRow`, `CONTRACT_TYPES_EXPORT_CELLS`, `toContractType`; the list envelope with `exportLimit` and `printLimit`                                      |
-| `service/contract-types.transport.ts`         | Domain events to the publisher port; `companyTimeZone()` through `SettingsFacade` (the one file that reaches another module)                                                                                               |
+| `service/contract-types.service.ts`           | `assertAdministrator` first in `list`, `get`, `create`, `update`, `remove` and `exportCsv`; export columns; the 409; the event after a write, then the `log` line; the facade reads                                     |
+| `service/contract-types.validator.ts`         | `parseListQuery` (one sort from `CONTRACT_TYPES_SORT_FIELDS`, default `-name`), `parseExportList`, `parseParams`, `parseCreateBody`, `parseUpdateBody`                                                                     |
+| `service/contract-types.transformer.ts`       | `toResponse`, `toExportRow`, `CONTRACT_TYPES_EXPORT_CELLS`, `toContractType`; the list envelope with `exportLimit` and `printLimit`                                                                                        |
+| `service/contract-types.transport.ts`         | Domain events to the publisher port                                                                                                                                                                                        |
 | `repository/contract-types.repository.ts`     | The only Prisma caller: the keyset list, `count`, `findById`, `create`, `update` (the name only), `remove`, `presentReferences`, `usageByContractType`, `listAll`, `findByIds`                                             |
 | `model/contract-types.model.ts`               | `ContractTypeRow`, `NewContractType`, `ContractTypeUsage`, `ContractType`, `ContractTypeId`, `ContractTypesSortField`, `ContractTypesListRequest`, `ContractTypesPage`, `CONTRACT_TYPES_FACADE_MAX_ROWS`                   |
-| `dto/contract-types.dto.ts`                   | The list, export and params schemas, the strict body, the response and envelope schemas (`CONTRACT_TYPES_NAME_MAX`, `CONTRACT_TYPES_SEARCH_MAX`)                                                                           |
+| `dto/contract-types.dto.ts`                   | The list, export and params schemas, the strict body, the response and envelope schemas (`CONTRACT_TYPES_SEARCH_MAX`)                                                                                                     |
 | `events/published.ts`, `events/subscribed.ts` | `ContractTypesCreatedV1`, `ContractTypesUpdatedV1`, `ContractTypesDeletedV1` / none                                                                                                                                        |
 | `facade/contract-types.facade.ts`             | The only surface other modules may import; `describe()`, `findById`, `listAll`, `findByIds`                                                                                                                                |
 | `index.ts`                                    | Public re-exports: `ContractTypesFacade` and the `ContractType`, `ContractTypeId` types                                                                                                                                    |

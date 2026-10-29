@@ -22,7 +22,7 @@ describe('ContractTypesFacade', () => {
     facade = ctx.moduleRef.get(ContractTypesFacade);
     // Ids 4 to 9: `Head Office` a third time, so the id breaks the tie among three.
     for (const name of ['Four', 'Five', 'Head Office', 'Seven', 'Eight', 'Nine']) {
-      await ctx.repo.create({ name, createdBy: 1, datecreated: new Date(0) });
+      await ctx.repo.create({ name });
     }
   });
 
