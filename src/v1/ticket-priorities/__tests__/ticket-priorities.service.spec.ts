@@ -1,231 +1,284 @@
-import { Test } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AppError } from '../../../shared/errors/app-error.js';
 import type { AuthenticatedUser } from '../../../shared/http/auth/access-token-verifier.js';
-import { TicketPrioritiesRepository } from '../repository/ticket-priorities.repository.js';
 import { TicketPrioritiesService } from '../service/ticket-priorities.service.js';
-import { SettingsFacade } from '../../settings/index.js';
+import { TicketPrioritiesTransformer } from '../service/ticket-priorities.transformer.js';
+import { TicketPrioritiesValidator } from '../service/ticket-priorities.validator.js';
 
-const mockRepository = {
-  findAll: vi.fn(),
+const repository = {
+  list: vi.fn(),
+  count: vi.fn(),
   findById: vi.fn(),
   create: vi.fn(),
   update: vi.fn(),
-  delete: vi.fn(),
+  remove: vi.fn(),
   isReferenced: vi.fn(),
+  listAll: vi.fn(),
 };
+const transport = { publish: vi.fn(), emailPipingDefaultPriority: vi.fn() };
+const logger = { log: vi.fn() };
 
-const mockSettingsFacade = {
-  getOption: vi.fn(), // <-- FIXED: getOption
-};
-
-const user = {} as AuthenticatedUser;
+const admin = { isAdmin: true, staffId: 1 } as AuthenticatedUser;
+const member = { isAdmin: false, staffId: 2 } as AuthenticatedUser;
 
 let service: TicketPrioritiesService;
 
-beforeEach(async () => {
+beforeEach(() => {
   vi.resetAllMocks();
+  transport.publish.mockResolvedValue(undefined);
+  service = new TicketPrioritiesService(
+    new TicketPrioritiesValidator(),
+    repository as never,
+    new TicketPrioritiesTransformer(),
+    transport as never,
+    logger as never,
+  );
+  service.now = () => new Date('2026-10-29T10:00:00.000Z');
+});
 
-  const moduleRef = await Test.createTestingModule({
-    providers: [
-      TicketPrioritiesService,
-      { provide: TicketPrioritiesRepository, useValue: mockRepository },
-      { provide: SettingsFacade, useValue: mockSettingsFacade },
-    ],
-  }).compile();
-
-  service = moduleRef.get(TicketPrioritiesService);
+describe('administrators only', () => {
+  it.each([
+    ['list', () => service.list(member, {})],
+    ['get', () => service.get(member, { id: 1 })],
+    ['create', () => service.create(member, { name: 'High' })],
+    ['update', () => service.update(member, { id: 1 }, { name: 'High' })],
+    ['remove', () => service.remove(member, { id: 1 })],
+    ['exportCsv', () => service.exportCsv(member, {})],
+  ])('%s answers ERP-AUTH-0005 to a non-admin before touching anything', async (_name, run) => {
+    await expect(run()).rejects.toMatchObject({ code: 'ERP-AUTH-0005' });
+    expect(repository.list).not.toHaveBeenCalled();
+    expect(repository.findById).not.toHaveBeenCalled();
+    expect(repository.create).not.toHaveBeenCalled();
+  });
 });
 
 describe('list', () => {
-  it('returns priorities in the order the repository gives them (newest ID first)', async () => {
-    mockRepository.findAll.mockResolvedValue([
-      { priorityid: 2, name: 'High' },
-      { priorityid: 1, name: 'Low' },
-    ]);
+  it('answers the keyset envelope with string ids', async () => {
+    repository.list.mockResolvedValue({
+      items: [
+        { id: 2, name: 'High' },
+        { id: 1, name: 'Low' },
+      ],
+      nextCursor: null,
+      prevCursor: null,
+      total: 2,
+      rangeStart: 1,
+    });
 
-    const result = await service.list(user);
+    const result = await service.list(admin, {});
 
     expect(result.data).toEqual([
-      { id: 2, name: 'High' },
-      { id: 1, name: 'Low' },
+      { id: '2', name: 'High' },
+      { id: '1', name: 'Low' },
     ]);
-    expect(result.meta.total).toBe(2);
+    expect(result.meta).toMatchObject({
+      nextCursor: null,
+      prevCursor: null,
+      total: 2,
+      rangeStart: 1,
+    });
+    expect(result.meta.exportLimit).toBeGreaterThan(0);
+    expect(result.meta.printLimit).toBeGreaterThan(0);
   });
 
-  it('returns an empty list when there are no priorities', async () => {
-    mockRepository.findAll.mockResolvedValue([]);
+  it('defaults to the id descending and passes q and sort to the repository', async () => {
+    repository.list.mockResolvedValue({
+      items: [],
+      nextCursor: null,
+      prevCursor: null,
+      total: 0,
+      rangeStart: 0,
+    });
 
-    const result = await service.list(user);
+    await service.list(admin, {});
+    expect(repository.list).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sortField: 'id', order: 'desc', search: null }),
+    );
 
-    expect(result.data).toEqual([]);
-    expect(result.meta.total).toBe(0);
+    await service.list(admin, { sort: 'name', q: 'hi' });
+    expect(repository.list).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sortField: 'name', order: 'asc', search: 'hi' }),
+    );
   });
 
-  it('treats a null repository result as an empty list', async () => {
-    mockRepository.findAll.mockResolvedValue(null);
-
-    const result = await service.list(user);
-
-    expect(result).toEqual({ data: [], meta: { total: 0 } });
-  });
-
-  it('returns an empty list on AppError ERP-CORE-0004', async () => {
-    mockRepository.findAll.mockRejectedValue(new AppError('ERP-CORE-0004', 'no_table'));
-
-    const result = await service.list(user);
-
-    expect(result).toEqual({ data: [], meta: { total: 0 } });
-  });
-
-  it('rethrows other AppErrors', async () => {
-    mockRepository.findAll.mockRejectedValue(new AppError('ERP-VALIDATION-0001', 'boom'));
-
-    await expect(service.list(user)).rejects.toMatchObject({
+  it('refuses a filter, two sorts and a q that is too long with ERP-VALIDATION-0001', async () => {
+    await expect(service.list(admin, { 'filter[name]': 'x' })).rejects.toMatchObject({
+      code: 'ERP-VALIDATION-0001',
+    });
+    await expect(service.list(admin, { sort: 'name,id' })).rejects.toMatchObject({
+      code: 'ERP-VALIDATION-0001',
+    });
+    await expect(service.list(admin, { q: 'a'.repeat(101) })).rejects.toMatchObject({
       code: 'ERP-VALIDATION-0001',
     });
   });
 
-  it('rethrows unknown errors', async () => {
-    mockRepository.findAll.mockRejectedValue(new Error('db down'));
-
-    await expect(service.list(user)).rejects.toThrow('db down');
+  it('does not hide repository errors', async () => {
+    repository.list.mockRejectedValue(new Error('db down'));
+    await expect(service.list(admin, {})).rejects.toThrow('db down');
   });
 });
 
 describe('get', () => {
-  it('returns the mapped priority', async () => {
-    mockRepository.findById.mockResolvedValue({ priorityid: 3, name: 'Medium' });
-
-    const result = await service.get(user, { id: 3 });
-
-    expect(result).toEqual({ id: 3, name: 'Medium' });
+  it('returns the priority', async () => {
+    repository.findById.mockResolvedValue({ id: 3, name: 'Medium' });
+    expect(await service.get(admin, { id: '3' })).toEqual({ id: '3', name: 'Medium' });
+    expect(repository.findById).toHaveBeenCalledWith(3);
   });
 
-  it('converts a string id to a number', async () => {
-    mockRepository.findById.mockResolvedValue({ priorityid: 3, name: 'Medium' });
-
-    await service.get(user, { id: '3' });
-
-    expect(mockRepository.findById).toHaveBeenCalledWith(3);
+  it('answers ERP-CORE-0004 for a missing id', async () => {
+    repository.findById.mockResolvedValue(null);
+    await expect(service.get(admin, { id: 99 })).rejects.toMatchObject({ code: 'ERP-CORE-0004' });
   });
 
-  it('throws AppError ERP-CORE-0004 when the priority does not exist', async () => {
-    mockRepository.findById.mockResolvedValue(null);
-
-    await expect(service.get(user, { id: 99 })).rejects.toMatchObject({
-      code: 'ERP-CORE-0004',
+  it.each(['abc', '0', '-1', '1.5'])('answers ERP-VALIDATION-0001 for id=%s', async (id) => {
+    await expect(service.get(admin, { id })).rejects.toMatchObject({
+      code: 'ERP-VALIDATION-0001',
     });
+    expect(repository.findById).not.toHaveBeenCalled();
   });
 });
 
 describe('create', () => {
-  it('creates the priority and returns the mapped result', async () => {
-    mockRepository.create.mockResolvedValue({ priorityid: 7, name: 'Critical' });
+  it('trims the name, creates, publishes and logs', async () => {
+    repository.create.mockResolvedValue({ id: 7, name: 'Critical' });
 
-    const result = await service.create(user, { name: 'Critical' });
+    const result = await service.create(admin, { name: '  Critical  ' });
 
-    expect(mockRepository.create).toHaveBeenCalledWith({ name: 'Critical' });
-    expect(result).toEqual({ id: 7, name: 'Critical' });
+    expect(repository.create).toHaveBeenCalledWith({ name: 'Critical' });
+    expect(result).toEqual({ id: '7', name: 'Critical' });
+    expect(transport.publish).toHaveBeenCalledTimes(1);
+    expect(logger.log).toHaveBeenCalledWith('ticket priority created', { id: 7 });
   });
 
-  it('propagates repository errors', async () => {
-    mockRepository.create.mockRejectedValue(new Error('duplicate'));
+  it.each([
+    ['empty', { name: '' }],
+    ['blank', { name: '   ' }],
+    ['51 characters', { name: 'a'.repeat(51) }],
+    ['missing', {}],
+    ['not a string', { name: 5 }],
+    ['an extra key', { name: 'High', priorityid: 9 }],
+  ])('refuses a body with a name that is %s', async (_label, body) => {
+    await expect(service.create(admin, body)).rejects.toMatchObject({
+      code: 'ERP-VALIDATION-0001',
+    });
+    expect(repository.create).not.toHaveBeenCalled();
+  });
 
-    await expect(service.create(user, { name: 'High' })).rejects.toThrow('duplicate');
+  it('accepts a 50-character name', async () => {
+    const name = 'a'.repeat(50);
+    repository.create.mockResolvedValue({ id: 8, name });
+    expect(await service.create(admin, { name })).toEqual({ id: '8', name });
   });
 });
 
 describe('update', () => {
-  it('updates the priority and returns the mapped result', async () => {
-    mockRepository.update.mockResolvedValue({ priorityid: 7, name: 'Urgent' });
+  it('renames, publishes and logs', async () => {
+    repository.update.mockResolvedValue({ id: 7, name: 'Urgent' });
 
-    const result = await service.update(user, { id: 7 }, { name: 'Urgent' });
+    const result = await service.update(admin, { id: '7' }, { name: 'Urgent' });
 
-    expect(mockRepository.update).toHaveBeenCalledWith(7, { name: 'Urgent' });
-    expect(result).toEqual({ id: 7, name: 'Urgent' });
+    expect(repository.update).toHaveBeenCalledWith(7, { name: 'Urgent' });
+    expect(result).toEqual({ id: '7', name: 'Urgent' });
+    expect(transport.publish).toHaveBeenCalledTimes(1);
   });
 
-  it('converts a string id to a number', async () => {
-    mockRepository.update.mockResolvedValue({ priorityid: 7, name: 'Urgent' });
+  it('answers ERP-CORE-0004 when the id is missing and publishes nothing', async () => {
+    repository.update.mockResolvedValue(null);
+    await expect(service.update(admin, { id: 9 }, { name: 'X' })).rejects.toMatchObject({
+      code: 'ERP-CORE-0004',
+    });
+    expect(transport.publish).not.toHaveBeenCalled();
+  });
 
-    await service.update(user, { id: '7' }, { name: 'Urgent' });
-
-    expect(mockRepository.update).toHaveBeenCalledWith(7, { name: 'Urgent' });
+  it('refuses a bad id or an empty body with ERP-VALIDATION-0001', async () => {
+    await expect(service.update(admin, { id: 'abc' }, { name: 'X' })).rejects.toMatchObject({
+      code: 'ERP-VALIDATION-0001',
+    });
+    await expect(service.update(admin, { id: 1 }, {})).rejects.toMatchObject({
+      code: 'ERP-VALIDATION-0001',
+    });
+    expect(repository.update).not.toHaveBeenCalled();
   });
 });
 
 describe('remove', () => {
-  it('refuses to delete if any ticket uses the priority', async () => {
-    mockRepository.isReferenced.mockResolvedValue(true);
+  beforeEach(() => {
+    repository.findById.mockResolvedValue({ id: 5, name: 'High' });
+    repository.isReferenced.mockResolvedValue(false);
+    transport.emailPipingDefaultPriority.mockResolvedValue('1');
+    repository.remove.mockResolvedValue(true);
+  });
 
-    await expect(service.remove(user, { id: 5 })).rejects.toMatchObject({
-      name: 'AppError',
-      code: 'ERP-VALIDATION-0001',
-      message: 'is_referenced',
+  it('answers ERP-CORE-0004 for a missing id', async () => {
+    repository.findById.mockResolvedValue(null);
+    await expect(service.remove(admin, { id: 9 })).rejects.toMatchObject({
+      code: 'ERP-CORE-0004',
     });
-    expect(mockRepository.delete).not.toHaveBeenCalled();
+    expect(repository.remove).not.toHaveBeenCalled();
   });
 
-  it('refuses to delete if the priority is the email_piping_default_priority', async () => {
-    mockRepository.isReferenced.mockResolvedValue(false);
-    mockSettingsFacade.getOption.mockResolvedValue('4');
-
-    await expect(service.remove(user, { id: 4 })).rejects.toMatchObject({
-      name: 'AppError',
+  it('answers ERP-VALIDATION-0001 for a bad id', async () => {
+    await expect(service.remove(admin, { id: 'abc' })).rejects.toMatchObject({
       code: 'ERP-VALIDATION-0001',
     });
-    expect(mockRepository.delete).not.toHaveBeenCalled();
   });
 
-  it('deletes the priority when unused and not the default', async () => {
-    mockRepository.isReferenced.mockResolvedValue(false);
-    mockSettingsFacade.getOption.mockResolvedValue('1'); // <-- FIXED
-    mockRepository.delete.mockResolvedValue({ priorityid: 6, name: 'Urgent' });
-
-    await service.remove(user, { id: 6 });
-
-    expect(mockRepository.delete).toHaveBeenCalledWith(6);
+  it('refuses while a ticket uses it (ERP-TICKETPRIORITIES-0001)', async () => {
+    repository.isReferenced.mockResolvedValue(true);
+    await expect(service.remove(admin, { id: 5 })).rejects.toMatchObject({
+      code: 'ERP-TICKETPRIORITIES-0001',
+    });
+    expect(repository.remove).not.toHaveBeenCalled();
   });
 
-  it('deletes when the default priority setting is unset', async () => {
-    mockRepository.isReferenced.mockResolvedValue(false);
-    mockSettingsFacade.getOption.mockResolvedValue(undefined); // <-- FIXED
-    mockRepository.delete.mockResolvedValue({ priorityid: 6, name: 'Urgent' });
-
-    await service.remove(user, { id: 6 });
-
-    expect(mockRepository.delete).toHaveBeenCalledWith(6);
+  it('refuses the email-piping default (ERP-TICKETPRIORITIES-0002)', async () => {
+    transport.emailPipingDefaultPriority.mockResolvedValue('5');
+    await expect(service.remove(admin, { id: 5 })).rejects.toMatchObject({
+      code: 'ERP-TICKETPRIORITIES-0002',
+    });
+    expect(repository.remove).not.toHaveBeenCalled();
   });
 
-  it('still deletes when the settings lookup fails', async () => {
-    mockRepository.isReferenced.mockResolvedValue(false);
-    mockSettingsFacade.getOption.mockRejectedValue(new Error('setting missing')); // <-- FIXED
-    mockRepository.delete.mockResolvedValue({ priorityid: 6, name: 'Urgent' });
-
-    await service.remove(user, { id: 6 });
-
-    expect(mockRepository.delete).toHaveBeenCalledWith(6);
+  it('refuses when the setting cannot be read (ERP-TICKETPRIORITIES-0002)', async () => {
+    transport.emailPipingDefaultPriority.mockRejectedValue(new Error('settings down'));
+    await expect(service.remove(admin, { id: 5 })).rejects.toMatchObject({
+      code: 'ERP-TICKETPRIORITIES-0002',
+    });
+    expect(repository.remove).not.toHaveBeenCalled();
   });
 
-  it('converts a string id to a number', async () => {
-    mockRepository.isReferenced.mockResolvedValue(false);
-    mockSettingsFacade.getOption.mockResolvedValue('1'); // <-- FIXED
-    mockRepository.delete.mockResolvedValue({ priorityid: 6, name: 'Urgent' });
-
-    await service.remove(user, { id: '6' });
-
-    expect(mockRepository.isReferenced).toHaveBeenCalledWith(6);
-    expect(mockRepository.delete).toHaveBeenCalledWith(6);
+  it('deletes when unused and not the default, then publishes and logs', async () => {
+    await service.remove(admin, { id: 5 });
+    expect(repository.remove).toHaveBeenCalledWith(5);
+    expect(transport.publish).toHaveBeenCalledTimes(1);
+    expect(logger.log).toHaveBeenCalledWith('ticket priority deleted', { id: 5 });
   });
 
-  it('reads the correct setting key', async () => {
-    mockRepository.isReferenced.mockResolvedValue(false);
-    mockSettingsFacade.getOption.mockResolvedValue('1'); // <-- FIXED
-    mockRepository.delete.mockResolvedValue({ priorityid: 6, name: 'Urgent' });
+  it('deletes when the setting is unset (null)', async () => {
+    transport.emailPipingDefaultPriority.mockResolvedValue(null);
+    await service.remove(admin, { id: 5 });
+    expect(repository.remove).toHaveBeenCalledWith(5);
+  });
 
-    await service.remove(user, { id: 6 });
+  it('answers ERP-CORE-0004 when the row vanished between the read and the delete', async () => {
+    repository.remove.mockResolvedValue(false);
+    await expect(service.remove(admin, { id: 5 })).rejects.toMatchObject({
+      code: 'ERP-CORE-0004',
+    });
+    expect(transport.publish).not.toHaveBeenCalled();
+  });
+});
 
-    expect(mockSettingsFacade.getOption).toHaveBeenCalledWith('email_piping_default_priority'); // <-- FIXED
+describe('facade reads', () => {
+  it('findById returns the model, or null, with no administrator check', async () => {
+    repository.findById.mockResolvedValue({ id: 2, name: 'High' });
+    expect(await service.findById(2)).toEqual({ id: 2, name: 'High' });
+    repository.findById.mockResolvedValue(null);
+    expect(await service.findById(99)).toBeNull();
+  });
+
+  it('listAll returns the model rows', async () => {
+    repository.listAll.mockResolvedValue([{ id: 1, name: 'Low' }]);
+    expect(await service.listAll()).toEqual([{ id: 1, name: 'Low' }]);
   });
 });

@@ -1,19 +1,16 @@
 import { Injectable } from '@nestjs/common';
-import { TicketPrioritiesRepository } from '../repository/ticket-priorities.repository.js';
-import type { TicketPriority } from '../model/ticket-priority.model.js'; // Ensure this model file exists
-
-/**
- * Facade for Ticket Priorities.
- */
+import { TicketPrioritiesService } from '../service/ticket-priorities.service.js';
+import type { TicketPriority } from '../model/ticket-priority.model.js';
+/** The module's public face for other modules: reads priorities through the service and returns `{ id, name }`. */
 @Injectable()
 export class TicketPrioritiesFacade {
-  constructor(private readonly repository: TicketPrioritiesRepository) {}
+  constructor(private readonly service: TicketPrioritiesService) {}
 
-  async findAll(): Promise<TicketPriority[]> {
-    return this.repository.findAll();
+  findAll(): Promise<readonly TicketPriority[]> {
+    return this.service.listAll();
   }
 
-  async findById(id: number): Promise<TicketPriority | null> {
-    return this.repository.findById(id);
+  findById(id: number): Promise<TicketPriority | null> {
+    return this.service.findById(id);
   }
 }

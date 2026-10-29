@@ -99,6 +99,8 @@ export const ERROR_CODES = {
   'ERP-FILES-0002': { status: 413, title: 'File too large' },
   'ERP-UPSTREAM-0001': { status: 503, title: 'An upstream system is unavailable' }, // ADR-0031 §7 load shedding
   'ERP-INTERNAL-0001': { status: 500, title: 'Internal error' },
+  'ERP-TICKETPRIORITIES-0001': { status: 409, title: 'Priority in use by a ticket' },
+  'ERP-TICKETPRIORITIES-0002': { status: 409, title: 'Priority is the email-piping default' },
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_CODES;

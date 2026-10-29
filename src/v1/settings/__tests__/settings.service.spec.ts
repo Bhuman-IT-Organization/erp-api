@@ -42,13 +42,14 @@ async function refusal(promise: Promise<unknown>): Promise<AppError> {
   return error;
 }
 
-describe('SETTINGS_ALLOW_LIST (D-22, D-37, lead sources, ticket status)', () => {
+describe('SETTINGS_ALLOW_LIST (D-22, D-37, lead sources, ticket status, ticket priorities)', () => {
   it('keeps the allowed setting names unique and frozen', () => {
     const expected = [
       ...D22_NAMES,
       ...D37_NAMES,
       'default_ticket_reply_status',
       ...LEAD_SOURCES_NAMES,
+      'email_piping_default_priority',
     ];
     expect(SETTINGS_ALLOW_LIST).toHaveLength(expected.length);
     expect(new Set(SETTINGS_ALLOW_LIST).size).toBe(SETTINGS_ALLOW_LIST.length);
