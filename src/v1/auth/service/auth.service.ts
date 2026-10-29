@@ -69,8 +69,6 @@ const DEVICE_MAX_LENGTH = 200;
 const BCRYPT_LABEL_LENGTH = 7;
 const REFRESH_TOKEN_PARTS = 3;
 
-let dummyHashPromise: Promise<string> | null = null;
-
 interface VersionCacheEntry {
   readonly value: number;
   readonly until: number;
@@ -321,9 +319,7 @@ export class AuthService implements OnModuleInit {
   // --- internals --------------------------------------------------------------------------------
 
   private async ensureDummyHash(): Promise<string> {
-    if (this.dummyHash !== null) return this.dummyHash;
-    dummyHashPromise ??= this.hasher.hash(randomBytes(DUMMY_SECRET_BYTES).toString('hex'));
-    this.dummyHash = await dummyHashPromise;
+    this.dummyHash ??= await this.hasher.hash(randomBytes(DUMMY_SECRET_BYTES).toString('hex'));
     return this.dummyHash;
   }
 

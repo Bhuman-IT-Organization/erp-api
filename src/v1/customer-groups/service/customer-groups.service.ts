@@ -160,7 +160,13 @@ export class CustomerGroupsService {
     this.assertAdministrator(actor, ADMIN_ONLY);
     const { id } = this.validator.parseParams(params);
     if ((await this.repository.findById(id)) === null) throw notFound();
-    if ((await this.repository.countCustomers(id)) > 0) {
+    let customerCount: number;
+    try {
+      customerCount = await this.repository.countCustomers(id);
+    } catch {
+      throw new AppError('ERP-CUSTOMERGROUPS-0001', 'its use could not be counted');
+    }
+    if (customerCount > 0) {
       throw new AppError('ERP-CUSTOMERGROUPS-0001', IN_USE);
     }
     const at = this.now().toISOString();
