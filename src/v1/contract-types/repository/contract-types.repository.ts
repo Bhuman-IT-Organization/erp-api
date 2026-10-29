@@ -2,10 +2,9 @@
  * Repository: the module's data seam (BE-08) and the only file here that touches Prisma (DB-04).
  *
  * Owner of the one table it writes (ADR-0029):
- *   `tblcontracts_types`  node: `name` (`VARCHAR(255)`); on create only, `created_by` (the signed-in
- *                         staff id) and `datecreated` (Perfex's wall clock, D-31); `id` is assigned
- *                         by the database. An update writes the name and nothing else. Every read
- *                         and write goes through the typed delegate.
+ *   `tblcontracts_types`  node: `name` (`LONGTEXT`); `id` is assigned by the database. An
+ *                         update writes the name and nothing else. Every read and write goes
+ *                         through the typed delegate.
  *
  * `CONTRACT_TYPE_REFERENCES`: what refers to a contract type, read for the delete refusal (D-07) and
  * each row's usage. A DECLARED candidate list (D-28), each entry a Perfex or Perfex-module column,
@@ -86,7 +85,7 @@ export const CONTRACT_TYPE_REFERENCES: readonly ContractTypeReference[] = Object
       client.$queryRaw`SELECT r.contract_type AS id, COUNT(*) AS n FROM tblcontracts r WHERE r.contract_type IN (${ids}) GROUP BY r.contract_type`,
   },
   {
-    group: 'contracts',
+    group: 'goals',
     table: 'tblgoals',
     column: 'contract_type',
     match: 'id',

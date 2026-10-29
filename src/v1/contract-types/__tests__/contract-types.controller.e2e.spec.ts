@@ -70,7 +70,8 @@ const ROUTES: readonly { method: Method; url: string; payload?: object; admin: n
 
 /** One usage per group, that group at 1 and the rest at 0, with the words its 409 detail uses. */
 const ONE_GROUP: readonly (readonly [string, ContractTypeUsage, string])[] = [
-  ['contracts', { contracts: 1 }, 'used by 1 contract(s)'],
+  ['contracts', { contracts: 1, goals: 0 }, 'used by 1 contract(s)'],
+  ['goals', { contracts: 0, goals: 1 }, 'used by 1 goal(s)'],
 ];
 
 function bearer(token: string): Record<string, string> {
@@ -198,7 +199,7 @@ describe('ContractTypesController (Fastify inject, no network)', () => {
     });
 
     it('each row carries its usage', async () => {
-      ctx.repo.usage.set(3, { contracts: 2 });
+      ctx.repo.usage.set(3, { contracts: 2, goals: 0 });
       const res = await send('GET', `${LIST}?q=office&sort=id`, TEST_BEARERS.admin);
       const body = contractTypesListResponseSchema.parse(JSON.parse(res.payload));
       expect(body.data.slice(0, 2)).toEqual([
@@ -210,7 +211,7 @@ describe('ContractTypesController (Fastify inject, no network)', () => {
         {
           id: '3',
           name: 'Head Office',
-          usage: { contracts: 2 },
+          usage: { contracts: 2, goals: 0 },
         },
       ]);
       expect(res.payload).not.toContain('createdBy');
@@ -383,6 +384,7 @@ describe('ContractTypesController (Fastify inject, no network)', () => {
       const id = await created('Busy');
       ctx.repo.usage.set(Number(id), {
         contracts: 2,
+        goals: 0,
       });
       const res = await send('DELETE', record(id), TEST_BEARERS.admin);
       expect(problem(res).detail).toBe('used by 2 contract(s)');

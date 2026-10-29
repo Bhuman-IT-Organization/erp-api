@@ -156,7 +156,7 @@ describe('ContractTypesService: reads', () => {
     expect(await service.get(ADMIN, { id: '1' })).toEqual({
       id: '1',
       name: 'Head Office',
-      usage: { contracts: 4 },
+      usage: { contracts: 4, goals: 0 },
     });
     expect((await refusal(service.get(ADMIN, { id: '404' }))).code).toBe('ERP-CORE-0004');
   });

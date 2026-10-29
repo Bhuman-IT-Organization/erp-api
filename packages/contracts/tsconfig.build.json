@@ -6,6 +6,5 @@
     "declaration": true,
     "noEmit": false
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["src/**/zz-lint-probe*"]
+  "include": ["src/**/*.ts"]
 }

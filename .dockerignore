@@ -8,5 +8,3 @@ src/shared/db/generated
 # Stryker output (test:mutation), per machine; a leftover sandbox breaks the build context (plan 04-06).
 .stryker-tmp
 reports
-# Architecture lint probes (scripts/check-architecture-lint.mjs); leftover probes break the build context.
-**/*zz-lint-probe*

@@ -18,10 +18,12 @@ import 'reflect-metadata';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { AppConfig } from '../../../shared/config/app-config.js';
-import { Prisma } from '../../../shared/db/generated/client.js';
+import { Prisma, PrismaClient } from '../../../shared/db/generated/client.js';
 import { PrismaService } from '../../../shared/db/prisma.service.js';
 import { HealthService } from '../../../shared/health/health.service.js';
 import { decodeCursor } from '../../../shared/http/keyset.js';
+import type { AuthenticatedUser } from '../../../shared/http/auth/access-token-verifier.js';
+import { LoggerService } from '../../../shared/logger/logger.service.js';
 import type {
   ContractTypeRow,
   ContractTypesListRequest,
@@ -33,6 +35,10 @@ import {
   ContractTypesRepository,
   referenceKey,
 } from '../repository/contract-types.repository.js';
+import { ContractTypesService } from '../service/contract-types.service.js';
+import { ContractTypesTransformer } from '../service/contract-types.transformer.js';
+import { ContractTypesTransport } from '../service/contract-types.transport.js';
+import { ContractTypesValidator } from '../service/contract-types.validator.js';
 import { NO_CONTRACT_TYPE_USAGE } from '../service/contract-types.transformer.js';
 
 /** Every row this spec creates carries this prefix, so the cleanup deletes exactly its own rows. */
@@ -64,14 +70,19 @@ describe.skipIf(!process.env.DATABASE_URL)(
     const service = new PrismaService(new AppConfig(), new HealthService());
     const repository = new ContractTypesRepository(service);
     const client = service.client;
+    const directClient = process.env.DATABASE_URL
+      ? new PrismaClient({ datasourceUrl: process.env.DATABASE_URL })
+      : new PrismaClient();
     let a: ContractTypeRow;
     let b: ContractTypeRow;
     let c: ContractTypeRow;
     /** The id of a row this spec created and deleted: guaranteed missing (ids are never reused). */
     let missingId = 0;
 
-    const cleanup = () =>
-      client.tblcontracts_types.deleteMany({ where: { name: { startsWith: MARKER } } });
+    const cleanup = async () => {
+      await directClient.tblcontracts.deleteMany({ where: { subject: { startsWith: MARKER } } });
+      await client.tblcontracts_types.deleteMany({ where: { name: { startsWith: MARKER } } });
+    };
 
     const create = (suffix: string): Promise<ContractTypeRow> =>
       repository.create({ name: `${MARKER}-${suffix}` });
@@ -96,6 +107,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
 
     afterAll(async () => {
       await cleanup();
+      await directClient.$disconnect();
       await service.client.$disconnect();
     });
 
@@ -205,7 +217,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
             client.$queryRaw`SELECT contract_type, COUNT(*) AS n FROM tblcontracts WHERE contract_type IN (${Prisma.join(in_)}) GROUP BY contract_type`,
         ],
         [
-          'contracts',
+          'goals',
           'tblgoals.contract_type',
           (in_) =>
             client.$queryRaw`SELECT contract_type, COUNT(*) AS n FROM tblgoals WHERE contract_type IN (${Prisma.join(in_)}) GROUP BY contract_type`,
@@ -234,6 +246,45 @@ describe.skipIf(!process.env.DATABASE_URL)(
         [a.id, NO_CONTRACT_TYPE_USAGE],
         [c.id, NO_CONTRACT_TYPE_USAGE],
       ]);
+    });
+
+    it('counts real contract rows referencing the contract type and refuses delete with 409', async () => {
+      const contract = await directClient.tblcontracts.create({
+        data: {
+          contract_type: a.id,
+          subject: `${MARKER}-real-contract`,
+          client: 1,
+          addedfrom: 1,
+          dateadded: new Date(),
+        },
+      });
+      try {
+        const usage = await repository.usageByContractType([a.id]);
+        expect(usage.get(a.id)?.contracts).toBeGreaterThanOrEqual(1);
+
+        const adminUser: AuthenticatedUser = {
+          staffId: 1,
+          sessionId: 'sid',
+          jti: 'jti',
+          isAdmin: true,
+          roleId: null,
+          tokenVersion: 0,
+          expiresAt: 4_102_444_800,
+        };
+        const serviceInstance = new ContractTypesService(
+          new ContractTypesValidator(),
+          repository,
+          new ContractTypesTransformer(),
+          new ContractTypesTransport({ publish: () => Promise.resolve() }),
+          new LoggerService(),
+        );
+        await expect(serviceInstance.remove(adminUser, { id: a.id })).rejects.toMatchObject({
+          status: 409,
+          code: 'ERP-CONTRACTTYPES-0001',
+        });
+      } finally {
+        await directClient.tblcontracts.deleteMany({ where: { id: contract.id } });
+      }
     });
 
     it('a very long name is accepted (LONGTEXT column)', async () => {

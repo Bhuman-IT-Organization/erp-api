@@ -20,7 +20,7 @@ const ROW: ContractTypeRow = {
   name: 'Fixed-Term',
 };
 const OTHER: ContractTypeRow = { id: 8, name: 'Permanent' };
-const USED: ContractTypeUsage = { contracts: 2 };
+const USED: ContractTypeUsage = { contracts: 2, goals: 0 };
 const META = { nextCursor: 'n', prevCursor: null, total: 3, rangeStart: 1 };
 
 describe('the response, the export rows and the facade shape', () => {

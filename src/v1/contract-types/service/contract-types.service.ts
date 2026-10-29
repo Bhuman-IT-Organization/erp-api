@@ -57,10 +57,10 @@ const ADMIN_ONLY = 'contract types are managed by administrators only';
 const NOT_COUNTED = 'its use could not be counted';
 
 /** Each usage group's words in a 409 detail, in the order the detail lists them. */
-const GROUP_WORDS = [['contracts', 'contract(s)']] as const satisfies readonly (readonly [
-  keyof ContractTypeUsage,
-  string,
-])[];
+const GROUP_WORDS = [
+  ['contracts', 'contract(s)'],
+  ['goals', 'goal(s)'],
+] as const satisfies readonly (readonly [keyof ContractTypeUsage, string])[];
 
 function notFound(): AppError {
   return new AppError('ERP-CORE-0004', 'Resource not found');

@@ -87,9 +87,10 @@ export const createContractTypesBodySchema = z.strictObject({
 /** `PATCH :id`: the same body; the form always sends the name, so `{}` is a 400 on `['name']`. */
 export const updateContractTypesBodySchema = createContractTypesBodySchema;
 
-/** What refers to the contract type: contracts. */
+/** What refers to the contract type: contracts, goals. */
 export const contractTypeUsageSchema = z.object({
   contracts: z.number().int().nonnegative(),
+  goals: z.number().int().nonnegative(),
 });
 
 /**

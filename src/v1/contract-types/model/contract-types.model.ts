@@ -17,10 +17,11 @@ export interface NewContractType {
 }
 
 /**
- * What refers to a contract type: contracts (tblcontracts.contract_type).
+ * What refers to a contract type: contracts (tblcontracts.contract_type), goals (tblgoals.contract_type).
  */
 export interface ContractTypeUsage {
   readonly contracts: number;
+  readonly goals: number;
 }
 
 /** The facade's public shape. */

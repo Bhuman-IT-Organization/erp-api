@@ -601,7 +601,6 @@ const checkProbes = async () => {
   }
 };
 
-cleanup();
 try {
   await checkDisjoint();
   await checkProbes();

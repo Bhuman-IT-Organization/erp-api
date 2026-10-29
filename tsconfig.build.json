@@ -1,4 +1,4 @@
 {
   "extends": "./tsconfig.json",
-  "exclude": ["src/**/*.spec.ts", "src/**/zz-lint-probe*"]
+  "exclude": ["src/**/*.spec.ts"]
 }

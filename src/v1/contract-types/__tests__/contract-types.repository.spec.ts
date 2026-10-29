@@ -37,7 +37,7 @@ interface PresentColumn {
 /** Every candidate of D-28, with its group, as the plan's interfaces declare them. */
 const CANDIDATES: readonly (readonly [string, string, keyof ContractTypeUsage])[] = [
   ['tblcontracts', 'contract_type', 'contracts'],
-  ['tblgoals', 'contract_type', 'contracts'],
+  ['tblgoals', 'contract_type', 'goals'],
 ];
 
 const ALL_PRESENT: readonly PresentColumn[] = CANDIDATES.map(([t, c]) => ({ t, c }));
@@ -130,7 +130,7 @@ describe('ContractTypesRepository: the referencing columns discovered at runtime
     expect(raw).toHaveLength(2);
     expect(raw[0]?.sql).toContain(PROBE);
     expect(readTable(raw[1]?.sql ?? '')).toBe('tblcontracts');
-    expect(before.get(7)).toEqual({ contracts: 2 });
+    expect(before.get(7)).toEqual({ contracts: 2, goals: 0 });
     expect(before.get(9)).toEqual(NO_CONTRACT_TYPE_USAGE);
   });
 
@@ -172,8 +172,8 @@ describe('ContractTypesRepository: the referencing columns discovered at runtime
       raw: { tblcontracts: [{ id: '7', n: 2n }] },
     });
     const usage = await repository.usageByContractType([7, 9]);
-    expect(usage.get(7)).toEqual({ contracts: 2 });
-    expect(usage.get(9)).toEqual({ contracts: 0 });
+    expect(usage.get(7)).toEqual({ contracts: 2, goals: 0 });
+    expect(usage.get(9)).toEqual({ contracts: 0, goals: 0 });
     const statements = usageStatements(raw);
     expect(statements).toHaveLength(1);
     expect(statements[0]?.values).toEqual([7, 9]);
@@ -187,8 +187,8 @@ describe('ContractTypesRepository: the referencing columns discovered at runtime
       },
     });
     const usage = await repository.usageByContractType([7, 9]);
-    expect(usage.get(7)).toEqual({ contracts: 3 });
-    expect(usage.get(9)).toEqual({ contracts: 0 });
+    expect(usage.get(7)).toEqual({ contracts: 2, goals: 1 });
+    expect(usage.get(9)).toEqual({ contracts: 0, goals: 0 });
     const statements = usageStatements(raw);
     expect(statements).toHaveLength(2);
   });

@@ -24,6 +24,7 @@ import type {
 /** The counts a contract type answers when the usage map has no entry for its id. */
 export const NO_CONTRACT_TYPE_USAGE: ContractTypeUsage = {
   contracts: 0,
+  goals: 0,
 };
 
 /** One exported row: the export columns (name, contracts). */
