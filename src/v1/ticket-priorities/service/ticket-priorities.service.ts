@@ -11,7 +11,7 @@ import {
   TicketPrioritiesDeletedV1,
   TicketPrioritiesUpdatedV1,
 } from '../events/published.js';
-import type { TicketPriority } from '../model/ticket-priority.model.js';
+import type { TicketPriority } from '../model/ticket-priorities.model.js';
 import { TicketPrioritiesRepository } from '../repository/ticket-priorities.repository.js';
 import {
   TICKET_PRIORITIES_EXPORT_CELLS,
