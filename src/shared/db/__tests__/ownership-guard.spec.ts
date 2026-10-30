@@ -489,8 +489,8 @@ describe('the committed register, today', () => {
     // removed the Departments and Custom Fields write routes, so v1/departments and v1/custom-fields
     // only read them.
     // Ticket Statuses claimed tbltickets_status for v1/ticket-statuses.
+    // Customer Groups claimed tblcustomers_groups for v1/customer-groups; tblcustomer_groups stays Perfex's.
     // Update this expectation in the same PR that changes either register.
-
     const nodeOwned = [...map.entries()]
       .filter(([, o]) => o === 'node')
       .map(([t]) => t)
