@@ -57,8 +57,6 @@
     "bidi-js": "1.1.0",
     "bullmq": "6.3.10",
     "bwip-js": "4.11.4",
-    "class-transformer": "^0.5.1",
-    "class-validator": "^0.15.1",
     "csv-parse": "7.0.3",
     "file-type": "22.1.1",
     "ioredis": "6.0.0",

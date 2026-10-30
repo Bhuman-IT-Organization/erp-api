@@ -488,6 +488,7 @@ describe('the committed register, today', () => {
     // The Services card claimed `tblservices` for `v1/services`; Perfex's quick add stays a co-writer.
     // `tblleads_sources` is written by `v1/lead-sources`; Perfex's delete route is closed at Nginx,
     // while quick add remains on Perfex.
+    // Ticket Priority claimed tbltickets_priorities for v1/ticket-priorities.
     // `tbldepartments`, `tblcustomfields` and `tblcustomfieldsvalues` are Perfex's again: this copy
     // removed the Departments and Custom Fields write routes, so v1/departments and v1/custom-fields
     // only read them.
@@ -499,7 +500,6 @@ describe('the committed register, today', () => {
       .map(([t]) => t)
       .sort();
     expect(nodeOwned).toEqual([
-      // Keep this list sorted alphabetically
       'tblcost_centers',
       'tblcurrencies',
       'tblcustomers_groups',

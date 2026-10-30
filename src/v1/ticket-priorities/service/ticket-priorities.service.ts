@@ -96,7 +96,13 @@ export class TicketPrioritiesService {
     const { id } = this.validator.parseParams(params);
     if ((await this.repository.findById(id)) === null) throw notFound();
 
-    if (await this.repository.isReferenced(id)) {
+    let referenced: boolean;
+    try {
+      referenced = await this.repository.isReferenced(id);
+    } catch {
+      throw new AppError('ERP-TICKETPRIORITIES-0001', 'its use could not be counted');
+    }
+    if (referenced) {
       throw new AppError('ERP-TICKETPRIORITIES-0001', 'Priority in use by a ticket');
     }
 
