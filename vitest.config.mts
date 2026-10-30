@@ -12,6 +12,9 @@ export default defineConfig({
   ],
   test: {
     ...test,
+    maxWorkers: 8,
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
     // packages/** so the workspace packages' own suites (`@erp/contracts`) run in `yarn test`.
     include: ['src/**/*.spec.ts', 'packages/*/__tests__/**/*.spec.ts'],
     exclude: ['src/**/*.int.spec.ts', 'node_modules/**', 'dist/**', 'packages/*/dist/**'],
