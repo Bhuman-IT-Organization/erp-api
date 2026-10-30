@@ -40,7 +40,7 @@ export const TIMINGS = Object.freeze({
     maxRetriesPerRequest: 1,
   }),
   http: Object.freeze({
-    legacy: Object.freeze({ timeoutMs: 30_000, probeCacheMs: 5_000 }), // ADR-0031 §1: legacy HTTP 30 s
+    legacy: Object.freeze({ timeoutMs: 15_000, probeCacheMs: 5_000 }), // ADR-0031 §1: legacy HTTP 15 s
     vendor: Object.freeze({ timeoutMs: 10_000 }), // vendor HTTP 10 s
   }),
   health: Object.freeze({

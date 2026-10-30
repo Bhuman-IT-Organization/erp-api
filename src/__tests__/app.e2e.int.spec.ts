@@ -525,7 +525,7 @@ describe.skipIf(!process.env.DATABASE_URL)('AppModule against the local stack', 
       expect(['ready', 'inactive']).toContain(
         (JSON.parse(live.payload) as { status: string }).status,
       );
-    }, 60_000);
+    });
 
     /** A fresh login whose keys are registered for the exact-name delete in afterAll. */
     async function freshSession(): Promise<{
