@@ -16,7 +16,7 @@ import {
 import type {
   TicketPrioritiesListRequest,
   TicketPrioritiesSortField,
-} from '../model/ticket-priority.model.js';
+} from '../model/ticket-priorities.model.js';
 
 export const TICKET_PRIORITIES_SORT_FIELDS = [
   'id',

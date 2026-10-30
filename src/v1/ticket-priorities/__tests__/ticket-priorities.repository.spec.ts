@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   TICKET_PRIORITIES_FACADE_MAX_ROWS,
   type TicketPrioritiesListRequest,
-} from '../model/ticket-priority.model.js';
+} from '../model/ticket-priorities.model.js';
 import { TicketPrioritiesRepository } from '../repository/ticket-priorities.repository.js';
 
 const priorities = {

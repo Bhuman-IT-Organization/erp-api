@@ -17,7 +17,7 @@ import {
   type TicketPrioritiesPage,
   type TicketPrioritiesSortField,
   type TicketPriority,
-} from '../model/ticket-priority.model.js';
+} from '../model/ticket-priorities.model.js';
 import type { TicketPrioritiesRepository } from '../repository/ticket-priorities.repository.js';
 
 /**

@@ -13,7 +13,7 @@ import {
   type TicketPrioritiesListResponseDto,
   type TicketPrioritiesResponseDto,
 } from '../dto/ticket-priorities.dto.js';
-import type { TicketPriority, TicketPrioritiesPage } from '../model/ticket-priority.model.js';
+import type { TicketPriority, TicketPrioritiesPage } from '../model/ticket-priorities.model.js';
 
 export interface TicketPriorityExportRow {
   readonly id: string;

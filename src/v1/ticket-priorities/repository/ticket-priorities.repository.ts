@@ -10,7 +10,7 @@ import {
   type TicketPrioritiesListRequest,
   type TicketPrioritiesPage,
   type TicketPrioritiesSortField,
-} from '../model/ticket-priority.model.js';
+} from '../model/ticket-priorities.model.js';
 
 const RECORD_NOT_FOUND = 'P2025';
 /** `tbltickets_priorities.priorityid` is a signed INT. */

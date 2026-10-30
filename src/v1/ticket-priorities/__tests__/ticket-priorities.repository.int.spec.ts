@@ -26,7 +26,7 @@ import type {
   TicketPrioritiesListRequest,
   TicketPrioritiesPage,
   TicketPriority,
-} from '../model/ticket-priority.model.js';
+} from '../model/ticket-priorities.model.js';
 import { TicketPrioritiesRepository } from '../repository/ticket-priorities.repository.js';
 import { TicketPrioritiesService } from '../service/ticket-priorities.service.js';
 import { TicketPrioritiesTransformer } from '../service/ticket-priorities.transformer.js';

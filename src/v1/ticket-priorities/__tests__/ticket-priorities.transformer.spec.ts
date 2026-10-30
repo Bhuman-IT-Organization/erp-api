@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { EXPORT_MAX_ROWS } from '../../../shared/http/csv.js';
 import { PRINT_MAX_ROWS } from '../../../shared/http/export.js';
-import type { TicketPrioritiesPage, TicketPriority } from '../model/ticket-priority.model.js';
+import type { TicketPrioritiesPage, TicketPriority } from '../model/ticket-priorities.model.js';
 import {
   TICKET_PRIORITIES_EXPORT_CELLS,
   TicketPrioritiesTransformer,

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { TicketPrioritiesService } from '../service/ticket-priorities.service.js';
-import type { TicketPriority } from '../model/ticket-priority.model.js';
+import type { TicketPriority } from '../model/ticket-priorities.model.js';
 /** The module's public face for other modules: reads priorities through the service and returns `{ id, name }`. */
 @Injectable()
 export class TicketPrioritiesFacade {
