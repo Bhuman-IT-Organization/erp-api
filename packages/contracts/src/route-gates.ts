@@ -78,6 +78,8 @@ export type RouteGate = PermissionCode | readonly PermissionCode[] | typeof ADMI
  * 04.1-23, D-06 and D-32: Perfex's own screen was administrator-only already), and so is
  * `/setup/currencies*` (plan 04.1-28, D-06 and D-38: `Currencies.php:11` is
  * administrator-only).
+ * `/setup/ticket-statuses*` is administrator-only as well (plan 06-ticket-statuses): the API
+ * asserts the administrator flag for every handler.
  *
  * The Email screens (plan 04.3-07): `/setup/email-templates*` is gated on the mapped Perfex view code
  * (D-09: the editor is read-only without `.edit`, which the api's save and test send declare);
@@ -117,6 +119,9 @@ export const ROUTE_GATES: Readonly<Record<string, RouteGate>> = Object.freeze({
   '/setup/services': ADMIN_GATE,
   '/setup/services/new': ADMIN_GATE,
   '/setup/services/:id': ADMIN_GATE,
+  '/setup/ticket-statuses': ADMIN_GATE,
+  '/setup/ticket-statuses/new': ADMIN_GATE,
+  '/setup/ticket-statuses/:id': ADMIN_GATE,
 });
 
 /** Every declared route path, sorted — the set both verifying tests enumerate. */
