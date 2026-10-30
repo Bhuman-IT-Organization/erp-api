@@ -10,7 +10,7 @@
  * bounded. This list takes no filter: any `filter[...]` is a 400 on `filter`.
  *
  * `?q=` is matched by the repository: the name contains it (case per the column's collation); when
- * it is all digits and fits the unsigned id column, also the id equal to it.
+ * it is all digits and fits the signed `INT` id column, also the id equal to it.
  */
 import { Injectable } from '@nestjs/common';
 import type { z } from 'zod';

@@ -3,7 +3,7 @@
 ## Purpose
 
 Reads the Perfex options other modules need, and only those (W2A-07). A facade over a fixed
-allow-list of 12 `tbloptions` names (D-10, D-22, D-37, lead sources), so no module reads `tbloptions` wholesale
+allow-list of 13 `tbloptions` names (D-10, D-22, D-37, lead sources, ticket status), so no module reads `tbloptions` wholesale
 and none can be handed a credential row by accident. It is the one facade-only module (D-23): no
 controller, no routes, no events and no owned table, written by hand rather than generated, and
 admitted by name in `src/v1/__tests__/module-shape.spec.ts`. Who reads it: branding (its ten

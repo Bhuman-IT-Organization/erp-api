@@ -105,6 +105,24 @@ describe('LeadSourcesRepository', () => {
     expect(await repository.count(request({ search: 'site' }))).toBe(2);
   });
 
+  it('matches numeric ids only within the signed INT range', async () => {
+    const maximum = stub();
+    await maximum.repository.list(request({ search: '2147483647' }));
+    expect(maximum.calls[0]).toMatchObject({
+      args: {
+        where: {
+          OR: [{ name: { contains: '2147483647' } }, { id: 2_147_483_647 }],
+        },
+      },
+    });
+
+    const aboveMaximum = stub();
+    await aboveMaximum.repository.list(request({ search: '2147483648' }));
+    expect(aboveMaximum.calls[0]).toMatchObject({
+      args: { where: { OR: [{ name: { contains: '2147483648' } }] } },
+    });
+  });
+
   it('reads and writes the selected fields only, mapping P2025 updates to null', async () => {
     const { repository, calls } = stub({
       first: { id: 7, name: 'Website' },

@@ -40,19 +40,32 @@ through `SettingsFacade`; this module does not read or write `tbloptions` direct
 
 All endpoints are administrator-only.
 
-| Method   | Path                          | Success                                                                                             | Relevant errors                                                        |
-| :------- | :---------------------------- | :-------------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------- |
-| `GET`    | `/api/v1/lead-sources`        | Paginated `{ data, meta }`; each row includes `usage: { leads, emailIntegrations, webToLeadForms }` | 400 invalid query                                                      |
-| `GET`    | `/api/v1/lead-sources/:id`    | `{ id, name, usage: { leads, emailIntegrations, webToLeadForms } }`                                 | 404 missing source                                                     |
-| `POST`   | `/api/v1/lead-sources`        | 201 with the new source                                                                             | 400 invalid body                                                       |
-| `PATCH`  | `/api/v1/lead-sources/:id`    | 200 with the renamed source                                                                         | 400 invalid body; 404 missing source                                   |
-| `DELETE` | `/api/v1/lead-sources/:id`    | 204, no body                                                                                        | 404 missing source; 409 default or in use / usage could not be counted |
-| `GET`    | `/api/v1/lead-sources/export` | CSV, Excel, PDF, or print rows                                                                      | 400 invalid export options                                             |
+| Method   | Path                          | Success                                                                                             | Relevant errors                                                 |
+| :------- | :---------------------------- | :-------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------- |
+| `GET`    | `/api/v1/lead-sources`        | Paginated `{ data, meta }`; each row includes `usage: { leads, emailIntegrations, webToLeadForms }` | 400 invalid query                                               |
+| `GET`    | `/api/v1/lead-sources/:id`    | `{ id, name, usage: { leads, emailIntegrations, webToLeadForms } }`                                 | 404 missing source                                              |
+| `POST`   | `/api/v1/lead-sources`        | 201 with the new source                                                                             | 400 invalid body                                                |
+| `PATCH`  | `/api/v1/lead-sources/:id`    | 200 with the renamed source                                                                         | 400 invalid body; 404 missing source                            |
+| `DELETE` | `/api/v1/lead-sources/:id`    | 204, no body                                                                                        | 404 missing source; 409 default or in use / safety check failed |
+| `GET`    | `/api/v1/lead-sources/export` | CSV, Excel, PDF, or print rows                                                                      | 400 invalid export options                                      |
 
 The list defaults to `name` ascending, with `id` as the tie-breaker. It also accepts `sort=name`,
-`sort=-name`, `sort=id` and `sort=-id`; `q` searches the name and an all-digit query can also match
-the ID. Create and update bodies are strict `{ name }` objects; names are trimmed and limited to
-150 characters. Duplicate names are allowed.
+`sort=-name`, `sort=id` and `sort=-id`; `q` searches the name and an all-digit query up to
+`2147483647` can also match the ID. Create and update bodies are strict `{ name }` objects; names
+are trimmed and limited to 150 characters. Duplicate names are allowed.
+
+## Legacy parity
+
+| Perfex (`application/controllers/admin/Leads.php`) | Node behavior                                                                                                                   |
+| :------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------ |
+| `Leads::sources` lists lead sources                | `GET /api/v1/lead-sources` returns the paginated list and usage counts.                                                         |
+| `Leads::source` adds a source                      | `POST /api/v1/lead-sources` creates a source.                                                                                   |
+| `Leads::source` edits a source                     | `PATCH /api/v1/lead-sources/:id` renames a source.                                                                              |
+| `Leads::delete_source` deletes a source            | `DELETE /api/v1/lead-sources/:id` refuses with 409 while any supported reference uses it or while it is the configured default. |
+
+Perfex checks lead and email-integration references and clears the default-source option after
+deletion. Node also counts web-to-lead-form references and refuses to delete the configured default
+source, preserving the setting and requiring an administrator to change it first.
 
 ## Events published
 

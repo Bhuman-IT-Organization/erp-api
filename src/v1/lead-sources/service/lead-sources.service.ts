@@ -48,6 +48,11 @@ const ADMIN_ONLY = 'lead sources are managed by administrators only';
 /** The detail when the usage answer does not name the id: an unknown count refuses. */
 const NOT_COUNTED = 'its use could not be counted';
 
+/** The detail when the default-source setting cannot be read: an unknown default refuses. */
+const DEFAULT_SOURCE_UNCHECKED = 'the default lead source could not be checked';
+
+const DEFAULT_SOURCE = 'it is the default lead source';
+
 /** Each usage group's words in a 409 detail, in the order the detail lists them. */
 const GROUP_WORDS = [
   ['leads', 'lead(s)'],
@@ -155,9 +160,14 @@ export class LeadSourcesService {
     this.assertAdministrator(actor, ADMIN_ONLY);
     const { id } = this.validator.parseParams(params);
     if ((await this.repository.findById(id)) === null) throw notFound();
-    if (await this.transport.isDefaultSource(id)) {
-      throw new AppError('ERP-LEADSOURCES-0002', 'it is the default lead source');
+    let isDefaultSource: boolean;
+    try {
+      isDefaultSource = await this.transport.isDefaultSource(id);
+    } catch (error) {
+      this.logger.error('lead source default could not be checked', { id, error });
+      throw new AppError('ERP-LEADSOURCES-0002', DEFAULT_SOURCE_UNCHECKED);
     }
+    if (isDefaultSource) throw new AppError('ERP-LEADSOURCES-0002', DEFAULT_SOURCE);
     let usage: ReadonlyMap<number, LeadSourceUsage>;
     try {
       usage = await this.repository.usageByLeadSource([id]);

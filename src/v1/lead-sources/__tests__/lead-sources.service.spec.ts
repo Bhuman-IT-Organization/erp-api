@@ -31,7 +31,10 @@ const ADMIN: AuthenticatedUser = {
 };
 const MEMBER: AuthenticatedUser = { ...ADMIN, staffId: 2, isAdmin: false };
 
-function build(defaultSource: string | null = null) {
+function build(
+  defaultSource: string | null = null,
+  getOption: () => Promise<string | null> = () => Promise.resolve(defaultSource),
+) {
   const repo = seededStore();
   const events = new RecordingDomainEventPublisher();
   const logger = new RecordingLogger();
@@ -39,7 +42,7 @@ function build(defaultSource: string | null = null) {
     new LeadSourcesValidator(),
     asRepository(repo),
     new LeadSourcesTransformer(),
-    new LeadSourcesTransport(events, { getOption: () => Promise.resolve(defaultSource) }),
+    new LeadSourcesTransport(events, { getOption }),
     logger,
   );
   service.now = () => TEST_NOW;
@@ -179,6 +182,25 @@ describe('LeadSourcesService: writes', () => {
     const error = await refusal(service.remove(ADMIN, { id: '1' }));
     expect(error.code).toBe('ERP-LEADSOURCES-0002');
     expect(error.status).toBe(409);
+    expect(usage).not.toHaveBeenCalled();
+    expect(events.count).toBe(0);
+    expect(await repo.findById(1)).not.toBeNull();
+  });
+
+  it('returns a 409 and logs when the default source cannot be read', async () => {
+    const { service, repo, events, logger } = build(null, () =>
+      Promise.reject(new Error('database unavailable')),
+    );
+    const logError = vi.spyOn(logger, 'error');
+    const usage = vi.spyOn(repo, 'usageByLeadSource');
+    const error = await refusal(service.remove(ADMIN, { id: '1' }));
+    expect(error.code).toBe('ERP-LEADSOURCES-0002');
+    expect(error.status).toBe(409);
+    expect(error.message).toBe('the default lead source could not be checked');
+    expect(logError).toHaveBeenCalledWith(
+      'lead source default could not be checked',
+      expect.objectContaining({ id: 1 }),
+    );
     expect(usage).not.toHaveBeenCalled();
     expect(events.count).toBe(0);
     expect(await repo.findById(1)).not.toBeNull();

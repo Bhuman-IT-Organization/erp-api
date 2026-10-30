@@ -2,9 +2,9 @@
  * Domain model: the `tbloptions` names other modules may read through the settings facade, spelled
  * exactly as Perfex stores each one.
  *
- * D-22: branding's 10, plus 04.1 D-37's credit-expense payment mode and Ticket Statuses' default
- * ticket-reply status: 12. No name of a credential is on the list, so the facade can never hand one
- * out by accident.
+ * D-22: branding's 10, plus 04.1 D-37's credit-expense payment mode, Ticket Statuses' default
+ * ticket-reply status and lead sources' default source: 13. No name of a credential is on the list,
+ * so the facade can never hand one out by accident.
  */
 export const SETTINGS_ALLOW_LIST = Object.freeze([
   // branding (BRANDING_OPTION_NAMES)
@@ -18,11 +18,12 @@ export const SETTINGS_ALLOW_LIST = Object.freeze([
   'decimal_separator',
   'remove_decimals_on_zero',
   'default_timezone',
-  'leads_default_source',
   // payment modes (04.1 D-37): the credit-expense mode the client's expense code reads
   'expense_credit_payment_mode',
   // Ticket Statuses: configured default ticket-reply status
   'default_ticket_reply_status',
+  // lead sources: the source new leads get
+  'leads_default_source',
 ] as const);
 
 /** A name on the allow-list; any other string is a compile-time error at the facade. */

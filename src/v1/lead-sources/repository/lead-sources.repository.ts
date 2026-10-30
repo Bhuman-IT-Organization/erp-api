@@ -23,8 +23,8 @@ import { NO_LEAD_SOURCE_USAGE } from '../service/lead-sources.transformer.js';
 /** Prisma's "record to update not found". */
 const RECORD_NOT_FOUND = 'P2025';
 
-/** The largest value of MySQL's `INT UNSIGNED` (the id column). */
-const MAX_UNSIGNED_INT_ID = 4_294_967_295;
+/** The largest value of MySQL's signed `INT` (the id column). */
+const MAX_INT_ID = 2_147_483_647;
 
 /** The columns of the table; nothing else is selected. */
 const COLUMNS = { id: true, name: true } as const;
@@ -97,8 +97,7 @@ export function referenceKey(reference: Pick<LeadSourceReference, 'table' | 'col
 function matchOf(search: string | null): WhereValue {
   if (search === null) return {};
   const or: WhereValue[] = [{ name: { contains: search } }];
-  if (/^\d+$/.test(search) && Number(search) <= MAX_UNSIGNED_INT_ID)
-    or.push({ id: Number(search) });
+  if (/^\d+$/.test(search) && Number(search) <= MAX_INT_ID) or.push({ id: Number(search) });
   return { OR: or };
 }
 

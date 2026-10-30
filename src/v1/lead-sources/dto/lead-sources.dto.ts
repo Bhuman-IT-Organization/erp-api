@@ -48,7 +48,7 @@ export const listLeadSourcesQuerySchema = z.object({
   cursor: z.string().min(1).optional(),
   /**
    * Search: the name contains `q` (case per the column's collation); when `q` is all digits and
-   * fits the unsigned id column, also the id equal to it.
+   * fits the signed `INT` id column, also the id equal to it.
    */
   q: z.string().max(LEAD_SOURCES_SEARCH_MAX).optional(),
   /** `name` (default, Perfex's order), `-name`, `id` or `-id`; a leading `-` is descending. */
