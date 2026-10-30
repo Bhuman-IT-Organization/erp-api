@@ -46,8 +46,8 @@ describe.skipIf(!process.env.DATABASE_URL)(
       ),
       new LoggerService(),
     );
-    let row: TicketStatus | undefined;
-    let ticketId: number | undefined;
+    let rows: TicketStatus[] = [];
+    const ticketIds: number[] = [];
 
     beforeAll(async () => {
       await prisma.client.tbltickets_status.deleteMany({
@@ -56,63 +56,94 @@ describe.skipIf(!process.env.DATABASE_URL)(
       await unguarded.tbltickets.deleteMany({
         where: { subject: { startsWith: MARKER } },
       });
-      row = await repository.create({
+      const first = await repository.create({
         name: `${MARKER}-Open`,
         statuscolor: '#03a9f4',
         statusorder: 9001,
       });
-      const status = row;
-      ticketId = (
-        await unguarded.tbltickets.create({
+      const second = await repository.create({
+        name: `${MARKER}-Closed`,
+        statuscolor: '#777777',
+        statusorder: 9002,
+      });
+      rows = [first, second];
+      for (const status of rows) {
+        const ticket = await unguarded.tbltickets.create({
           data: {
             userid: 1,
             department: 1,
             priority: 1,
             status: status.ticketstatusid,
-            ticketkey: `${MARKER}-key`,
-            subject: `${MARKER}-subject`,
+            ticketkey: `${MARKER}-${String(status.ticketstatusid)}-key`,
+            subject: `${MARKER}-${String(status.ticketstatusid)}-subject`,
             message: 'test',
             date: new Date(),
             email: 'test@example.com',
             name: 'Test',
           },
-        })
-      ).ticketid;
-      const found = await repository.findById(status.ticketstatusid);
-      if (found === null) throw new Error('integration status disappeared after ticket creation');
-      row = found;
+        });
+        ticketIds.push(ticket.ticketid);
+      }
+      rows = await Promise.all(
+        rows.map(async (status) => {
+          const found = await repository.findById(status.ticketstatusid);
+          if (found === null) {
+            throw new Error('integration status disappeared after ticket creation');
+          }
+          return found;
+        }),
+      );
     });
 
     afterAll(async () => {
-      if (ticketId !== undefined) {
-        await unguarded.tbltickets.deleteMany({ where: { ticketid: ticketId } });
+      if (ticketIds.length > 0) {
+        await unguarded.tbltickets.deleteMany({ where: { ticketid: { in: ticketIds } } });
       }
-      if (row !== undefined) await repository.remove(row.ticketstatusid);
+      for (const status of rows) await repository.remove(status.ticketstatusid);
       await unguarded.$disconnect();
       await prisma.client.$disconnect();
     });
 
-    it('reads and writes the existing Prisma model without creating a table', async () => {
-      if (row === undefined) throw new Error('integration row was not created');
-      expect(row.isdefault).toBe(0);
-      expect(await repository.findById(row.ticketstatusid)).toEqual(row);
-      await expect(repository.hasTicketReferences(row.ticketstatusid)).resolves.toBe(true);
-      await expect(service.remove(ADMIN, { id: String(row.ticketstatusid) })).rejects.toMatchObject(
-        {
-          code: 'ERP-TICKETSTATUSES-0001',
-          message: 'is_referenced',
-        },
-      );
+    it('lists, searches, pages, and counts ticket references against the database', async () => {
+      if (rows.length !== 2) throw new Error('integration rows were not created');
+      const [open, closed] = rows;
+      if (open === undefined || closed === undefined) {
+        throw new Error('integration rows were not created');
+      }
+      expect(open.isdefault).toBe(0);
+      expect(await repository.findById(open.ticketstatusid)).toEqual(open);
+      await expect(repository.hasTicketReferences(open.ticketstatusid)).resolves.toBe(true);
       await expect(
-        repository.update(row.ticketstatusid, { statusorder: 9002 }),
-      ).resolves.toMatchObject({
-        statusorder: 9002,
+        service.remove(ADMIN, { id: String(open.ticketstatusid) }),
+      ).rejects.toMatchObject({
+        code: 'ERP-TICKETSTATUSES-0001',
+        message: 'is_referenced',
       });
-      expect(
-        (await repository.list()).items.some(
-          (status) => status.ticketstatusid === row?.ticketstatusid,
-        ),
-      ).toBe(true);
+      await expect(
+        repository.update(open.ticketstatusid, { statusorder: 9003 }),
+      ).resolves.toMatchObject({
+        statusorder: 9003,
+      });
+      const firstPage = await service.list(ADMIN, { q: MARKER, limit: '1' });
+      expect(firstPage.data).toHaveLength(1);
+      expect(firstPage.data[0]?.name).toContain(MARKER);
+      expect(firstPage.meta.total).toBe(2);
+      expect(firstPage.meta.nextCursor).toEqual(expect.any(String));
+      const secondPage = await service.list(ADMIN, {
+        q: MARKER,
+        limit: '1',
+        cursor: firstPage.meta.nextCursor ?? undefined,
+      });
+      expect(secondPage.data).toHaveLength(1);
+      expect(secondPage.data[0]?.ticketstatusid).not.toBe(firstPage.data[0]?.ticketstatusid);
+      const search = await service.list(ADMIN, { q: `${MARKER}-Open` });
+      expect(search.data.map((status) => status.name)).toEqual([open.name]);
+      const listedOpen =
+        firstPage.data.find((status) => status.ticketstatusid === String(open.ticketstatusid)) ??
+        secondPage.data.find((status) => status.ticketstatusid === String(open.ticketstatusid));
+      expect(listedOpen?.ticket_count).toBe(
+        await unguarded.tbltickets.count({ where: { status: open.ticketstatusid } }),
+      );
     });
   },
 );

@@ -80,6 +80,17 @@ describe('TicketStatusesValidator', () => {
     expect(refused(() => validator.parseCreateBody({ name: 'Open', statusorder: 1.5 })).code).toBe(
       'ERP-VALIDATION-0001',
     );
+    for (const statusorder of [-2_147_483_649, 2_147_483_648]) {
+      expect(refused(() => validator.parseCreateBody({ name: 'Open', statusorder })).code).toBe(
+        'ERP-VALIDATION-0001',
+      );
+    }
+    expect(
+      validator.parseCreateBody({ name: 'Open', statusorder: -2_147_483_648 }).statusorder,
+    ).toBe(-2_147_483_648);
+    expect(
+      validator.parseCreateBody({ name: 'Open', statusorder: 2_147_483_647 }).statusorder,
+    ).toBe(2_147_483_647);
   });
 
   it('refuses empty edits and mass-assignment keys', () => {

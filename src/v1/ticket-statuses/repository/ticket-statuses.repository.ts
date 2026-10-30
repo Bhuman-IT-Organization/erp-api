@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { PrismaService } from '../../../shared/db/prisma.service.js';
 import { encodeCursor, keysetWhere, type KeyValue } from '../../../shared/http/keyset.js';
 import { LIST_QUERY_LIMITS } from '../../../shared/http/pagination.js';
+import { TICKET_STATUS_ID_MAX } from '../dto/ticket-statuses.dto.js';
 import type {
   NewTicketStatus,
   TicketStatus,
@@ -59,7 +60,7 @@ function matchOf(search: string | null): WhereValue {
 
   if (/^\d+$/.test(search)) {
     const id = Number(search);
-    if (Number.isSafeInteger(id) && id > 0) {
+    if (Number.isSafeInteger(id) && id > 0 && id <= TICKET_STATUS_ID_MAX) {
       or.push({ ticketstatusid: id });
     }
   }
@@ -143,9 +144,11 @@ export class TicketStatusesRepository {
     });
 
     const statuses = rowsSchema.parse(rows);
+    const ids = statuses.map((status) => status.ticketstatusid);
 
     const counts = await this.prisma.client.tbltickets.groupBy({
       by: ['status'],
+      where: { status: { in: ids } },
       _count: { _all: true },
     });
 
@@ -206,9 +209,11 @@ export class TicketStatusesRepository {
         select: COLUMNS,
       }),
     );
+    const ids = statuses.map((status) => status.ticketstatusid);
 
     const counts = await this.prisma.client.tbltickets.groupBy({
       by: ['status'],
+      where: { status: { in: ids } },
       _count: { _all: true },
     });
 
