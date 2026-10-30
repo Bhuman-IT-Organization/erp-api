@@ -9,8 +9,16 @@ describe('PredefinedRepliesValidator', () => {
     expect(validator.parseParams({ id: '12' })).toEqual({ id: 12 });
   });
 
-  it.each(['abc', '0', '-1', '1.5'])('rejects invalid ID: %s', (id) => {
+  it.each(['abc', '0', '-1', '1.5', '2147483648'])('rejects invalid ID: %s', (id) => {
     expect(() => validator.parseParams({ id })).toThrow(AppError);
+  });
+
+  it('accepts the largest signed MySQL INT ID', () => {
+    expect(validator.parseParams({ id: '2147483647' }).id).toBe(2_147_483_647);
+  });
+
+  it('rejects an all-digit search query above the signed MySQL INT maximum', () => {
+    expect(() => validator.parseListQuery({ q: '2147483648' })).toThrow(AppError);
   });
 
   it('trims whitespace from a valid name', () => {

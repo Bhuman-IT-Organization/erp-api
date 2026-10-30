@@ -8,17 +8,17 @@ Move the Setup > Support > Predefined Replies screen from Perfex to the Node API
 
 - `tbltickets_predefined_replies` — owned by Node for this feature.
 
-The table contains the predefined reply ID, name and HTML message. Reply names are limited to 191 characters.
+The table contains the predefined reply ID, name and HTML message. Reply names are limited to 191 characters. IDs are signed MySQL `INT` values (maximum `2147483647`).
 
 ## Facade surface
 
 The module exports `PredefinedRepliesFacade` for module-to-module reads:
 
-- `findById(id)` — find a reply by ID.
+- `findById(id)` — find a reply by ID, or `null` when absent.
 - `listAll()` — retrieve all replies ordered by name, then ID.
-- `findByIds(ids)` — retrieve replies for the supplied IDs, preserving the requested order and skipping missing IDs.
+- `findByIds(ids)` — retrieve replies for the supplied IDs, preserving the requested order, de-duplicating IDs and skipping missing IDs.
 
-These facade methods do not require an actor and return the stored records, including the HTML message. The HTTP management routes remain administrator-only.
+These facade methods do not require an actor and return the stored records, including the HTML message exactly as stored. They do not convert HTML to plain text. The HTTP management routes remain administrator-only.
 
 ## Endpoints
 
@@ -50,9 +50,9 @@ The export endpoint supports CSV, Excel, PDF and print output. It uses the list 
 
 Messages are stored as HTML in `tbltickets_predefined_replies`.
 
-When a message is saved through the Node API, plain-text input is escaped for `&`, `<`, `>`, double quotes and apostrophes. Blank lines separate paragraphs, and line breaks within paragraphs are represented by `<br>`.
+When a message is saved through the Node API, plain-text input is escaped for `&`, `<`, `>`, double quotes and apostrophes, then stored as escaped HTML. Blank lines separate paragraphs, and line breaks within paragraphs are represented by `<br>`.
 
-When a reply is retrieved through the HTTP API, the stored HTML is converted to plain text. The response includes `hasOtherFormatting` to indicate whether legacy formatting such as bold text, lists or links was detected.
+When a reply is retrieved through the HTTP API, the stored HTML is converted to plain text. The response includes `hasOtherFormatting`, which is true for any HTML tag other than `<p>` and `<br>` (including images, styled spans, divs, code and horizontal rules). Entity decoding happens in one pass so doubly escaped content is not decoded twice.
 
 This conversion does not preserve rich-text formatting when the message is edited and saved as plain text. The frontend must render the returned message as text rather than injecting the stored HTML directly.
 
@@ -86,18 +86,19 @@ None.
 
 The module follows the backend module structure and project conventions.
 
-| Layer                                  | Responsibility                                                |
-| -------------------------------------- | ------------------------------------------------------------- |
-| Controller                             | HTTP endpoints and request handling                           |
-| Service                                | Predefined-reply business logic                               |
-| Repository                             | Database access                                               |
-| Model                                  | Domain types and schemas                                      |
-| DTO                                    | Request and response validation                               |
-| Events                                 | Published domain events                                       |
-| Transport                              | Domain-event publishing                                       |
-| Facade                                 | Module-to-module reads                                        |
-| `service/predefined-replies.export.ts` | Export formatting for CSV, XLSX, PDF and print                |
-| `service/reply-html.ts`                | HTML escaping, plain-text conversion and formatting detection |
+| Layer                                       | Responsibility                                                |
+| ------------------------------------------- | ------------------------------------------------------------- |
+| Controller                                  | HTTP endpoints and request handling                           |
+| Service                                     | Predefined-reply business logic                               |
+| Repository                                  | Database access                                               |
+| Model                                       | Domain types and schemas                                      |
+| DTO                                         | Request and response validation                               |
+| Events                                      | Published domain events                                       |
+| Transport                                   | Domain-event publishing                                       |
+| Facade                                      | Module-to-module reads                                        |
+| `service/predefined-replies.export.ts`      | Export formatting for CSV, XLSX, PDF and print                |
+| `service/predefined-replies.transformer.ts` | Maps stored rows to validated HTTP response DTOs              |
+| `service/reply-html.ts`                     | HTML escaping, plain-text conversion and formatting detection |
 
 The facade is exported by `PredefinedRepliesModule` for module-to-module reads.
 
@@ -128,6 +129,10 @@ yarn typecheck
 ```
 
 Tests should cover:
+
+- Single-pass HTML entity decoding and detection of every non-`p`/`br` tag.
+- Actor-free facade reads through the Nest module, returning stored HTML.
+- Repository query shapes, route-gate drift and response transformation.
 
 - Administrator access and route gates, including rejection of non-administrators before invalid request input is parsed.
 - Listing, creating, retrieving, updating and deleting replies.

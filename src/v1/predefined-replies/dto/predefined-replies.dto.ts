@@ -18,6 +18,7 @@ import { LIST_QUERY_LIMITS } from '../../../shared/http/pagination.js';
 
 export const PREDEFINED_REPLY_NAME_MAX = 191;
 export const PREDEFINED_REPLIES_SEARCH_MAX = 191;
+export const PREDEFINED_REPLY_MYSQL_INT_MAX = 2_147_483_647;
 
 export const listPredefinedRepliesQuerySchema = z.object({
   limit: z.coerce.number().int().min(LIST_QUERY_LIMITS.min).max(LIST_QUERY_LIMITS.max).optional(),
@@ -42,7 +43,7 @@ export const exportPredefinedRepliesQuerySchema = listPredefinedRepliesQuerySche
   });
 
 export const predefinedReplyParamsSchema = z.object({
-  id: z.coerce.number().int().positive(),
+  id: z.coerce.number().int().positive().max(PREDEFINED_REPLY_MYSQL_INT_MAX),
 });
 
 export const createPredefinedReplyBodySchema = z.strictObject({
@@ -65,12 +66,6 @@ export const predefinedReplyResponseSchema = z
     name: z.string(),
     message: z.string(),
     hasOtherFormatting: z.boolean(),
-  })
-  .readonly();
-
-export const predefinedReplyDeleteResponseSchema = z
-  .object({
-    success: z.literal(true),
   })
   .readonly();
 

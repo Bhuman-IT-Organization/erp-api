@@ -36,4 +36,22 @@ describe('reply-html', () => {
       hasOtherFormatting: false,
     });
   });
+
+  it('decodes entities once and preserves doubly escaped markup text', () => {
+    const stored = toStoredHtml('&lt;b&gt;literal&lt;/b&gt;');
+    expect(fromStoredHtml(stored)).toEqual({
+      text: '&lt;b&gt;literal&lt;/b&gt;',
+      hasOtherFormatting: false,
+    });
+  });
+
+  it.each([
+    '<img src="x">',
+    '<span style="color:red">text</span>',
+    '<div>text</div>',
+    '<code>x</code>',
+    '<hr>',
+  ])('flags every non-p/br tag: %s', (html) => {
+    expect(fromStoredHtml(html).hasOtherFormatting).toBe(true);
+  });
 });

@@ -1165,7 +1165,7 @@
       ]
     },
     "evidence_changed": false,
-    "note": "Wave 2a slice 3 (W2A-03, setup-lists brief §8, D-25 to D-31): written by the Setup screen, which v1/cost-centers owns; Perfex and its modules keep reading it (purchase requests, orders, quotations and shipping charges, expenses, fixed_equipment assets). Perfex's only writer is its own Cost Centers screen (Cost_centers_model add, update, delete; no co-writer, D-27), whose /admin/cost_centers/create, /edit and /delete are refused at Nginx; that screen had no administrator check (D-26). A delete is refused while a purchase request, order or quotation, a shipping charge, an expense or a fixed asset names the row (D-07); the referencing columns are discovered at runtime, and fixed_equipment names a cost center by its text (D-28). Node writes created_by and datecreated on create as Perfex does (D-31).",
+    "note": "Wave 2a slice 3 (W2A-03, setup-lists brief \u00a78, D-25 to D-31): written by the Setup screen, which v1/cost-centers owns; Perfex and its modules keep reading it (purchase requests, orders, quotations and shipping charges, expenses, fixed_equipment assets). Perfex's only writer is its own Cost Centers screen (Cost_centers_model add, update, delete; no co-writer, D-27), whose /admin/cost_centers/create, /edit and /delete are refused at Nginx; that screen had no administrator check (D-26). A delete is refused while a purchase request, order or quotation, a shipping charge, an expense or a fixed asset names the row (D-07); the referencing columns are discovered at runtime, and fixed_equipment names a cost center by its text (D-28). Node writes created_by and datecreated on create as Perfex does (D-31).",
     "owner": "node",
     "owner_confidence": "write-single",
     "table": "tblcost_centers"
@@ -1305,7 +1305,7 @@
       ]
     },
     "evidence_changed": false,
-    "note": "Wave 2a slice 5 (W2A-05, setup-lists brief §8, D-38 to D-44): written by the Setup screen, which v1/currencies owns; Perfex and its modules keep reading it (invoices, estimates, proposals, expenses, credit notes, subscriptions, customers, reports, accounting, purchase, warehouse, fixed_equipment, hr_payroll and exports, and einvoice, hr_profile, ideal, manufacturing and timesheets, which read it through currencies_model or the core helpers get_base_currency, get_currency and app_format_money, so the table-name scan does not list them). Perfex's only writer is its own Currencies screen (Currencies_model add, edit, delete and make_base_currency; no co-writer), whose /admin/currencies/manage, /delete and /make_base_currency are refused at Nginx; get_currency_symbol stays on Perfex (D-38). The base changes only while the current base has no transaction in Perfex's seven core columns (D-39). A delete is refused while the currency is the base, while an id-referencing transactional or master column holds it (D-40: one reference register discovered at runtime; exchange rates not counted) or while a use another module registers counts it (D-41); renaming the code is refused while anything in the register or a registered use holds the currency (D-42).",
+    "note": "Wave 2a slice 5 (W2A-05, setup-lists brief \u00a78, D-38 to D-44): written by the Setup screen, which v1/currencies owns; Perfex and its modules keep reading it (invoices, estimates, proposals, expenses, credit notes, subscriptions, customers, reports, accounting, purchase, warehouse, fixed_equipment, hr_payroll and exports, and einvoice, hr_profile, ideal, manufacturing and timesheets, which read it through currencies_model or the core helpers get_base_currency, get_currency and app_format_money, so the table-name scan does not list them). Perfex's only writer is its own Currencies screen (Currencies_model add, edit, delete and make_base_currency; no co-writer), whose /admin/currencies/manage, /delete and /make_base_currency are refused at Nginx; get_currency_symbol stays on Perfex (D-38). The base changes only while the current base has no transaction in Perfex's seven core columns (D-39). A delete is refused while the currency is the base, while an id-referencing transactional or master column holds it (D-40: one reference register discovered at runtime; exchange rates not counted) or while a use another module registers counts it (D-41); renaming the code is refused while anything in the register or a registered use holds the currency (D-42).",
     "owner": "node",
     "owner_confidence": "write-single",
     "table": "tblcurrencies"
@@ -1577,7 +1577,7 @@
       ]
     },
     "evidence_changed": false,
-    "note": "Owner perfex-core by decision, owner_confidence conflict and evidence unchanged. Node never writes it (identity brief §10 Q10); core writes it (Announcements_model.php, Misc_model.php dismiss_announcement, Staff_model.php add and delete, Clients_model.php delete_contact); hr_profile's only writer, the staff add (Hr_profile_model.php:3468), stays a recorded co-writer.",
+    "note": "Owner perfex-core by decision, owner_confidence conflict and evidence unchanged. Node never writes it (identity brief \u00a710 Q10); core writes it (Announcements_model.php, Misc_model.php dismiss_announcement, Staff_model.php add and delete, Clients_model.php delete_contact); hr_profile's only writer, the staff add (Hr_profile_model.php:3468), stays a recorded co-writer.",
     "owner": "perfex-core",
     "owner_confidence": "conflict",
     "table": "tbldismissed_announcements"
@@ -1781,7 +1781,7 @@
       ]
     },
     "evidence_changed": false,
-    "note": "Wave 2a pilot (W2A-01, setup-lists brief §8): written by the Setup screen, which v1/expense-categories owns; Perfex keeps reading it. Two Perfex writers stay recorded co-writers until their modules migrate (D-14): POST /admin/expenses/category (the expense form's inline add) and /admin/timesheets/add_expense_category (through Expenses_model::add_category). Perfex's own delete, /admin/expenses/delete_category, is refused at Nginx. A delete is refused while tblexpenses.category, tblacc_expense_category_mappings.category_id or, when the table exists, tblpur_petty_cash_advances.expense_category holds the id (D-07, D-15).",
+    "note": "Wave 2a pilot (W2A-01, setup-lists brief \u00a78): written by the Setup screen, which v1/expense-categories owns; Perfex keeps reading it. Two Perfex writers stay recorded co-writers until their modules migrate (D-14): POST /admin/expenses/category (the expense form's inline add) and /admin/timesheets/add_expense_category (through Expenses_model::add_category). Perfex's own delete, /admin/expenses/delete_category, is refused at Nginx. A delete is refused while tblexpenses.category, tblacc_expense_category_mappings.category_id or, when the table exists, tblpur_petty_cash_advances.expense_category holds the id (D-07, D-15).",
     "owner": "node",
     "owner_confidence": "write-single",
     "table": "tblexpenses_categories"
@@ -6191,7 +6191,7 @@
       ]
     },
     "evidence_changed": false,
-    "note": "Wave 2a slice 4 (W2A-04, setup-lists brief §8, D-32 to D-37): written by the Setup screen, which v1/payment-modes owns; Perfex and its modules keep reading it (invoices and payments, expenses, credit notes, reports, accounting, purchase, exports, and fixed_equipment and timesheets, which read it through payment_modes_model, so the table-name scan does not list them, D-37). Perfex's only writer is its own Payment Modes screen (Payment_modes_model add, edit, delete and the two toggles; no co-writer), whose /admin/paymentmodes/manage, /delete, /change_payment_mode_status and /change_payment_mode_show_to_client_status are refused at Nginx (D-32); the show-to-client toggle is dropped (D-35). A delete is refused while an invoice payment, an expense, a credit note refund, a purchase invoice or order payment, a debit note refund, a fixed equipment refund or an order return refund names the mode (D-33: the columns discovered at runtime and compared as exact text; accounting mappings and allowed lists are not counted), and while Perfex's expense_credit_payment_mode option names it (D-37).",
+    "note": "Wave 2a slice 4 (W2A-04, setup-lists brief \u00a78, D-32 to D-37): written by the Setup screen, which v1/payment-modes owns; Perfex and its modules keep reading it (invoices and payments, expenses, credit notes, reports, accounting, purchase, exports, and fixed_equipment and timesheets, which read it through payment_modes_model, so the table-name scan does not list them, D-37). Perfex's only writer is its own Payment Modes screen (Payment_modes_model add, edit, delete and the two toggles; no co-writer), whose /admin/paymentmodes/manage, /delete, /change_payment_mode_status and /change_payment_mode_show_to_client_status are refused at Nginx (D-32); the show-to-client toggle is dropped (D-35). A delete is refused while an invoice payment, an expense, a credit note refund, a purchase invoice or order payment, a debit note refund, a fixed equipment refund or an order return refund names the mode (D-33: the columns discovered at runtime and compared as exact text; accounting mappings and allowed lists are not counted), and while Perfex's expense_credit_payment_mode option names it (D-37).",
     "owner": "node",
     "owner_confidence": "write-single",
     "table": "tblpayment_modes"
@@ -7833,7 +7833,7 @@
       ]
     },
     "evidence_changed": false,
-    "note": "Wave 1 (ADR-0033 d.10): written by the member screen, which v1/identity owns; hr_profile stays a recorded co-writer until it migrates (identity-access brief §10 Q9). Wave 2k slice 4 (4.11 R-66): hr_profile's member screens are refused at the front door by plan 04.11-41, so its co-write of this table ends there.",
+    "note": "Wave 1 (ADR-0033 d.10): written by the member screen, which v1/identity owns; hr_profile stays a recorded co-writer until it migrates (identity-access brief \u00a710 Q9). Wave 2k slice 4 (4.11 R-66): hr_profile's member screens are refused at the front door by plan 04.11-41, so its co-write of this table ends there.",
     "owner": "node",
     "owner_confidence": "conflict",
     "table": "tblstaff_departments"
@@ -7872,7 +7872,7 @@
       ]
     },
     "evidence_changed": false,
-    "note": "Wave 1 (ADR-0033 d.10): v1/identity owns the permission rows and is the only module that writes them (ADR-0034 d.1); granting is admin-only (d.2) and every change writes one tblidentity_audit row in the same transaction (d.3). The seven modules listed as writers stay recorded co-writers until each migrates (identity-access brief §10 Q2). The table has no primary key, so Prisma @@ignores it and the write is raw: admitted by the table-aware raw path in erp-api src/shared/db/ownership-guard.ts. Wave 2k slice 4 (4.11 R-66, finding 6): hr_profile's member form (add_edit_member) and update_staff_profile, the last Perfex paths that rewrote a member's role and permission set, are refused at the front door by plan 04.11-41.",
+    "note": "Wave 1 (ADR-0033 d.10): v1/identity owns the permission rows and is the only module that writes them (ADR-0034 d.1); granting is admin-only (d.2) and every change writes one tblidentity_audit row in the same transaction (d.3). The seven modules listed as writers stay recorded co-writers until each migrates (identity-access brief \u00a710 Q2). The table has no primary key, so Prisma @@ignores it and the write is raw: admitted by the table-aware raw path in erp-api src/shared/db/ownership-guard.ts. Wave 2k slice 4 (4.11 R-66, finding 6): hr_profile's member form (add_edit_member) and update_staff_profile, the last Perfex paths that rewrote a member's role and permission set, are refused at the front door by plan 04.11-41.",
     "owner": "node",
     "owner_confidence": "ddl-single",
     "table": "tblstaff_permissions"
@@ -8194,7 +8194,7 @@
       ]
     },
     "evidence_changed": false,
-    "note": "Wave 2a slice 2 (W2A-02, setup-lists brief §8, §10 Q4 answered as D-20): written by the Setup screen, which v1/taxes owns; Perfex keeps reading it. Perfex core Subscriptions stays a recorded coexistence co-writer until Subscriptions migrates (Subscriptions_model handleSelectedTax inserts a row for a Stripe tax rate with no match; not refused). fixed_equipment's get_tax_by_name($name, $rate) could write but has no caller: declared, unreachable, not a writer; fixed_equipment keeps reading the table. Perfex's own /admin/taxes/manage and /admin/taxes/delete are refused at Nginx. A delete is refused while an item, expense, subscription, vendor item, purchase, warehouse, fixed equipment or sales return line, or an accounting mapping or history row holds the id (D-07); an edit is refused while an expense or a subscription uses the tax (Perfex's own lock).",
+    "note": "Wave 2a slice 2 (W2A-02, setup-lists brief \u00a78, \u00a710 Q4 answered as D-20): written by the Setup screen, which v1/taxes owns; Perfex keeps reading it. Perfex core Subscriptions stays a recorded coexistence co-writer until Subscriptions migrates (Subscriptions_model handleSelectedTax inserts a row for a Stripe tax rate with no match; not refused). fixed_equipment's get_tax_by_name($name, $rate) could write but has no caller: declared, unreachable, not a writer; fixed_equipment keeps reading the table. Perfex's own /admin/taxes/manage and /admin/taxes/delete are refused at Nginx. A delete is refused while an item, expense, subscription, vendor item, purchase, warehouse, fixed equipment or sales return line, or an accounting mapping or history row holds the id (D-07); an edit is refused while an expense or a subscription uses the tax (Perfex's own lock).",
     "owner": "node",
     "owner_confidence": "conflict",
     "table": "tbltaxes"
@@ -8334,7 +8334,7 @@
       ]
     },
     "evidence_changed": false,
-    "note": "Written by v1/predefined-replies; Perfex's delete is closed at Nginx; 'save as predefined reply' on a ticket stays on Perfex.",
+    "note": "Written by v1/predefined-replies; Perfex's edit by id and delete routes are closed at Nginx; the message is stored as escaped HTML; 'save as predefined reply' on a ticket stays on Perfex.",
     "owner": "node",
     "owner_confidence": "write-single",
     "table": "tbltickets_predefined_replies"

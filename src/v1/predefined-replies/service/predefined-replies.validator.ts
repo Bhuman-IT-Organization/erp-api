@@ -8,6 +8,7 @@ import {
   exportPredefinedRepliesQuerySchema,
   listPredefinedRepliesQuerySchema,
   PREDEFINED_REPLIES_SEARCH_MAX,
+  PREDEFINED_REPLY_MYSQL_INT_MAX,
   predefinedReplyParamsSchema,
   updatePredefinedReplyBodySchema,
   type CreatePredefinedReplyBody,
@@ -71,6 +72,14 @@ function parseSearch(input: unknown): string | null {
       ['q'],
       `q must be at most ${String(PREDEFINED_REPLIES_SEARCH_MAX)} characters`,
     );
+  }
+
+  if (
+    search !== null &&
+    /^\d+$/.test(search) &&
+    BigInt(search) > BigInt(PREDEFINED_REPLY_MYSQL_INT_MAX)
+  ) {
+    refuse('Query is invalid', ['q'], 'numeric q must not exceed 2147483647');
   }
 
   return search === '' ? null : search;

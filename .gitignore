@@ -15,3 +15,4 @@ src/shared/db/generated/
 # Stryker output (test:mutation), per machine; never committed or formatted.
 .stryker-tmp/
 reports/
+/node_modules

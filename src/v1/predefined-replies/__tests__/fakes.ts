@@ -4,6 +4,7 @@ import type {
   PredefinedReply,
   PredefinedRepliesListRequest,
   PredefinedRepliesPage,
+  UpdatePredefinedReply,
   PredefinedRepliesSortField,
 } from '../model/predefined-replies.model.js';
 import type { PredefinedRepliesRepository } from '../repository/predefined-replies.repository.js';
@@ -26,6 +27,10 @@ export class InMemoryPredefinedRepliesRepository {
 
   async seed(): Promise<void> {
     for (const item of SEED_ITEMS) await this.create(item);
+  }
+
+  count(request: PredefinedRepliesListRequest): Promise<number> {
+    return this.list(request).then((page) => page.total);
   }
 
   list(request: PredefinedRepliesListRequest): Promise<PredefinedRepliesPage> {
@@ -82,6 +87,21 @@ export class InMemoryPredefinedRepliesRepository {
     return Promise.resolve(this.rows.get(id) ?? null);
   }
 
+  listAll(): Promise<PredefinedReply[]> {
+    return Promise.resolve(
+      [...this.rows.values()].sort((a, b) => a.name.localeCompare(b.name) || a.id - b.id),
+    );
+  }
+
+  findByIds(ids: readonly number[]): Promise<PredefinedReply[]> {
+    return Promise.resolve(
+      ids.flatMap((id) => {
+        const row = this.rows.get(id);
+        return row === undefined ? [] : [row];
+      }),
+    );
+  }
+
   create(input: NewPredefinedReply): Promise<PredefinedReply> {
     const row: PredefinedReply = {
       id: ++this.lastId,
@@ -92,9 +112,14 @@ export class InMemoryPredefinedRepliesRepository {
     return Promise.resolve(row);
   }
 
-  update(id: number, input: NewPredefinedReply): Promise<PredefinedReply | null> {
-    if (!this.rows.has(id)) return Promise.resolve(null);
-    const row: PredefinedReply = { id, name: input.name, message: input.message };
+  update(id: number, input: UpdatePredefinedReply): Promise<PredefinedReply | null> {
+    const existing = this.rows.get(id);
+    if (existing === undefined) return Promise.resolve(null);
+    const row: PredefinedReply = {
+      id,
+      name: input.name ?? existing.name,
+      message: input.message ?? existing.message,
+    };
     this.rows.set(id, row);
     return Promise.resolve(row);
   }

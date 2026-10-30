@@ -18,6 +18,7 @@ import type {
   PredefinedReplyResponseDto,
   PredefinedRepliesListResponseDto,
 } from '../dto/predefined-replies.dto.js';
+import type { PredefinedReply } from '../model/predefined-replies.model.js';
 import {
   PREDEFINED_REPLIES_EXPORT_COLUMNS,
   PREDEFINED_REPLIES_EXPORT_FILE_STEM,
@@ -29,7 +30,8 @@ import {
 } from './predefined-replies.export.js';
 import { PredefinedRepliesTransport } from './predefined-replies.transport.js';
 import { PredefinedRepliesValidator } from './predefined-replies.validator.js';
-import { fromStoredHtml, toStoredHtml } from './reply-html.js';
+import { toStoredHtml } from './reply-html.js';
+import { PredefinedRepliesTransformer } from './predefined-replies.transformer.js';
 
 const ADMIN_ONLY = 'Predefined replies are available to administrators only';
 
@@ -40,6 +42,7 @@ export class PredefinedRepliesService {
     private readonly validator: PredefinedRepliesValidator,
     private readonly transport: PredefinedRepliesTransport,
     private readonly logger: LoggerService,
+    private readonly transformer: PredefinedRepliesTransformer,
   ) {}
 
   async list(actor: AuthenticatedUser, query: unknown): Promise<PredefinedRepliesListResponseDto> {
@@ -100,7 +103,7 @@ export class PredefinedRepliesService {
       throw new AppError('ERP-CORE-0004', 'Predefined reply not found');
     }
 
-    return this.toResponse(reply);
+    return this.transformer.toResponse(reply);
   }
 
   async create(actor: AuthenticatedUser, input: unknown): Promise<PredefinedReplyResponseDto> {
@@ -115,7 +118,7 @@ export class PredefinedRepliesService {
     await this.transport.publish(new PredefinedRepliesCreatedV1({ id: reply.id }));
     this.logger.log('predefined reply created', { id: reply.id });
 
-    return this.toResponse(reply);
+    return this.transformer.toResponse(reply);
   }
 
   async update(
@@ -152,7 +155,7 @@ export class PredefinedRepliesService {
     await this.transport.publish(new PredefinedRepliesUpdatedV1({ id: reply.id }));
     this.logger.log('predefined reply updated', { id: reply.id });
 
-    return this.toResponse(reply);
+    return this.transformer.toResponse(reply);
   }
 
   async remove(actor: AuthenticatedUser, idInput: unknown): Promise<void> {
@@ -169,13 +172,18 @@ export class PredefinedRepliesService {
     this.logger.log('predefined reply deleted', { id });
   }
 
+  /** Module-to-module read: all stored records ordered by name then ID. */
+  async listAll(): Promise<readonly PredefinedReply[]> {
+    return this.repository.listAll();
+  }
+
   /** Module-to-module read: stored HTML, with no actor or administrator check. */
-  async findById(id: number) {
+  async findById(id: number): Promise<PredefinedReply | null> {
     return this.repository.findById(id);
   }
 
   /** Module-to-module read: requested ids, preserving order and skipping absent ids. */
-  async findByIds(ids: readonly number[]) {
+  async findByIds(ids: readonly number[]): Promise<readonly PredefinedReply[]> {
     const unique = [...new Set(ids)];
     const rows = await this.repository.findByIds(unique);
     const byId = new Map(rows.map((row) => [row.id, row] as const));
@@ -184,21 +192,6 @@ export class PredefinedRepliesService {
       const row = byId.get(id);
       return row === undefined ? [] : [row];
     });
-  }
-
-  private toResponse(reply: {
-    id: number;
-    name: string;
-    message: string;
-  }): PredefinedReplyResponseDto {
-    const converted = fromStoredHtml(reply.message);
-
-    return {
-      id: String(reply.id),
-      name: reply.name,
-      message: converted.text,
-      hasOtherFormatting: converted.hasOtherFormatting,
-    };
   }
 
   private paramsInput(input: unknown): unknown {

@@ -467,7 +467,6 @@ describe('the committed register, today', () => {
   });
 
   it('names exactly the node-owned tables; every other model write is rejected', () => {
-    // Predefined Replies claimed tbltickets_predefined_replies for v1/predefined-replies.
     // The whole node-owned set, from both registers, listed rather than counted so a change to
     // either one has to be made here too. Wave 0 (Phase 1.3, ADR-0030) claimed `tblstaff`;
     // `tblidentity_audit` is Node-created (ADR-0034 d.3) and lives in the node register (ADR-0035).
@@ -489,6 +488,7 @@ describe('the committed register, today', () => {
     // `tbldepartments`, `tblcustomfields` and `tblcustomfieldsvalues` are Perfex's again: this copy
     // removed the Departments and Custom Fields write routes, so v1/departments and v1/custom-fields
     // only read them.
+    //Predefined Replies claimed tbltickets_predefined_replies for v1/predefined-replies.
     // Update this expectation in the same PR that changes either register.
     const nodeOwned = [...map.entries()]
       .filter(([, o]) => o === 'node')

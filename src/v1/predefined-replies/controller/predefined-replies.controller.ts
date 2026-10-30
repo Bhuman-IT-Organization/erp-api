@@ -34,10 +34,10 @@ import { PredefinedRepliesService } from '../service/predefined-replies.service.
 
 @ApiTags('Predefined Replies')
 @Controller('predefined-replies')
-@UseGuards(JwtAuthGuard, PermissionGuard)
 export class PredefinedRepliesController {
   constructor(private readonly service: PredefinedRepliesService) {}
 
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Get()
   @ApiZod({
     summary: 'List predefined replies',
@@ -51,6 +51,7 @@ export class PredefinedRepliesController {
     return this.service.list(user, query);
   }
 
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Get(PREDEFINED_REPLIES_ROUTES.export)
   @ApiZod({
     summary: 'Export predefined replies as CSV, Excel, PDF or print rows (administrators only)',
@@ -68,6 +69,7 @@ export class PredefinedRepliesController {
     return replyExport(reply, await this.service.exportCsv(user, query));
   }
 
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Get(':id')
   @ApiZod({
     summary: 'Get a predefined reply',
@@ -81,6 +83,7 @@ export class PredefinedRepliesController {
     return this.service.get(user, params);
   }
 
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Post()
   @ApiZod({
     summary: 'Create a predefined reply',
@@ -94,6 +97,7 @@ export class PredefinedRepliesController {
     return this.service.create(user, body);
   }
 
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Patch(':id')
   @ApiZod({
     summary: 'Update a predefined reply',
@@ -108,6 +112,7 @@ export class PredefinedRepliesController {
     return this.service.update(user, params, body);
   }
 
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Delete(':id')
   @HttpCode(HTTP_STATUS.NO_CONTENT)
   @ApiZod({

@@ -19,6 +19,7 @@ type Method = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 
 const ROUTES: readonly { method: Method; url: string; payload?: object; status: number }[] = [
   { method: 'GET', url: LIST, status: 200 },
+  { method: 'GET', url: `${LIST}/export`, status: 200 },
   { method: 'GET', url: record(1), status: 200 },
   {
     method: 'POST',
@@ -68,9 +69,10 @@ describe('PredefinedRepliesController (Fastify inject)', () => {
       ...(payload === undefined ? {} : { payload }),
     });
 
-  it('registers all five API routes, including DELETE', () => {
+  it('registers all six API routes, including export and DELETE', () => {
     for (const route of [
       `GET ${LIST}`,
+      `GET ${LIST}/export`,
       `GET ${LIST}/:id`,
       `POST ${LIST}`,
       `PATCH ${LIST}/:id`,
@@ -155,12 +157,16 @@ describe('PredefinedRepliesController (Fastify inject)', () => {
     const idBody = predefinedRepliesListResponseSchema.parse(JSON.parse(idSearch.payload));
     expect(idBody.data.map((reply) => reply.id)).toContain('1');
 
-    const messageSearch = await send('GET', `${LIST}?q=Original%20message`, TEST_BEARERS.admin);
+    const messageSearch = await send(
+      'GET',
+      `${LIST}?q=First%20reply%20message`,
+      TEST_BEARERS.admin,
+    );
     expect(messageSearch.statusCode).toBe(200);
     const messageBody = predefinedRepliesListResponseSchema.parse(
       JSON.parse(messageSearch.payload),
     );
-    expect(messageBody.data.map((reply) => reply.name)).not.toContain('New reply');
+    expect(messageBody.data).toEqual([]);
   });
 
   it('creates, reads, updates, and deletes a reply', async () => {
@@ -195,11 +201,43 @@ describe('PredefinedRepliesController (Fastify inject)', () => {
     expect(problem(missing).code).toBe('ERP-CORE-0004');
   });
 
+  it('rejects a non-admin with an invalid body before body validation', async () => {
+    const res = await send('POST', LIST, TEST_BEARERS.everyCode, { unexpected: true });
+    expect(res.statusCode).toBe(403);
+    expect(problem(res).code).toBe('ERP-AUTH-0005');
+  });
+
+  it('preserves the stored message when a patch changes only the name', async () => {
+    const created = await send('POST', LIST, TEST_BEARERS.admin, {
+      name: 'Name-only update',
+      message: 'Keep this message',
+    });
+    const id = predefinedReplyResponseSchema.parse(JSON.parse(created.payload)).id;
+    const updated = await send('PATCH', record(id), TEST_BEARERS.admin, { name: 'Renamed only' });
+    expect(updated.statusCode).toBe(200);
+    expect(JSON.parse(updated.payload)).toMatchObject({
+      name: 'Renamed only',
+      message: 'Keep this message',
+    });
+  });
+
+  it.each(['csv', 'xlsx', 'pdf', 'print'])('exports predefined replies as %s', async (format) => {
+    const res = await send('GET', `${LIST}/export?format=${format}`, TEST_BEARERS.admin);
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['cache-control']).toContain('no-store');
+  });
+
   it('rejects an invalid create body', async () => {
     const res = await send('POST', LIST, TEST_BEARERS.admin, {
       name: ' ',
       message: 'Message',
     });
+    expect(res.statusCode).toBe(400);
+    expect(problem(res).code).toBe('ERP-VALIDATION-0001');
+  });
+
+  it('rejects an all-digit search value above the signed MySQL INT maximum', async () => {
+    const res = await send('GET', `${LIST}?q=2147483648`, TEST_BEARERS.admin);
     expect(res.statusCode).toBe(400);
     expect(problem(res).code).toBe('ERP-VALIDATION-0001');
   });

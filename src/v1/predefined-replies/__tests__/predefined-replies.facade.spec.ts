@@ -1,70 +1,95 @@
-import { describe, expect, it, vi } from 'vitest';
-import type { AuthenticatedUser } from '../../../shared/http/auth/access-token-verifier.js';
+import 'reflect-metadata';
+import { Global, Module } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import { describe, expect, it } from 'vitest';
+import {
+  ACCESS_TOKEN_VERIFIER,
+  type AccessTokenVerifier,
+  type AuthenticatedUser,
+} from '../../../shared/http/auth/access-token-verifier.js';
+import { EventsModule } from '../../../shared/events/events.module.js';
+import { LoggerModule } from '../../../shared/logger/logger.module.js';
 import { PredefinedRepliesFacade } from '../facade/predefined-replies.facade.js';
-import type { PredefinedRepliesService } from '../service/predefined-replies.service.js';
+import { PredefinedRepliesModule } from '../predefined-replies.module.js';
+import { PredefinedRepliesRepository } from '../repository/predefined-replies.repository.js';
+import { asRepository, InMemoryPredefinedRepliesRepository } from './fakes.js';
 
-const actor = {
+const ADMIN = {
   staffId: 1,
-  sessionId: 'test-session',
-  jti: 'test-jti',
+  sessionId: 'facade-test-session',
+  jti: 'facade-test-jti',
   isAdmin: true,
   roleId: null,
   tokenVersion: 0,
-  expiresAt: 1_800_000_000,
+  expiresAt: 4_102_444_800,
 } satisfies AuthenticatedUser;
 
-const reply = {
-  id: 1,
-  name: 'Greeting',
-  message: 'Hello, how can we help?',
-};
+class StubAccessTokenVerifier implements AccessTokenVerifier {
+  verifyAccessToken(): Promise<AuthenticatedUser | null> {
+    return Promise.resolve(ADMIN);
+  }
 
-function build() {
-  const service = {
-    list: vi.fn().mockResolvedValue({
-      data: [{ ...reply, id: '1' }],
-      meta: {
-        nextCursor: null,
-        prevCursor: null,
-        total: 1,
-        rangeStart: 1,
-      },
-    }),
-    get: vi.fn().mockResolvedValue({ ...reply, id: '1' }),
-  };
-
-  const facade = new PredefinedRepliesFacade(service as unknown as PredefinedRepliesService);
-
-  return { facade, service };
+  hasPermission(): Promise<boolean> {
+    return Promise.resolve(true);
+  }
 }
 
-describe('PredefinedRepliesFacade', () => {
-  it('forwards list requests to the service', async () => {
-    const { facade, service } = build();
-    const query = { limit: 10 };
+@Global()
+@Module({
+  providers: [
+    {
+      provide: ACCESS_TOKEN_VERIFIER,
+      useClass: StubAccessTokenVerifier,
+    },
+  ],
+  exports: [ACCESS_TOKEN_VERIFIER],
+})
+class StubVerifierModule {}
 
-    await expect(facade.list(actor, query)).resolves.toEqual({
-      data: [{ ...reply, id: '1' }],
-      meta: {
-        nextCursor: null,
-        prevCursor: null,
-        total: 1,
-        rangeStart: 1,
-      },
+describe('PredefinedRepliesFacade through PredefinedRepliesModule', () => {
+  it('exposes actor-free reads and returns stored HTML unchanged', async () => {
+    const repository = new InMemoryPredefinedRepliesRepository();
+
+    const second = await repository.create({
+      name: 'Second',
+      message: '<p>Stored <b>HTML</b></p>',
     });
 
-    expect(service.list).toHaveBeenCalledWith(actor, query);
-  });
-
-  it('returns a reply with a string ID', async () => {
-    const { facade, service } = build();
-
-    await expect(facade.findById(actor, 1)).resolves.toEqual({
-      id: '1',
-      name: 'Greeting',
-      message: 'Hello, how can we help?',
+    const first = await repository.create({
+      name: 'First',
+      message: '<p>First</p>',
     });
 
-    expect(service.get).toHaveBeenCalledWith(actor, 1);
+    const moduleRef = await Test.createTestingModule({
+      imports: [LoggerModule, EventsModule, StubVerifierModule, PredefinedRepliesModule],
+    })
+      .overrideProvider(PredefinedRepliesRepository)
+      .useValue(asRepository(repository))
+      .compile();
+
+    try {
+      const facade = moduleRef.get(PredefinedRepliesFacade);
+
+      await expect(facade.list(ADMIN, {})).resolves.toMatchObject({
+        data: [
+          { id: String(second.id), name: 'Second' },
+          { id: String(first.id), name: 'First' },
+        ],
+        meta: { total: 2 },
+      });
+
+      await expect(facade.listAll()).resolves.toEqual([first, second]);
+
+      await expect(facade.findById(second.id)).resolves.toEqual(second);
+
+      await expect(facade.findById(404)).resolves.toBeNull();
+
+      await expect(facade.findByIds([second.id, first.id, second.id, 404])).resolves.toEqual([
+        second,
+        first,
+      ]);
+    } finally {
+      await moduleRef.close();
+    }
   });
 });

@@ -114,12 +114,12 @@ describe.skipIf(!process.env.DATABASE_URL)(
       expect(back.rangeStart).toBe(1);
     });
 
-    it('searches the message as well as the name', async () => {
+    it('searches names only and does not match message content', async () => {
       const page = await repository.list({
         ...request(),
         search: MESSAGE_TOKEN,
       });
-      expect(ids(page)).toEqual([c.id]);
+      expect(ids(page)).toEqual([]);
     });
 
     it('updates a row and returns null for a missing id', async () => {

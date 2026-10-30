@@ -6,6 +6,7 @@ import { PredefinedRepliesTransport } from '../service/predefined-replies.transp
 import { RecordingDomainEventPublisher } from '../../../shared/events/domain-event.publisher.js';
 import { LoggerService } from '../../../shared/logger/logger.service.js';
 import { PredefinedRepliesValidator } from '../service/predefined-replies.validator.js';
+import { PredefinedRepliesTransformer } from '../service/predefined-replies.transformer.js';
 
 const NOW = 1_800_000_000;
 
@@ -28,7 +29,6 @@ const reply = {
   id: 1,
   name: 'Greeting',
   message: 'Hello, how can we help?',
-  hasOtherFormatting: false,
 };
 
 function build() {
@@ -41,16 +41,20 @@ function build() {
       rangeStart: 1,
     }),
     findById: vi.fn().mockResolvedValue(reply),
+    listAll: vi.fn().mockResolvedValue([reply]),
+    findByIds: vi.fn().mockResolvedValue([reply]),
     create: vi
       .fn()
       .mockImplementation((input: { name: string; message: string }) =>
         Promise.resolve({ id: 2, ...input }),
       ),
-    update: vi
-      .fn()
-      .mockImplementation((_id: number, input: { name: string; message: string }) =>
-        Promise.resolve({ id: 1, ...input }),
-      ),
+    update: vi.fn().mockImplementation((_id: number, input: { name?: string; message?: string }) =>
+      Promise.resolve({
+        id: 1,
+        name: input.name ?? reply.name,
+        message: input.message ?? '<p>Hello, how can we help?</p>',
+      }),
+    ),
     remove: vi.fn().mockResolvedValue(true),
   };
 
@@ -63,6 +67,7 @@ function build() {
     new PredefinedRepliesValidator(),
     transport,
     logger,
+    new PredefinedRepliesTransformer(),
   );
 
   return { service, repository, publisher, logger };
@@ -97,7 +102,12 @@ describe('PredefinedRepliesService', () => {
   it('returns a reply by ID', async () => {
     const { service } = build();
 
-    await expect(service.get(ADMIN, 1)).resolves.toEqual({ ...reply, id: '1' });
+    await expect(service.get(ADMIN, 1)).resolves.toEqual({
+      id: '1',
+      name: 'Greeting',
+      message: 'Hello, how can we help?',
+      hasOtherFormatting: false,
+    });
   });
 
   it('returns an error when a reply does not exist', async () => {
@@ -107,6 +117,23 @@ describe('PredefinedRepliesService', () => {
     await expect(service.get(ADMIN, 404)).rejects.toMatchObject({
       code: 'ERP-CORE-0004',
     });
+  });
+
+  it('provides actor-free stored-record reads without converting HTML', async () => {
+    const { service, repository } = build();
+    const stored = {
+      id: 7,
+      name: 'Stored',
+      message: '<p>&lt;b&gt;</p>',
+    };
+    repository.findById.mockResolvedValue(stored);
+    repository.listAll.mockResolvedValue([stored]);
+    repository.findByIds.mockResolvedValue([stored]);
+
+    await expect(service.findById(7)).resolves.toEqual(stored);
+    await expect(service.listAll()).resolves.toEqual([stored]);
+    await expect(service.findByIds([7, 7, 404])).resolves.toEqual([stored]);
+    expect(repository.findByIds).toHaveBeenCalledWith([7, 404]);
   });
 
   it('creates a reply through the repository', async () => {
@@ -162,5 +189,42 @@ describe('PredefinedRepliesService', () => {
     await expect(service.remove(ADMIN, 404)).rejects.toMatchObject({
       code: 'ERP-CORE-0004',
     });
+  });
+
+  it('preserves the stored message when only the name is updated', async () => {
+    const { service, repository } = build();
+    repository.findById.mockResolvedValue({
+      id: 1,
+      name: 'Greeting',
+      message: '<p>Original</p>',
+    });
+    repository.update.mockImplementation((_id, input: { name?: string; message?: string }) =>
+      Promise.resolve({
+        id: 1,
+        name: input.name ?? 'Greeting',
+        message: input.message ?? '<p>Original</p>',
+      }),
+    );
+
+    await expect(service.update(ADMIN, 1, { name: 'Renamed' })).resolves.toMatchObject({
+      name: 'Renamed',
+      message: 'Original',
+    });
+    expect(repository.update).toHaveBeenCalledWith(1, { name: 'Renamed' });
+  });
+
+  it('publishes create, update and delete events with only the record ID', async () => {
+    const { service, publisher } = build();
+    await service.create(ADMIN, { name: 'Created', message: 'Hello' });
+    await service.update(ADMIN, 1, { name: 'Changed' });
+    await service.remove(ADMIN, 1);
+
+    expect(
+      publisher.drain().map((event) => ({ name: event.name, payload: event.payload })),
+    ).toEqual([
+      { name: 'predefined-replies.record.created', payload: { id: 2 } },
+      { name: 'predefined-replies.record.updated', payload: { id: 1 } },
+      { name: 'predefined-replies.record.deleted', payload: { id: 1 } },
+    ]);
   });
 });

@@ -23,31 +23,35 @@ export function toStoredHtml(plainText: string): string {
     .join('');
 }
 
+const ENTITY_MAP: Readonly<Record<string, string>> = {
+  amp: '&',
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  '#39': "'",
+  apos: "'",
+  nbsp: '\u00a0',
+};
+
 /**
- * Converts stored HTML into plain text for the API.
- * Flags common formatting from older Perfex replies so the UI can warn
- * that saving the reply as plain text will remove that formatting.
+ * Converts stored HTML into plain text. Any tag other than paragraph and line-break markup is
+ * flagged, and entities are decoded in one pass so escaped text is never decoded recursively.
  */
 export function fromStoredHtml(html: string): {
   text: string;
   hasOtherFormatting: boolean;
 } {
-  const hasOtherFormatting =
-    /<(?:b|strong|i|em|u|s|del|ins|a|ul|ol|li|table|thead|tbody|tr|td|th|blockquote|h[1-6])\b/i.test(
-      html,
-    );
+  const hasOtherFormatting = /<\/?(?!p\b|br\b)[a-z][^>]*>/i.test(html);
 
   const text = html
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/p\s*>/gi, '\n\n')
     .replace(/<p\b[^>]*>/gi, '')
     .replace(/<[^>]*>/g, '')
-    .replace(/&nbsp;/gi, '\u00a0')
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;|&apos;/gi, "'")
+    .replace(
+      /&(?:amp|lt|gt|quot|#39|apos|nbsp);/gi,
+      (entity) => ENTITY_MAP[entity.slice(1, -1).toLowerCase()] ?? entity,
+    )
     .replace(/\n{3,}/g, '\n\n')
     .replace(/^\n+|\n+$/g, '');
 
