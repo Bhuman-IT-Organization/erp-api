@@ -4,7 +4,6 @@ import { AppError } from '../../../shared/errors/app-error.js';
 import { decodeCursor } from '../../../shared/http/keyset.js';
 import { LIST_QUERY_LIMITS, parseListQuery } from '../../../shared/http/pagination.js';
 
-// validator.spec.ts, replace the import of the 4 schemas from the validator
 import {
   createTicketPrioritiesBodySchema,
   updateTicketPrioritiesBodySchema,
@@ -12,7 +11,7 @@ import {
   type UpdateTicketPrioritiesBody,
   type CreateTicketPrioritiesBody,
   type TicketPrioritiesParams,
-  TICKET_PRIORITIES_SEARCH_MAX, // only if the dto exports it
+  TICKET_PRIORITIES_SEARCH_MAX,
 } from '../dto/ticket-priorities.dto.js';
 import type {
   TicketPrioritiesListRequest,

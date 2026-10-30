@@ -231,6 +231,16 @@ describe('remove', () => {
     expect(repository.remove).not.toHaveBeenCalled();
   });
 
+  it('refuses when its use could not be counted (ERP-TICKETPRIORITIES-0001)', async () => {
+    repository.isReferenced.mockRejectedValue(new Error('the ticket count failed'));
+    await expect(service.remove(admin, { id: 5 })).rejects.toMatchObject({
+      code: 'ERP-TICKETPRIORITIES-0001',
+      message: 'its use could not be counted',
+    });
+    expect(repository.remove).not.toHaveBeenCalled();
+    expect(transport.publish).not.toHaveBeenCalled();
+  });
+
   it('refuses the email-piping default (ERP-TICKETPRIORITIES-0002)', async () => {
     transport.emailPipingDefaultPriority.mockResolvedValue('5');
     await expect(service.remove(admin, { id: 5 })).rejects.toMatchObject({
