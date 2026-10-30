@@ -10,7 +10,7 @@
  * name match of the reference statement is checked on the real `name` column.
  *
  * Everything this spec writes it creates itself and deletes again: `tblcontracts_types` rows whose name
- * starts with `MARKER`, removed before the run (a leftover of a crashed run) and after it. No other
+ * starts with `MARKER`, and one `tblcontracts` row for the refused delete, removed before the run (a leftover of a crashed run) and after it. No other
  * table is written, no seeded row is touched, and no value from the local data is read into an assertion message:
  * ids and counts are compared, never printed, and every name asserted is one this spec wrote.
  */
@@ -170,9 +170,9 @@ describe.skipIf(!process.env.DATABASE_URL)(
       expect(await repository.count(request())).toBe(3);
     });
 
-    it('q as an id matches the id; an all-digit q up to INT UNSIGNED runs', async () => {
+    it('q as an id matches the id; an all-digit q up to INT runs', async () => {
       expect(ids(await repository.list(request({ search: String(c.id) })))).toContain(c.id);
-      await expect(repository.count(request({ search: '4294967295' }))).resolves.toBeTypeOf(
+      await expect(repository.count(request({ search: '2147483647' }))).resolves.toBeTypeOf(
         'number',
       );
     });

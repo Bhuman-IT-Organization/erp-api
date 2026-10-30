@@ -348,18 +348,18 @@ describe('ContractTypesRepository: the table delegate', () => {
     expect(page.prevCursor).not.toBeNull();
   });
 
-  it('q that is no number matches the name only; an id beyond INT UNSIGNED is not an id', async () => {
+  it('q that is no number matches the name only; an id beyond INT is not an id', async () => {
     const { repository, calls } = stub();
     await repository.count(request({ search: 'term' }));
     expect(calls[0]?.args).toEqual({ where: { OR: [{ name: { contains: 'term' } }] } });
     const fits = stub();
-    await fits.repository.count(request({ search: '4294967295' }));
+    await fits.repository.count(request({ search: '2147483647' }));
     expect(fits.calls[0]?.args).toEqual({
-      where: { OR: [{ name: { contains: '4294967295' } }, { id: 4_294_967_295 }] },
+      where: { OR: [{ name: { contains: '2147483647' } }, { id: 2_147_483_647 }] },
     });
     const long = stub();
-    await long.repository.count(request({ search: '4294967296' }));
-    expect(long.calls[0]?.args).toEqual({ where: { OR: [{ name: { contains: '4294967296' } }] } });
+    await long.repository.count(request({ search: '2147483648' }));
+    expect(long.calls[0]?.args).toEqual({ where: { OR: [{ name: { contains: '2147483648' } }] } });
   });
 
   it('a before cursor reads reversed and answers in order; an empty page has no cursors', async () => {

@@ -186,13 +186,21 @@ describe('structural scan: only the listed files write a co-write table (ADR-005
 
   it('finds every writer of a co-write table inside the files its records list', () => {
     const strays: string[] = [];
+    if (map.size === 0) {
+      expect(strays).toEqual([]);
+      return;
+    }
+    const compiled = [...map.entries()].map(([table, records]) => ({
+      table,
+      patterns: writePatterns(table),
+      allowed: new Set(records.flatMap((r) => r.files)),
+    }));
     for (const file of files) {
       const text = readFileSync(file, 'utf8');
       const path = relative(ROOT, file).split(sep).join('/');
-      for (const [table, records] of map) {
-        if (!writePatterns(table).some((p) => p.test(text))) continue;
-        const allowed = records.flatMap((r) => r.files);
-        if (!allowed.includes(path)) strays.push(`${path} writes ${table}`);
+      for (const { table, patterns, allowed } of compiled) {
+        if (!patterns.some((p) => p.test(text))) continue;
+        if (!allowed.has(path)) strays.push(`${path} writes ${table}`);
       }
     }
     expect(strays).toEqual([]);

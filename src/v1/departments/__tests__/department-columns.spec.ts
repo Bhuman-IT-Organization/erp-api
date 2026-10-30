@@ -108,9 +108,12 @@ function stripComments(source: string): string {
   return out;
 }
 
+let srcCache: Source[] | null = null;
+
 /** Every non-test `.ts` file under `root`, the generated Prisma client excluded. */
 function sourcesUnder(root: string): Source[] {
-  return readdirSync(root, { withFileTypes: true, recursive: true })
+  if (root === SRC && srcCache !== null) return srcCache;
+  const sources = readdirSync(root, { withFileTypes: true, recursive: true })
     .filter((entry) => entry.isFile() && entry.name.endsWith('.ts'))
     .map((entry) => relative(root, join(entry.parentPath, entry.name)).split(sep).join('/'))
     .filter(
@@ -120,6 +123,8 @@ function sourcesUnder(root: string): Source[] {
         !file.startsWith('shared/db/generated/'),
     )
     .map((file) => ({ file, code: stripComments(readFileSync(join(root, file), 'utf8')) }));
+  if (root === SRC) srcCache = sources;
+  return sources;
 }
 
 /** One reach of the delegate: where, and the method called on it (`null` when taken whole). */

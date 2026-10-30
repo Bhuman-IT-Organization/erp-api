@@ -39,7 +39,7 @@ Under `api/v1/contract-types` (`CONTRACT_TYPES_ROUTES` in `contract-types.routes
 | `PATCH`  | `:id`    | 200 the contract type                                                                                                                                                                           | 404 `ERP-CORE-0004`                                                                     |
 | `DELETE` | `:id`    | 204, no body                                                                                                                                                                                    | 404 `ERP-CORE-0004`; 409 `ERP-CONTRACTTYPES-0001`                                       |
 
-The body is `{ name }`, strict: the name is required, trimmed, min 1 character with no length limit (the column is `LONGTEXT`), every character accepted and stored as text, and a name another contract type holds is accepted (Perfex has no uniqueness check); any other key (`id`, ...) is a 400 naming it, and `{}` on `PATCH` is a 400 on `['name']`. `usage` holds `{ contracts: number, goals: number }`. `q` matches the name (contains, under the column's collation) and, when `q` is all digits up to 4294967295, the id.
+The body is `{ name }`, strict: the name is required, trimmed, min 1 character with no length limit (the column is `LONGTEXT`), every character accepted and stored as text, and a name another contract type holds is accepted (Perfex has no uniqueness check); any other key (`id`, ...) is a 400 naming it, and `{}` on `PATCH` is a 400 on `['name']`. `usage` holds `{ contracts: number, goals: number }`. `q` matches the name (contains, under the column's collation) and, when `q` is all digits up to 2147483647, the id.
 
 `ERP-CONTRACTTYPES-0001` (DELETE): `contracts` or `goals` is non-zero, or the usage count fails or does not name the id (`its use could not be counted`). Nothing is deleted and no event is published.
 
@@ -93,7 +93,7 @@ corepack yarn test src/v1/contract-types          # unit, the repository over a 
 corepack yarn test:int src/v1/contract-types      # the repository against the local stack (node ../erp-infra/scripts/local-up.mjs first)
 ```
 
-The int spec writes only `tblcontracts_types` rows and deletes them before and after the run; it never writes a Perfex-owned table and never reads a local value into an assertion message.
+The int spec writes `tblcontracts_types` rows and deletes them before and after the run; it inserts a `tblcontracts` row for the refused delete and removes it afterwards, and never reads a local value into an assertion message.
 
 ## Legacy parity
 

@@ -37,8 +37,8 @@ import { NO_CONTRACT_TYPE_USAGE } from '../service/contract-types.transformer.js
 /** Prisma's "record to update not found". */
 const RECORD_NOT_FOUND = 'P2025';
 
-/** The largest value of MySQL's `INT UNSIGNED` (the id column): a longer all-digit `q` is not an id. */
-const MAX_UNSIGNED_INT_ID = 4_294_967_295;
+/** The largest value of MySQL's signed `INT` (the id column): a longer all-digit `q` is not an id. */
+const MAX_INT_ID = 2_147_483_647;
 
 /** The two columns of the table; nothing else is selected. */
 const COLUMNS = { id: true, name: true } as const;
@@ -103,8 +103,7 @@ export function referenceKey(reference: Pick<ContractTypeReference, 'table' | 'c
 function matchOf(search: string | null): WhereValue {
   if (search === null) return {};
   const or: WhereValue[] = [{ name: { contains: search } }];
-  if (/^\d+$/.test(search) && Number(search) <= MAX_UNSIGNED_INT_ID)
-    or.push({ id: Number(search) });
+  if (/^\d+$/.test(search) && Number(search) <= MAX_INT_ID) or.push({ id: Number(search) });
   return { OR: or };
 }
 
