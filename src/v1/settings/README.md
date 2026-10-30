@@ -3,12 +3,12 @@
 ## Purpose
 
 Reads the Perfex options other modules need, and only those (W2A-07). A facade over a fixed
-allow-list of 11 `tbloptions` names (D-10, D-22, D-37), so no module reads `tbloptions` wholesale
+allow-list of 13 `tbloptions` names (D-10, D-22, D-37, lead sources, ticket status), so no module reads `tbloptions` wholesale
 and none can be handed a credential row by accident. It is the one facade-only module (D-23): no
 controller, no routes, no events and no owned table, written by hand rather than generated, and
 admitted by name in `src/v1/__tests__/module-shape.spec.ts`. Who reads it: branding (its ten
-options, since W2A-07; cost centers reads `default_timezone` among them) and payment modes (the
-credit-expense mode, D-37).
+options, since W2A-07; cost centers reads `default_timezone` among them), payment modes (the
+credit-expense mode, D-37), and lead sources (`leads_default_source`).
 
 It writes nothing.
 
@@ -46,10 +46,11 @@ from their transport, and add `SettingsModule` to their module's `imports`. A te
 
 `SETTINGS_ALLOW_LIST` in `model/settings.model.ts`, frozen, spelled as Perfex stores each name (04.1 D-37 for one).
 
-| Group                | Names                                                                                                                                                                                        | Read by                            |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
-| branding             | `companyname`, `company_logo`, `company_logo_dark`, `active_language`, `dateformat`, `time_format`, `thousand_separator`, `decimal_separator`, `remove_decimals_on_zero`, `default_timezone` | branding (`BRANDING_OPTION_NAMES`) |
-| payment modes (D-37) | `expense_credit_payment_mode`                                                                                                                                                                | payment modes (the delete lock)    |
+| Group                | Names                                                                                                                                                                                        | Read by                                      |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| branding             | `companyname`, `company_logo`, `company_logo_dark`, `active_language`, `dateformat`, `time_format`, `thousand_separator`, `decimal_separator`, `remove_decimals_on_zero`, `default_timezone` | branding (`BRANDING_OPTION_NAMES`)           |
+| payment modes (D-37) | `expense_credit_payment_mode`                                                                                                                                                                | payment modes (the delete lock)              |
+| lead sources         | `leads_default_source`                                                                                                                                                                       | lead sources (default-source delete refusal) |
 
 D-22's rule for adding one: a later slice that needs another key adds it to the list in its own
 plan, with who reads it. `default_tax` is not on the list: `v1/taxes` reads it itself (D-21).

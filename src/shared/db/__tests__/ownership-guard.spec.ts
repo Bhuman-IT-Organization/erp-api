@@ -485,6 +485,8 @@ describe('the committed register, today', () => {
     // record, so the ratchet did not move.
     // Wave 2a slice 5 (plan 04.1-27) claimed `tblcurrencies` for `v1/currencies`; a write-single
     // record, so the ratchet did not move.
+    // `tblleads_sources` is written by `v1/lead-sources`; Perfex's delete route is closed at Nginx,
+    // while quick add remains on Perfex.
     // `tbldepartments`, `tblcustomfields` and `tblcustomfieldsvalues` are Perfex's again: this copy
     // removed the Departments and Custom Fields write routes, so v1/departments and v1/custom-fields
     // only read them.
@@ -501,6 +503,7 @@ describe('the committed register, today', () => {
       'tblcustomers_groups',
       'tblexpenses_categories',
       'tblidentity_audit',
+      'tblleads_sources',
       'tblmail_sent_emails',
       'tblmail_template_versions',
       'tblmail_templates',

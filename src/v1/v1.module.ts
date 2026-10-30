@@ -11,6 +11,7 @@ import { ExpenseCategoriesModule } from './expense-categories/expense-categories
 import { IdentityModule } from './identity/identity.module.js';
 import { MailModule } from './mail/mail.module.js';
 import { PaymentModesModule } from './payment-modes/payment-modes.module.js';
+import { LeadSourcesModule } from './lead-sources/lead-sources.module.js';
 import { SettingsModule } from './settings/settings.module.js';
 import { TaxesModule } from './taxes/taxes.module.js';
 import { TicketStatusesModule } from './ticket-statuses/ticket-statuses.module.js';
@@ -31,6 +32,7 @@ import { TicketStatusesModule } from './ticket-statuses/ticket-statuses.module.j
     DepartmentsModule,
     SettingsModule,
     CustomFieldsModule,
+    LeadSourcesModule,
     TicketStatusesModule,
     CustomerGroupsModule,
   ],
