@@ -48,6 +48,11 @@ export const ERROR_CODES = {
   'ERP-IDENTITY-0009': { status: 422, title: 'Unknown department' },
   // v1/expense-categories (plan 04.1-03): 0001 refuses a delete while anything still uses the category.
   'ERP-EXPENSECATEGORIES-0001': { status: 409, title: 'The expense category is still in use' },
+
+  // v1/lead-sources: 0001 refuses a delete while references remain; 0002 protects the default source.
+  'ERP-LEADSOURCES-0001': { status: 409, title: 'Lead source is still in use' },
+  'ERP-LEADSOURCES-0002': { status: 409, title: 'The lead source is the default source' },
+
   // v1/taxes (plan 04.1-11): in use (0001), Perfex's locked edit (0002), a duplicate name (0003), a default tax in Settings (0004, D-21).
   'ERP-TAXES-0001': { status: 409, title: 'The tax is still in use' },
   'ERP-TAXES-0002': {
@@ -79,6 +84,8 @@ export const ERROR_CODES = {
     status: 409,
     title: 'The currency code cannot change while the currency is in use',
   },
+  // v1/customer-groups: 0001 refuses a delete while any customer is still in the group (read-only count of tblcustomer_groups, which Perfex keeps writing).
+  'ERP-CUSTOMERGROUPS-0001': { status: 409, title: 'The customer group is still in use' },
   // v1/mail (plan 04.3-07). ERP-MAIL-0001 and ERP-MAIL-0003 are web copy keys only, never thrown: an unknown merge field
   // is the `unknown_merge_field` rule inside ERP-VALIDATION-0001 and a stale save is ERP-CORE-0013 (ADR-0040).
   'ERP-MAIL-0002': { status: 409, title: 'Email is not configured' },

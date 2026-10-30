@@ -486,10 +486,13 @@ describe('the committed register, today', () => {
     // Wave 2a slice 5 (plan 04.1-27) claimed `tblcurrencies` for `v1/currencies`; a write-single
     // record, so the ratchet did not move.
     // The Services card claimed `tblservices` for `v1/services`; Perfex's quick add stays a co-writer.
+    // `tblleads_sources` is written by `v1/lead-sources`; Perfex's delete route is closed at Nginx,
+    // while quick add remains on Perfex.
     // `tbldepartments`, `tblcustomfields` and `tblcustomfieldsvalues` are Perfex's again: this copy
     // removed the Departments and Custom Fields write routes, so v1/departments and v1/custom-fields
     // only read them.
     // Ticket Statuses claimed tbltickets_status for v1/ticket-statuses.
+    // Customer Groups claimed tblcustomers_groups for v1/customer-groups; tblcustomer_groups stays Perfex's.
     // Update this expectation in the same PR that changes either register.
     const nodeOwned = [...map.entries()]
       .filter(([, o]) => o === 'node')
@@ -498,8 +501,10 @@ describe('the committed register, today', () => {
     expect(nodeOwned).toEqual([
       'tblcost_centers',
       'tblcurrencies',
+      'tblcustomers_groups',
       'tblexpenses_categories',
       'tblidentity_audit',
+      'tblleads_sources',
       'tblmail_sent_emails',
       'tblmail_template_versions',
       'tblmail_templates',
