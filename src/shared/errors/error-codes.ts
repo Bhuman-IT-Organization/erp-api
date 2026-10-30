@@ -63,6 +63,8 @@ export const ERROR_CODES = {
   'ERP-TAXES-0004': { status: 409, title: 'The tax is a default tax in Settings' },
   // v1/cost-centers (plan 04.1-18): 0001 refuses a delete while any referencing column still names the cost center (D-07, D-28).
   'ERP-COSTCENTERS-0001': { status: 409, title: 'The cost center is still in use' },
+  // v1/services: 0001 refuses a delete while any ticket still uses the service.
+  'ERP-SERVICES-0001': { status: 409, title: 'The service is still in use' },
   // v1/ticket-statuses (plan 06): 0001 is a referenced status, 0002 is a built-in status.
   'ERP-TICKETSTATUSES-0001': { status: 409, title: 'The ticket status is still referenced' },
   'ERP-TICKETSTATUSES-0002': { status: 409, title: 'The built-in ticket status cannot be deleted' },

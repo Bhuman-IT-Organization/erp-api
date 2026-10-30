@@ -7598,8 +7598,8 @@
       ]
     },
     "evidence_changed": false,
-    "note": "",
-    "owner": "perfex-core",
+    "note": "Node writes tblservices through v1/services. Perfex's delete route /admin/tickets/delete_service is refused at Nginx, while the quick-add route /admin/tickets/service remains available on Perfex as a co-writer.",
+    "owner": "node",
     "owner_confidence": "write-single",
     "table": "tblservices"
   },
