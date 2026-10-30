@@ -467,7 +467,6 @@ describe('the committed register, today', () => {
   });
 
   it('names exactly the node-owned tables; every other model write is rejected', () => {
-    // Step 1.2: Services card — tblservices is now owned by Node.
     // The whole node-owned set, from both registers, listed rather than counted so a change to
     // either one has to be made here too. Wave 0 (Phase 1.3, ADR-0030) claimed `tblstaff`;
     // `tblidentity_audit` is Node-created (ADR-0034 d.3) and lives in the node register (ADR-0035).
