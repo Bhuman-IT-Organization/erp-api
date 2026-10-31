@@ -48,6 +48,11 @@ export const ERROR_CODES = {
   'ERP-IDENTITY-0009': { status: 422, title: 'Unknown department' },
   // v1/expense-categories (plan 04.1-03): 0001 refuses a delete while anything still uses the category.
   'ERP-EXPENSECATEGORIES-0001': { status: 409, title: 'The expense category is still in use' },
+
+  // v1/lead-sources: 0001 refuses a delete while references remain; 0002 protects the default source.
+  'ERP-LEADSOURCES-0001': { status: 409, title: 'Lead source is still in use' },
+  'ERP-LEADSOURCES-0002': { status: 409, title: 'The lead source is the default source' },
+
   // v1/taxes (plan 04.1-11): in use (0001), Perfex's locked edit (0002), a duplicate name (0003), a default tax in Settings (0004, D-21).
   'ERP-TAXES-0001': { status: 409, title: 'The tax is still in use' },
   'ERP-TAXES-0002': {
@@ -56,6 +61,8 @@ export const ERROR_CODES = {
   },
   'ERP-TAXES-0003': { status: 409, title: 'A tax with that name already exists' },
   'ERP-TAXES-0004': { status: 409, title: 'The tax is a default tax in Settings' },
+  // v1/contract-types (Task card 04): 0001 refuses a delete while any contract (or goal) still names the contract type.
+  'ERP-CONTRACTTYPES-0001': { status: 409, title: 'The contract type is still in use' },
   // v1/cost-centers (plan 04.1-18): 0001 refuses a delete while any referencing column still names the cost center (D-07, D-28).
   'ERP-COSTCENTERS-0001': { status: 409, title: 'The cost center is still in use' },
   // v1/lead-statuses: deletion restrictions.
@@ -68,6 +75,14 @@ export const ERROR_CODES = {
   'ERP-LEADSTATUSES-0004': {
     status: 409,
     title: 'Lead status usage could not be counted',
+  // v1/services: 0001 refuses a delete while any ticket still uses the service.
+  'ERP-SERVICES-0001': { status: 409, title: 'The service is still in use' },
+  // v1/ticket-statuses (plan 06): 0001 is a referenced status, 0002 is a built-in status.
+  'ERP-TICKETSTATUSES-0001': { status: 409, title: 'The ticket status is still referenced' },
+  'ERP-TICKETSTATUSES-0002': { status: 409, title: 'The built-in ticket status cannot be deleted' },
+  'ERP-TICKETSTATUSES-0003': {
+    status: 409,
+    title: 'The ticket status is the default reply status',
   },
   // v1/payment-modes (plan 04.1-23): 0001 refuses a delete while a transactional column still names the mode (D-33), 0002 the credit expense mode (D-37).
   'ERP-PAYMENTMODES-0001': { status: 409, title: 'The payment mode is still in use' },
@@ -81,6 +96,8 @@ export const ERROR_CODES = {
     status: 409,
     title: 'The currency code cannot change while the currency is in use',
   },
+  // v1/customer-groups: 0001 refuses a delete while any customer is still in the group (read-only count of tblcustomer_groups, which Perfex keeps writing).
+  'ERP-CUSTOMERGROUPS-0001': { status: 409, title: 'The customer group is still in use' },
   // v1/mail (plan 04.3-07). ERP-MAIL-0001 and ERP-MAIL-0003 are web copy keys only, never thrown: an unknown merge field
   // is the `unknown_merge_field` rule inside ERP-VALIDATION-0001 and a stale save is ERP-CORE-0013 (ADR-0040).
   'ERP-MAIL-0002': { status: 409, title: 'Email is not configured' },
@@ -94,6 +111,8 @@ export const ERROR_CODES = {
   'ERP-FILES-0002': { status: 413, title: 'File too large' },
   'ERP-UPSTREAM-0001': { status: 503, title: 'An upstream system is unavailable' }, // ADR-0031 §7 load shedding
   'ERP-INTERNAL-0001': { status: 500, title: 'Internal error' },
+  'ERP-TICKETPRIORITIES-0001': { status: 409, title: 'Priority in use by a ticket' },
+  'ERP-TICKETPRIORITIES-0002': { status: 409, title: 'Priority is the email-piping default' },
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_CODES;

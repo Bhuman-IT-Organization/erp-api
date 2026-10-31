@@ -1141,8 +1141,8 @@
       ]
     },
     "evidence_changed": false,
-    "note": "",
-    "owner": "perfex-core",
+    "note": "Written by v1/contract-types; Perfex's delete is closed at Nginx; the quick add on the contract form stays on Perfex.",
+    "owner": "node",
     "owner_confidence": "write-single",
     "table": "tblcontracts_types"
   },
@@ -1416,34 +1416,34 @@
       ]
     },
     "evidence_changed": false,
-    "note": "",
+    "note": "Owner perfex-core by decision: Perfex keeps writing this table from the customer screens (customer create Clients_model.php:188, profile save Clients_model.php:296, customer delete Clients_model.php:984, bulk actions Clients.php:892), so Node must not own it. v1/customer-groups only reads it (a count of the customers in a group) to refuse a group delete with 409 ERP-CUSTOMERGROUPS-0001 while any customer is in the group; it never writes or deletes rows here.",
     "owner": "perfex-core",
     "owner_confidence": "write-single",
     "table": "tblcustomer_groups"
   },
   {
-    "decided_by": null,
-    "decided_on": null,
-    "evidence": {
-      "ddl": [],
-      "forms": [
-        "db_prefix_concat"
-      ],
-      "no_writer_reason": null,
-      "readers": [
-        "fixed_equipment",
-        "perfex-core"
-      ],
-      "writers": [
-        "perfex-core"
-      ]
-    },
-    "evidence_changed": false,
-    "note": "",
-    "owner": "perfex-core",
-    "owner_confidence": "write-single",
-    "table": "tblcustomers_groups"
+  "decided_by": "migration lead",
+  "decided_on": "2026-10-27",
+  "evidence": {
+    "ddl": [],
+    "forms": [
+      "db_prefix_concat"
+    ],
+    "no_writer_reason": null,
+    "readers": [
+      "fixed_equipment",
+      "perfex-core"
+    ],
+    "writers": [
+      "perfex-core"
+    ]
   },
+  "evidence_changed": false,
+  "note": "Written by v1/customer-groups; Perfex's delete is closed at Nginx; the quick add on the customer profile stays on Perfex.",
+  "owner": "node",
+  "owner_confidence": "write-single",
+  "table": "tblcustomers_groups"
+},
   {
     "decided_by": null,
     "decided_on": null,
@@ -5345,8 +5345,8 @@
       ]
     },
     "evidence_changed": false,
-    "note": "",
-    "owner": "perfex-core",
+    "note": "Node writes lead sources through v1/lead-sources. Perfex's delete route is closed at Nginx; quick add remains on Perfex.",
+    "owner": "node",
     "owner_confidence": "write-single",
     "table": "tblleads_sources"
   },
@@ -7598,8 +7598,8 @@
       ]
     },
     "evidence_changed": false,
-    "note": "",
-    "owner": "perfex-core",
+    "note": "Node writes tblservices through v1/services. Perfex's delete route /admin/tickets/delete_service is refused at Nginx, while the quick-add route /admin/tickets/service remains available on Perfex as a co-writer.",
+    "owner": "node",
     "owner_confidence": "write-single",
     "table": "tblservices"
   },
@@ -8356,14 +8356,14 @@
       ]
     },
     "evidence_changed": false,
-    "note": "",
-    "owner": "perfex-core",
+    "note": "Ticket Priority claimed tbltickets_priorities for v1/ticket-priorities. Perfex's screen is closed at Nginx.",
+    "owner": "node",
     "owner_confidence": "write-single",
     "table": "tbltickets_priorities"
   },
   {
-    "decided_by": null,
-    "decided_on": null,
+    "decided_by": "migration lead",
+    "decided_on": "2026-10-27",
     "evidence": {
       "ddl": [],
       "forms": [
@@ -8378,8 +8378,8 @@
       ]
     },
     "evidence_changed": false,
-    "note": "",
-    "owner": "perfex-core",
+    "note": "Written by v1/ticket-statuses; Perfex's status add, edit and delete are closed at Nginx.",
+    "owner": "node",
     "owner_confidence": "write-single",
     "table": "tbltickets_status"
   },

@@ -74,10 +74,13 @@ export type RouteGate = PermissionCode | readonly PermissionCode[] | typeof ADMI
  * `v1/expense-categories` declares no code and asserts the flag in every service method.
  * `/setup/taxes*` (plan 04.1-11, D-06) is the same: `v1/taxes` asserts the flag in every handler's
  * service method. So is `/setup/cost-centers*` (plan 04.1-18, D-06 and D-26: Perfex's own screen
- * had no check at all; its menu item was administrator-only). So is `/setup/payment-modes*` (plan
+ * had no check at all; its menu item was administrator-only). So is `/setup/contract-types*`
+ * (administrator-only: Perfex's own screen was administrator-only). So is `/setup/payment-modes*` (plan
  * 04.1-23, D-06 and D-32: Perfex's own screen was administrator-only already), and so is
  * `/setup/currencies*` (plan 04.1-28, D-06 and D-38: `Currencies.php:11` is
  * administrator-only).
+ * `/setup/ticket-statuses*` is administrator-only as well (plan 06-ticket-statuses): the API
+ * asserts the administrator flag for every handler.
  *
  * The Email screens (plan 04.3-07): `/setup/email-templates*` is gated on the mapped Perfex view code
  * (D-09: the editor is read-only without `.edit`, which the api's save and test send declare);
@@ -111,12 +114,30 @@ export const ROUTE_GATES: Readonly<Record<string, RouteGate>> = Object.freeze({
   '/setup/lead-statuses': ADMIN_GATE,
   '/setup/lead-statuses/new': ADMIN_GATE,
   '/setup/lead-statuses/:id': ADMIN_GATE,
+  '/setup/contract-types': ADMIN_GATE,
+  '/setup/contract-types/new': ADMIN_GATE,
+  '/setup/contract-types/:id': ADMIN_GATE,
   '/setup/payment-modes': ADMIN_GATE,
   '/setup/payment-modes/new': ADMIN_GATE,
   '/setup/payment-modes/:id': ADMIN_GATE,
   '/setup/currencies': ADMIN_GATE,
   '/setup/currencies/new': ADMIN_GATE,
   '/setup/currencies/:id': ADMIN_GATE,
+  '/setup/services': ADMIN_GATE,
+  '/setup/services/new': ADMIN_GATE,
+  '/setup/services/:id': ADMIN_GATE,
+  '/setup/lead-sources': ADMIN_GATE,
+  '/setup/lead-sources/new': ADMIN_GATE,
+  '/setup/lead-sources/:id': ADMIN_GATE,
+  '/setup/ticket-statuses': ADMIN_GATE,
+  '/setup/ticket-statuses/new': ADMIN_GATE,
+  '/setup/ticket-statuses/:id': ADMIN_GATE,
+  '/setup/customer-groups': ADMIN_GATE,
+  '/setup/customer-groups/new': ADMIN_GATE,
+  '/setup/customer-groups/:id': ADMIN_GATE,
+  '/setup/ticket-priorities': ADMIN_GATE,
+  '/setup/ticket-priorities/new': ADMIN_GATE,
+  '/setup/ticket-priorities/:id': ADMIN_GATE,
 });
 
 /** Every declared route path, sorted — the set both verifying tests enumerate. */
