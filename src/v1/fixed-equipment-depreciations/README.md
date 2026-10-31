@@ -2,32 +2,89 @@
 
 ## Purpose
 
-Manages the Fixed Equipment depreciation settings: the list of depreciation terms that assets and asset models refer to. It replaces Perfex's Fixed Equipment → Settings → Depreciations tab (`admin/fixed_equipment/settings?tab=depreciations`), with the screen at `/setup/fixed-equipment-depreciations` in `erp-web` and the API at `api/v1/fixed-equipment-depreciations`.
+Manages the Fixed Equipment depreciation settings: the list of depreciation terms (a name and a number of months) that assets and asset models refer to. It replaces Perfex's Fixed Equipment → Settings → Depreciations tab (`admin/fixed_equipment/settings?tab=depreciations`), with the screen at `/setup/fixed-equipment-depreciations` in `erp-web` and the API at `api/v1/fixed-equipment-depreciations`.
 
 ## Owned tables
 
-- `tblfe_depreciations`: claimed in the ownership register. Node writes `name`, `term` and, on create, `creator_id`; `id` and `date_creator` are set by the database.
+- `tblfe_depreciations`: claimed in the ownership register and written through Prisma. Node writes `name`, `term` and, on create, `creator_id` (the signed-in member); `id` and `date_creator` are set by the database. An edit changes `name` and `term` only.
 
-## The Perfex screen
+## Facade surface
 
-- **List:** ID, Name and Term (shown as `<term> months`), newest ID first, with search, the pager and the Export menu. Each row has Edit and Delete.
-- **Form:** Depreciation Name and Number of Months, both required. One action saves both add and edit (`add_depreciations`); delete is `delete_depreciations/<id>`.
-- **Who can use it:** the `fixed_equipment_setting_depreciation` permission: view, view_own, create, edit, delete. With view_own only, a user sees only the rows they created (`creator_id`).
+- `findAll()`: every depreciation as `{ id, name, term, creatorId }`, by name ascending.
+- `findById(id)`: one depreciation or `null`, whoever created it.
+  **Who uses it:** No module in this copy yet. Other modules import only `src/v1/fixed-equipment-depreciations/index.ts`.
 
-## Rules kept
+## Endpoints
 
-- Access through `fixedEquipment.settingDepreciation.view`, `.viewOwn`, `.create`, `.edit` and `.delete`.
-- View own: only the rows whose `creator_id` is the user's staff id.
-- Create saves `creator_id` as the signed-in staff member; edit changes `name` and `term` only.
-- Name: required, trimmed, at most 200 characters (the column's length). Term: required, a number of months.
-- List order: the id descending by default.
+Under `api/v1/fixed-equipment-depreciations` (`FIXED_EQUIPMENT_DEPRECIATIONS_ROUTES` in `fixed-equipment-depreciations.routes.ts`). Every handler carries `JwtAuthGuard` and `PermissionGuard` and declares its codes from `PERMISSIONS.fixedEquipment.settingDepreciation` (mapped from Perfex's `fixed_equipment_setting_depreciation`): no bearer is 401 `ERP-AUTH-0004`, a missing code 403 `ERP-AUTH-0005`. The reads admit `view` (every row) or `viewOwn` (only the rows the member created). Every failure is an RFC 9457 problem with an `ERP-*` code.
 
-## Planned endpoints
+| Method   | Path     | Code            | Success                                                                     | Errors beyond the standard ones                |
+| -------- | -------- | --------------- | --------------------------------------------------------------------------- | ---------------------------------------------- |
+| `GET`    | ``       | view or viewOwn | 200 `{ data, meta }`                                                        | 400 `ERP-VALIDATION-0001`                      |
+| `GET`    | `export` | view or viewOwn | 200 the file (`csv`, `xlsx`, `pdf`) or `print` rows of `id`, `name`, `term` | 400 `ERP-VALIDATION-0001`                      |
+| `GET`    | `:id`    | view or viewOwn | 200 the depreciation                                                        | 404 `ERP-CORE-0004`, 400 `ERP-VALIDATION-0001` |
+| `POST`   | ``       | create          | 201 the depreciation                                                        | 400 `ERP-VALIDATION-0001`                      |
+| `PATCH`  | `:id`    | edit            | 200 the depreciation                                                        | 404 `ERP-CORE-0004`, 400 `ERP-VALIDATION-0001` |
+| `DELETE` | `:id`    | delete          | 204, no body                                                                | 404 `ERP-CORE-0004`, 400 `ERP-VALIDATION-0001` |
 
-Under `api/v1/fixed-equipment-depreciations`: `GET` (list), `GET export`, `GET :id`, `POST`, `PATCH :id`, `DELETE :id`.
+Under `viewOwn`, another member's row is the same 404 as a missing one.
 
-## Proposed differences from Perfex
+## Events published
 
-- **Delete while in use:** Perfex deletes a depreciation even when an asset or model refers to it. The plan is to keep that behaviour (no 409).
-- **Extra permissions:** Perfex also lets the assets, licenses, accessories and consumables permissions see, edit and delete depreciations. Node checks only `fixedEquipment.settingDepreciation.*`.
-- **No change made:** Perfex shows "no data changes" when an edit saves the same values; Node saves and answers the record.
+| Event                                          | When                      | Payload                                              |
+| ---------------------------------------------- | ------------------------- | ---------------------------------------------------- |
+| `fixed-equipment-depreciations.record.created` | after `POST` stores it    | `{ id, at }`, `FixedEquipmentDepreciationsCreatedV1` |
+| `fixed-equipment-depreciations.record.updated` | after `PATCH` saves it    | `{ id, at }`, `FixedEquipmentDepreciationsUpdatedV1` |
+| `fixed-equipment-depreciations.record.deleted` | after `DELETE` removes it | `{ id, at }`, `FixedEquipmentDepreciationsDeletedV1` |
+
+Declared in `events/published.ts` (`FIXED_EQUIPMENT_DEPRECIATIONS_PUBLISHED_EVENTS`), published through `DOMAIN_EVENT_PUBLISHER` from `service/fixed-equipment-depreciations.transport.ts`. A payload carries the id and the server time, never the name. After each publish the service writes one `LoggerService.log` line, `depreciation created|updated|deleted` with `{ id }`.
+
+## Events subscribed
+
+None. Listed in `events/subscribed.ts` (`FIXED_EQUIPMENT_DEPRECIATIONS_SUBSCRIBED_EVENTS`, empty).
+
+## Jobs
+
+None.
+
+## Resilience
+
+- **Breaker:** none: no outbound HTTP, no vendor call.
+- **Retry policy:** none on writes: an unkeyed `POST` retried could create two rows, and the events are in-process.
+- **Pool budget:** shares `POOL.db.api` (`connection_limit` in `DATABASE_URL`); one list page costs 1 connection; no extra DB or Redis client.
+
+## Layers
+
+| File                                      | Responsibility                                                                                                                                                                                           |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fixed-equipment-depreciations.module.ts` | Wires the controller, the service and its parts, and the repository.                                                                                                                                     |
+| `fixed-equipment-depreciations.routes.ts` | The route constants, the permission codes and the export columns.                                                                                                                                        |
+| `controller/`                             | The HTTP handlers: guards, permission codes, the row scope; no logic.                                                                                                                                    |
+| `dto/`                                    | Zod schemas and types for requests and responses, and the name and search limits.                                                                                                                        |
+| `service/`                                | The rules (`fixed-equipment-depreciations.service.ts`), request parsing (`.validator.ts`), the row-to-response mapping and the export cells (`.transformer.ts`), and event publishing (`.transport.ts`). |
+| `repository/`                             | The Prisma queries on `tblfe_depreciations`, with the `own` narrowing on `creator_id`.                                                                                                                   |
+| `model/`                                  | The model other modules see and the list request and page shapes.                                                                                                                                        |
+| `events/`                                 | Events published (`published.ts`) and subscribed (`subscribed.ts`, none).                                                                                                                                |
+| `facade/`                                 | The read surface for other modules.                                                                                                                                                                      |
+| `index.ts`                                | The module's public entry point and exports.                                                                                                                                                             |
+| `__tests__/`                              | Unit specs, the in-process e2e spec over the real guards, and the int spec against the local mirror.                                                                                                     |
+
+## Legacy parity
+
+| Perfex                                                                                                                 | Node                                                          | Notes                                                                                                             |
+| ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| List (`depreciations_table`): ID, Name, Term (`<term> months`), the id descending                                      | `GET /api/v1/fixed-equipment-depreciations`, and `GET export` | Same columns and order; server search on the name or the id; sort by id or name.                                  |
+| View own: a member with only `view_own` sees the rows they created (`creator_id`)                                      | `viewOwn` narrows every read to `creator_id = staffId`        | Same rule.                                                                                                        |
+| Add (`add_depreciations` with no id): name and number of months; `creator_id` = the member                             | `POST`                                                        | Both fields required; the name at most 200 characters (the column's length); the number of months greater than 0. |
+| Edit (`add_depreciations` with the id): the name and the number of months                                              | `PATCH /:id`                                                  | The creator stays. Perfex answers "no data changes" when nothing changed; Node saves and answers the record.      |
+| Delete (`delete_depreciations/<id>`): no check on assets or models that refer to it                                    | `DELETE /:id`                                                 | Same: no in-use check, so an asset or model may keep pointing at a deleted depreciation, as in Perfex.            |
+| Access: `fixed_equipment_setting_depreciation`, and also the assets, licenses, accessories and consumables permissions | `fixedEquipment.settingDepreciation.*` only                   | **Difference:** only this screen's own codes open it; the other Fixed Equipment permissions no longer do.         |
+
+## How to run its tests
+
+```bash
+corepack yarn test src/v1/fixed-equipment-depreciations
+corepack yarn test:int src/v1/fixed-equipment-depreciations
+```
+
+The int spec needs the local database running and skips without `DATABASE_URL`.

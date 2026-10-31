@@ -18,6 +18,7 @@ import { TaxesModule } from './taxes/taxes.module.js';
 import { ServicesModule } from './services/services.module.js';
 import { TicketStatusesModule } from './ticket-statuses/ticket-statuses.module.js';
 import { TicketPrioritiesModule } from './ticket-priorities/ticket-priorities.module.js';
+import { FixedEquipmentDepreciationsModule } from './fixed-equipment-depreciations/fixed-equipment-depreciations.module.js';
 
 /** Registers every v1 module. Route prefix `api/v1` is applied globally in main.ts. */
 @Module({
@@ -41,6 +42,7 @@ import { TicketPrioritiesModule } from './ticket-priorities/ticket-priorities.mo
     TicketStatusesModule,
     CustomerGroupsModule,
     TicketPrioritiesModule,
+    FixedEquipmentDepreciationsModule,
   ],
 })
 export class V1Module {}
