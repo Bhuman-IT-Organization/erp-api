@@ -157,7 +157,12 @@ export class TicketStatusesService {
     }
     if (hasReferences) throw referenced();
 
-    const defaultStatus = await this.transport.defaultTicketReplyStatus();
+    let defaultStatus: string | null;
+    try {
+      defaultStatus = await this.transport.defaultTicketReplyStatus();
+    } catch {
+      throw defaultReplyStatus();
+    }
     const parsedDefaultStatus = parseDefaultTicketReplyStatus(defaultStatus);
     if (parsedDefaultStatus !== null && parsedDefaultStatus > 0 && parsedDefaultStatus === id) {
       throw defaultReplyStatus();

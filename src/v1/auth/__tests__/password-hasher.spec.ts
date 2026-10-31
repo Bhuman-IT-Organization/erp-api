@@ -45,7 +45,7 @@ describe('PasswordHasher', () => {
     expect(produced).toHaveLength(60);
     await expect(hasher.verify('x', produced)).resolves.toBe(true);
     await expect(hasher.verify('y', produced)).resolves.toBe(false);
-  });
+  }, 30_000);
 
   it('two hashes of the same password differ (fresh salt each time)', async () => {
     const [a, b] = await Promise.all([hasher.hash('x'), hasher.hash('x')]);

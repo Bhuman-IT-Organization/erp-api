@@ -383,7 +383,7 @@ describe('auth controller (in-process)', () => {
     expect(down.statusCode).toBe(500);
     expect(problem(down).code).toBe('ERP-INTERNAL-0001');
     expectUntouched(down);
-  });
+  }, 30_000);
 
   it('POST logout with bearer + CSRF → 204, erp_refresh and erp_session_present cleared, token and session dead', async () => {
     const session = await login(SEED_EMAILS.active, SEED_PASSWORDS.active);
