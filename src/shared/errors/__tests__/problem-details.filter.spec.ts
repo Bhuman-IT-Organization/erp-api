@@ -67,7 +67,7 @@ describe('ProblemDetailsFilter', () => {
   });
 
   it('sets Retry-After from extras.retryAfterS', () => {
-    const { reply } = run(new AppError('ERP-AUTH-0006', undefined, { retryAfterS: 42 }));
+    const { reply } = run(new AppError('ERP-AUTH-0006', undefined, { retryAfter: 42 }));
     expect(reply.statusCode).toBe(429);
     expect(reply.headers['retry-after']).toBe('42');
   });

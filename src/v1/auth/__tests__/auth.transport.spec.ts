@@ -179,7 +179,7 @@ describe('AuthTransport', () => {
     const upstream = error as UpstreamUnavailableError;
     expect(upstream.code).toBe('ERP-UPSTREAM-0001');
     expect(upstream.upstream).toBe('legacy');
-    expect(upstream.extras?.retryAfterS).toBe(Math.ceil(TIMINGS.breaker.halfOpenAfterMs / 1_000));
+    expect(upstream.extras?.retryAfter).toBe(Math.ceil(TIMINGS.breaker.halfOpenAfterMs / 1_000));
     expect(calls).toHaveLength(0);
   });
 

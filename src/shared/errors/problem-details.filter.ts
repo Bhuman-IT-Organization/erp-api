@@ -104,7 +104,7 @@ export class ProblemDetailsFilter implements ExceptionFilter {
     const request = http.getRequest<FastifyRequest>();
 
     if (exception instanceof AppError) {
-      const retryAfterS = exception.extras?.retryAfterS;
+      const retryAfterS = exception.extras?.retryAfter;
       if (retryAfterS !== undefined) void reply.header('Retry-After', String(retryAfterS));
       this.send(reply, exception.status, problemBodyOf(exception));
       return;

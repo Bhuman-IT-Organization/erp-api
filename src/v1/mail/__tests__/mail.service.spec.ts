@@ -550,7 +550,7 @@ describe('MailService.sendTemplateTest (D-04, D-10)', () => {
     now += 1_500;
     const error = await rejection(service.sendTemplateTest(EDITOR, { id: '1' }, DRAFT));
     expect(error.code).toBe('ERP-MAIL-0007');
-    expect(error.extras?.retryAfterS).toBe(599);
+    expect(error.extras?.retryAfter).toBe(599);
     expect(repo.sent).toHaveLength(5);
   });
 
@@ -559,7 +559,7 @@ describe('MailService.sendTemplateTest (D-04, D-10)', () => {
     spent.countTest = () => Promise.resolve({ count: 6, retryAfterMs: 0 });
     const { service } = withNotice(spent);
     const error = await rejection(service.sendTemplateTest(EDITOR, { id: '1' }, DRAFT));
-    expect(error.extras?.retryAfterS).toBe(1);
+    expect(error.extras?.retryAfter).toBe(1);
   });
 
   it('a lost add marks the row failed and answers 503 ERP-UPSTREAM-0001', async () => {

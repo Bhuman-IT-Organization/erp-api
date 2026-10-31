@@ -510,8 +510,8 @@ export class MailService {
   ): Promise<AcceptedResponseDto> {
     const counted = await this.state.countTest(actor.staffId);
     if (counted.count > TIMINGS.mail.testMaxPerWindow) {
-      const retryAfterS = Math.max(1, Math.ceil(counted.retryAfterMs / MS_PER_SECOND));
-      throw new AppError('ERP-MAIL-0007', undefined, { retryAfterS });
+      const retryAfter = Math.max(1, Math.ceil(counted.retryAfterMs / MS_PER_SECOND));
+      throw new AppError('ERP-MAIL-0007', undefined, { retryAfter });
     }
     const { row } = await this.repository.insertSent(
       {

@@ -150,7 +150,7 @@ export class AuthService implements OnModuleInit {
     const lockout = await this.store.getLockout(email);
     if (lockout !== null && isLocked(lockout, now)) {
       await this.publishFailed(null, 'locked', at);
-      throw new AppError('ERP-AUTH-0006', undefined, { retryAfterS: retryAfterS(lockout, now) });
+      throw new AppError('ERP-AUTH-0006', undefined, { retryAfter: retryAfterS(lockout, now) });
     }
 
     const staff = await this.repository.findStaffByEmail(email);
@@ -334,7 +334,7 @@ export class AuthService implements OnModuleInit {
     await this.store.setLockout(email, next, TIMINGS.auth.lockoutWindowMs);
     await this.publishFailed(staffId, 'invalid_credentials', new Date(now));
     if (isLocked(next, now)) {
-      return new AppError('ERP-AUTH-0006', undefined, { retryAfterS: retryAfterS(next, now) });
+      return new AppError('ERP-AUTH-0006', undefined, { retryAfter: retryAfterS(next, now) });
     }
     return new AppError('ERP-AUTH-0001');
   }

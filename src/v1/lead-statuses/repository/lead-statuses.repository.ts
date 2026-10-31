@@ -64,6 +64,12 @@ type Key = readonly [KeyValue, number];
 function matchOf(search: string | null): Prisma.tblleads_statusWhereInput {
   if (search === null) return {};
 
+  if (/^\d+$/.test(search)) {
+    return {
+      OR: [{ name: { contains: search } }, { id: Number(search) }],
+    };
+  }
+
   return {
     name: { contains: search },
   };
@@ -240,7 +246,7 @@ export class LeadStatusesRepository {
     const row = await this.prisma.client.tblleads_status.create({
       data: {
         name: input.name,
-        color: input.color ?? '#28B8DA',
+        color: input.color?.trim() ? input.color.trim() : '#757575',
         statusorder: input.statusorder ?? null,
         isdefault: 0,
       },
@@ -259,11 +265,7 @@ export class LeadStatusesRepository {
         data: {
           ...(patch.name !== undefined ? { name: patch.name } : {}),
 
-          ...(patch.color !== undefined
-            ? {
-                color: patch.color?.trim() ? patch.color.trim() : '#757575',
-              }
-            : {}),
+          ...(patch.color !== undefined ? { color: patch.color } : {}),
 
           ...(patch.statusorder !== undefined ? { statusorder: patch.statusorder } : {}),
         },

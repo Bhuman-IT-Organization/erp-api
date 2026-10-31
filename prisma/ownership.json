@@ -5370,7 +5370,7 @@
       ]
     },
     "evidence_changed": false,
-    "note": "Written by v1/lead-statuses; Perfex's delete is closed at Nginx; the quick add on the leads screen stays on Perfex.",
+    "note": "Written by v1/lead-statuses; Perfex's delete is closed at Nginx; the quick add on the leads screen stays on Perfex; Kanban still writes status order through update_status_order and colour through change_status_color.",
     "owner": "node",
     "owner_confidence": "write-single",
     "table": "tblleads_status"

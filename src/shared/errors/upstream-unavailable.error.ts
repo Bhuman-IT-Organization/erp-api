@@ -12,6 +12,8 @@ export class UpstreamUnavailableError extends AppError {
     readonly upstream: string,
     retryAfterS: number,
   ) {
-    super('ERP-UPSTREAM-0001', `${upstream} is unavailable`, { retryAfterS });
+    super('ERP-UPSTREAM-0001', `${upstream} is unavailable`, {
+      retryAfter: retryAfterS,
+    });
   }
 }

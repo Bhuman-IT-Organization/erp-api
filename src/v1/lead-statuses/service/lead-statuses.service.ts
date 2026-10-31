@@ -193,10 +193,7 @@ export class LeadStatusesService {
       usage.emailIntegration > 0 ||
       usage.webToLead > 0
     ) {
-      throw new AppError(
-        'ERP-LEADSTATUSES-0001',
-        `Lead status is still referenced. Usage counts: leads=${String(usage.leads)}, lastLeadStatus=${String(usage.lastLeadStatus)}, emailIntegration=${String(usage.emailIntegration)}, webToLead=${String(usage.webToLead)}`,
-      );
+      throw new AppError('ERP-LEADSTATUSES-0001', undefined, { usage });
     }
 
     const deleted = await this.repository.remove(id);
