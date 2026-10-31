@@ -10,6 +10,7 @@ import { DepartmentsModule } from './departments/departments.module.js';
 import { ExampleItemModule } from './example-item/example-item.module.js';
 import { ExpenseCategoriesModule } from './expense-categories/expense-categories.module.js';
 import { IdentityModule } from './identity/identity.module.js';
+import { LeadStatusesModule } from './lead-statuses/lead-statuses.module.js';
 import { MailModule } from './mail/mail.module.js';
 import { PaymentModesModule } from './payment-modes/payment-modes.module.js';
 import { LeadSourcesModule } from './lead-sources/lead-sources.module.js';
@@ -27,6 +28,7 @@ import { TicketPrioritiesModule } from './ticket-priorities/ticket-priorities.mo
     AuthModule,
     BrandingModule,
     IdentityModule,
+    LeadStatusesModule,
     ExpenseCategoriesModule,
     MailModule,
     TaxesModule,

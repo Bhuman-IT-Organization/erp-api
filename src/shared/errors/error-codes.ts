@@ -65,6 +65,16 @@ export const ERROR_CODES = {
   'ERP-CONTRACTTYPES-0001': { status: 409, title: 'The contract type is still in use' },
   // v1/cost-centers (plan 04.1-18): 0001 refuses a delete while any referencing column still names the cost center (D-07, D-28).
   'ERP-COSTCENTERS-0001': { status: 409, title: 'The cost center is still in use' },
+  // v1/lead-statuses: deletion restrictions.
+  // 0001: referenced by leads or email integration.
+  // 0002: built-in Customer status.
+  // 0003: configured default lead status.
+  'ERP-LEADSTATUSES-0001': { status: 409, title: 'The lead status is still in use' },
+  'ERP-LEADSTATUSES-0002': { status: 409, title: 'The built-in lead status cannot be deleted' },
+  'ERP-LEADSTATUSES-0003': { status: 409, title: 'The default lead status cannot be deleted' },
+  'ERP-LEADSTATUSES-0004': {
+    status: 409,
+    title: 'Lead status usage could not be counted',
   // v1/services: 0001 refuses a delete while any ticket still uses the service.
   'ERP-SERVICES-0001': { status: 409, title: 'The service is still in use' },
   // v1/ticket-statuses (plan 06): 0001 is a referenced status, 0002 is a built-in status.

@@ -20,6 +20,9 @@ export const SETTINGS_ALLOW_LIST = Object.freeze([
   'default_timezone',
   // payment modes (04.1 D-37): the credit-expense mode the client's expense code reads
   'expense_credit_payment_mode',
+
+  // lead statuses: configured default status
+  'leads_default_status',
   // Ticket Statuses: configured default ticket-reply status
   'default_ticket_reply_status',
   // lead sources: the source new leads get

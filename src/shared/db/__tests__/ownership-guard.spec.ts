@@ -507,6 +507,7 @@ describe('the committed register, today', () => {
       'tblcustomers_groups',
       'tblexpenses_categories',
       'tblidentity_audit',
+      'tblleads_status',
       'tblleads_sources',
       'tblmail_sent_emails',
       'tblmail_template_versions',
