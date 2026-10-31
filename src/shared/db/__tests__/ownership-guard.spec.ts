@@ -495,11 +495,13 @@ describe('the committed register, today', () => {
     // Ticket Statuses claimed tbltickets_status for v1/ticket-statuses.
     // Customer Groups claimed tblcustomers_groups for v1/customer-groups; tblcustomer_groups stays Perfex's.
     // Update this expectation in the same PR that changes either register.
+    // Contract Types claimed tblcontracts_types for v1/contract-types.
     const nodeOwned = [...map.entries()]
       .filter(([, o]) => o === 'node')
       .map(([t]) => t)
       .sort();
     expect(nodeOwned).toEqual([
+      'tblcontracts_types',
       'tblcost_centers',
       'tblcurrencies',
       'tblcustomers_groups',

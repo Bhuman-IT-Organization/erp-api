@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from './auth/auth.module.js';
 import { BrandingModule } from './branding/branding.module.js';
+import { ContractTypesModule } from './contract-types/contract-types.module.js';
 import { CostCentersModule } from './cost-centers/cost-centers.module.js';
 import { CurrenciesModule } from './currencies/currencies.module.js';
 import { CustomFieldsModule } from './custom-fields/custom-fields.module.js';
@@ -30,6 +31,7 @@ import { TicketPrioritiesModule } from './ticket-priorities/ticket-priorities.mo
     MailModule,
     TaxesModule,
     CostCentersModule,
+    ContractTypesModule,
     PaymentModesModule,
     CurrenciesModule,
     DepartmentsModule,
