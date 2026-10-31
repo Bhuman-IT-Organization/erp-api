@@ -57,7 +57,10 @@ export const createFixedEquipmentDepreciationsBodySchema = z.strictObject({
       FIXED_EQUIPMENT_DEPRECIATIONS_NAME_MAX,
       `Name must be ${String(FIXED_EQUIPMENT_DEPRECIATIONS_NAME_MAX)} characters or less`,
     ),
-  term: z.number().positive('Number of months must be greater than 0'),
+  term: z
+    .number()
+    .int('Number of months must be a whole number')
+    .positive('Number of months must be greater than 0'),
 });
 
 export const updateFixedEquipmentDepreciationsBodySchema =

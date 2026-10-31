@@ -56,6 +56,7 @@ describe('createFixedEquipmentDepreciationsBodySchema', () => {
     expect(ok({ name: 'Straight line', term: 0 })).toBe(false);
     expect(ok({ name: 'Straight line', term: -6 })).toBe(false);
     expect(ok({ name: 'Straight line', term: 1 })).toBe(true);
+    expect(ok({ name: 'Straight line', term: 1.5 })).toBe(false);
   });
 
   it('refuses a key Perfex never posts, the creator included', () => {
