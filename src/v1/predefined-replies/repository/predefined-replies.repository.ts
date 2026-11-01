@@ -11,6 +11,8 @@ import type {
   UpdatePredefinedReply,
 } from '../model/predefined-replies.model.js';
 
+const MYSQL_INT_MAX = 2_147_483_647;
+
 const predefinedReplyRowSchema = z.object({
   id: z.number().int(),
   name: z.string(),
@@ -35,7 +37,9 @@ function matchOf(search: string | null): WhereValue {
 
   if (/^\d+$/.test(search)) {
     const id = Number(search);
-    if (Number.isSafeInteger(id) && id > 0) conditions.push({ id });
+    if (Number.isSafeInteger(id) && id > 0 && id <= MYSQL_INT_MAX) {
+      conditions.push({ id });
+    }
   }
 
   return { OR: conditions };

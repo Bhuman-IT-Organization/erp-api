@@ -41,8 +41,10 @@ export function fromStoredHtml(html: string): {
   text: string;
   hasOtherFormatting: boolean;
 } {
-  const hasOtherFormatting = /<\/?(?!p\b|br\b)[a-z][^>]*>/i.test(html);
-
+  const hasOtherFormatting =
+    /<\/?(?!p\b|br\b)[a-z][^>]*>/i.test(html) ||
+    /<p\b[^>]*\s+[^>]*>/i.test(html) ||
+    /<br\b[^>]*\s+[^>]*>/i.test(html);
   const text = html
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/p\s*>/gi, '\n\n')

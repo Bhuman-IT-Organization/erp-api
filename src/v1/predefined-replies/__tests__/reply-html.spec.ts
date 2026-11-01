@@ -37,6 +37,14 @@ describe('reply-html', () => {
     });
   });
 
+  it('flags paragraph tags with attributes as other formatting', () => {
+    expect(fromStoredHtml('<p style="text-align:center">Hello</p>').hasOtherFormatting).toBe(true);
+  });
+
+  it('flags line-break tags with attributes as other formatting', () => {
+    expect(fromStoredHtml('<p>Hello<br class="clear">there</p>').hasOtherFormatting).toBe(true);
+  });
+
   it('decodes entities once and preserves doubly escaped markup text', () => {
     const stored = toStoredHtml('&lt;b&gt;literal&lt;/b&gt;');
     expect(fromStoredHtml(stored)).toEqual({

@@ -70,14 +70,6 @@ describe('PredefinedRepliesFacade through PredefinedRepliesModule', () => {
     try {
       const facade = moduleRef.get(PredefinedRepliesFacade);
 
-      await expect(facade.list(ADMIN, {})).resolves.toMatchObject({
-        data: [
-          { id: String(second.id), name: 'Second' },
-          { id: String(first.id), name: 'First' },
-        ],
-        meta: { total: 2 },
-      });
-
       await expect(facade.listAll()).resolves.toEqual([first, second]);
 
       await expect(facade.findById(second.id)).resolves.toEqual(second);

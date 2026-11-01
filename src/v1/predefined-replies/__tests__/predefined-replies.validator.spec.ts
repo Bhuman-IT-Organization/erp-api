@@ -17,8 +17,8 @@ describe('PredefinedRepliesValidator', () => {
     expect(validator.parseParams({ id: '2147483647' }).id).toBe(2_147_483_647);
   });
 
-  it('rejects an all-digit search query above the signed MySQL INT maximum', () => {
-    expect(() => validator.parseListQuery({ q: '2147483648' })).toThrow(AppError);
+  it('accepts an all-digit search query above the signed MySQL INT maximum', () => {
+    expect(validator.parseListQuery({ q: '2147483648' }).search).toBe('2147483648');
   });
 
   it('trims whitespace from a valid name', () => {

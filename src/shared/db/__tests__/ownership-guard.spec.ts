@@ -488,7 +488,7 @@ describe('the committed register, today', () => {
     // `tbldepartments`, `tblcustomfields` and `tblcustomfieldsvalues` are Perfex's again: this copy
     // removed the Departments and Custom Fields write routes, so v1/departments and v1/custom-fields
     // only read them.
-    //Predefined Replies claimed tbltickets_predefined_replies for v1/predefined-replies.
+    // Predefined Replies claimed tbltickets_predefined_replies for v1/predefined-replies.
     // Update this expectation in the same PR that changes either register.
     const nodeOwned = [...map.entries()]
       .filter(([, o]) => o === 'node')

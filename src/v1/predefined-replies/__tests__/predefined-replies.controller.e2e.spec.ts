@@ -236,10 +236,13 @@ describe('PredefinedRepliesController (Fastify inject)', () => {
     expect(problem(res).code).toBe('ERP-VALIDATION-0001');
   });
 
-  it('rejects an all-digit search value above the signed MySQL INT maximum', async () => {
+  it('searches by name only for an all-digit value above the signed MySQL INT maximum', async () => {
     const res = await send('GET', `${LIST}?q=2147483648`, TEST_BEARERS.admin);
-    expect(res.statusCode).toBe(400);
-    expect(problem(res).code).toBe('ERP-VALIDATION-0001');
+
+    expect(res.statusCode).toBe(200);
+
+    const body = predefinedRepliesListResponseSchema.parse(JSON.parse(res.payload));
+    expect(body.data).toEqual([]);
   });
 
   it('rejects invalid identifiers', async () => {

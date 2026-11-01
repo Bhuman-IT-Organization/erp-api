@@ -38,7 +38,7 @@ All management routes require an authenticated user and administrator authorizat
 ### List behaviour
 
 - Search matches the reply name and, when the query contains only digits, an exact reply ID. It does not search message content.
-- The default sort is name ascending.
+- The default sort is name descending.
 - List rows expose only `id` and `name`.
 - List metadata includes the configured export and print row limits.
 
