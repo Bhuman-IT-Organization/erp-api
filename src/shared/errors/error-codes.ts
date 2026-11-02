@@ -66,7 +66,7 @@ export const ERROR_CODES = {
   // v1/cost-centers (plan 04.1-18): 0001 refuses a delete while any referencing column still names the cost center (D-07, D-28).
   'ERP-COSTCENTERS-0001': { status: 409, title: 'The cost center is still in use' },
   // v1/lead-statuses: deletion restrictions.
-  // 0001: referenced by leads or email integration.
+  // 0001: referenced by leads, last lead status, email integration or Web-to-Lead forms.
   // 0002: built-in Customer status.
   // 0003: configured default lead status.
   'ERP-LEADSTATUSES-0001': { status: 409, title: 'The lead status is still in use' },

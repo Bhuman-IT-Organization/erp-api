@@ -26,6 +26,8 @@ export interface UpdateLeadStatusData {
   readonly color?: string | null;
   readonly statusorder?: number | null;
 }
+/** The largest value of MySQL's signed INT (the id column). */
+const MAX_INT_ID = 2_147_483_647;
 
 const COLUMNS = {
   id: true,
@@ -64,15 +66,13 @@ type Key = readonly [KeyValue, number];
 function matchOf(search: string | null): Prisma.tblleads_statusWhereInput {
   if (search === null) return {};
 
-  if (/^\d+$/.test(search)) {
-    return {
-      OR: [{ name: { contains: search } }, { id: Number(search) }],
-    };
+  const or: Prisma.tblleads_statusWhereInput[] = [{ name: { contains: search } }];
+
+  if (/^\d+$/.test(search) && Number(search) <= MAX_INT_ID) {
+    or.push({ id: Number(search) });
   }
 
-  return {
-    name: { contains: search },
-  };
+  return { OR: or };
 }
 
 function keyOf(row: LeadStatusRow, sortField: LeadStatusesSortField): Key {
