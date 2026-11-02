@@ -196,6 +196,21 @@ describe.skipIf(!process.env.DATABASE_URL)('LeadStatusesRepository against local
     expect(selected).toContainEqual(created);
   });
 
+  it('handles numeric searches above the MySQL INT maximum', async () => {
+    await expect(
+      repository.list({
+        search: '2147483648',
+        sortField: 'id',
+        order: 'asc',
+        cursor: null,
+        limit: 10,
+      }),
+    ).resolves.toMatchObject({
+      items: [],
+      total: 0,
+    });
+  });
+
   it('returns zero usage for a new status', async () => {
     const created = await repository.create({
       name: `${MARKER}-usage`,

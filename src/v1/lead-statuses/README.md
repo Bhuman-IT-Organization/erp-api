@@ -56,7 +56,7 @@ All endpoints are administrator-only (`ERP-AUTH-0005` for anyone else).
 
 The list defaults to `name` ascending, with `id` as the tie-breaker. It also accepts `sort=name`,
 `sort=-name`, `sort=id` and `sort=-id`; `q` (at most 100 characters) searches the name, and an
-all-digit `q` also matches the ID.
+all-digit `q` up to 2147483647 also matches the ID.
 
 Create and update take a strict `{ name, color?, statusorder? }` body:
 
