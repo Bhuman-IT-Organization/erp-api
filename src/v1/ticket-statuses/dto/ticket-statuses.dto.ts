@@ -20,6 +20,7 @@ export const TICKET_STATUS_NAME_MAX = 50;
 export const TICKET_STATUSES_SEARCH_MAX = 100;
 
 const TICKET_STATUS_COLOR_MAX = 7;
+const TICKET_STATUS_ORDER_MIN = -2_147_483_648;
 
 const statusColorSchema = z
   .union([z.literal(''), z.string().max(TICKET_STATUS_COLOR_MAX)])
@@ -34,7 +35,7 @@ const statusOrderSchema = z.preprocess((value) => {
     return Number.isInteger(numeric) ? numeric : value;
   }
   return value;
-}, z.number().int().nullable());
+}, z.number().int().min(TICKET_STATUS_ORDER_MIN).max(TICKET_STATUS_ID_MAX).nullable());
 
 /** Standard BE-19 list query parameters. */
 export const ticketStatusesListQuerySchema = z.strictObject({

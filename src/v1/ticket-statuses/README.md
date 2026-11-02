@@ -57,7 +57,7 @@ None.
 ## Resilience
 
 - **Breaker:** None; the module makes no outbound HTTP calls.
-- **Retry policy:** None; database and settings failures are surfaced, and a failed ticket-count check refuses deletion.
+- **Retry policy:** None; database failures are surfaced, and failed ticket-count or reply-status-setting reads refuse deletion.
 - **Pool budget:** Uses the shared Prisma connection pool.
 
 ## Layers
@@ -71,6 +71,16 @@ None.
 | `model/`      | Stored status, write types, and list request/page types.                                  |
 | `repository/` | Prisma reads, writes, counts, and keyset pagination.                                      |
 | `service/`    | Administrator checks, validation orchestration, delete rules, transformation, and export. |
+
+## Legacy parity
+
+| Perfex flow                                                              | API flow                                                                                                                                  |
+| ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Open Ticket Statuses from Setup → view the status list and ticket counts | `GET /api/v1/ticket-statuses` returns a searchable, paged status list with `ticket_count`.                                                |
+| Add a status with its name, color, and order                             | `POST /api/v1/ticket-statuses` creates the status.                                                                                        |
+| Edit a status name, color, or order                                      | `PATCH /api/v1/ticket-statuses/:id` updates the editable fields.                                                                          |
+| Delete a status                                                          | `DELETE /api/v1/ticket-statuses/:id` deletes an eligible status; built-in statuses and ticket-referenced statuses are refused.            |
+| Delete the configured default ticket reply status                        | Refused with `ERP-TICKETSTATUSES-0003` so the setting cannot point to a deleted status. A failed settings read receives the same refusal. |
 
 ## How to run its tests
 
