@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AuthenticatedUser } from '../../../shared/http/auth/access-token-verifier.js';
+import {
+  FixedEquipmentDepreciationsCreatedV1,
+  FixedEquipmentDepreciationsDeletedV1,
+  FixedEquipmentDepreciationsUpdatedV1,
+} from '../events/published.js';
 import { FixedEquipmentDepreciationsService } from '../service/fixed-equipment-depreciations.service.js';
 import { FixedEquipmentDepreciationsTransformer } from '../service/fixed-equipment-depreciations.transformer.js';
 import { FixedEquipmentDepreciationsValidator } from '../service/fixed-equipment-depreciations.validator.js';
@@ -11,14 +16,23 @@ const repository = {
   create: vi.fn(),
   update: vi.fn(),
   remove: vi.fn(),
+  usage: vi.fn(),
   listAll: vi.fn(),
 };
 const transport = { publish: vi.fn() };
 const logger = { log: vi.fn() };
 
 const member = { isAdmin: false, staffId: 3 } as AuthenticatedUser;
+const NOW = '2026-10-31T10:00:00.000Z';
 
 const EMPTY_PAGE = { items: [], nextCursor: null, prevCursor: null, total: 0, rangeStart: 0 };
+
+/** The one event published, its class and its payload. */
+function published(): { readonly event: unknown; readonly payload: unknown } {
+  expect(transport.publish).toHaveBeenCalledTimes(1);
+  const event: unknown = transport.publish.mock.calls[0]?.[0];
+  return { event, payload: (event as { payload: unknown }).payload };
+}
 
 let service: FixedEquipmentDepreciationsService;
 
@@ -32,7 +46,7 @@ beforeEach(() => {
     transport as never,
     logger as never,
   );
-  service.now = () => new Date('2026-10-31T10:00:00.000Z');
+  service.now = () => new Date(NOW);
 });
 
 describe('list', () => {
@@ -135,14 +149,16 @@ describe('get', () => {
 });
 
 describe('create', () => {
-  it('trims the name, saves the term and the actor as creator, publishes and logs', async () => {
+  it('trims the name, saves the term and the actor as creator, publishes the created event and logs', async () => {
     repository.create.mockResolvedValue({ id: 5, name: 'Declining', term: 24, creatorId: 3 });
 
     const result = await service.create(member, { name: '  Declining  ', term: 24 });
 
     expect(repository.create).toHaveBeenCalledWith({ name: 'Declining', term: 24, creatorId: 3 });
     expect(result).toEqual({ id: '5', name: 'Declining', term: 24 });
-    expect(transport.publish).toHaveBeenCalledTimes(1);
+    const { event, payload } = published();
+    expect(event).toBeInstanceOf(FixedEquipmentDepreciationsCreatedV1);
+    expect(payload).toEqual({ id: 5, at: NOW });
     expect(logger.log).toHaveBeenCalledWith('depreciation created', { id: 5 });
   });
 
@@ -153,6 +169,7 @@ describe('create', () => {
     ['no name', { term: 12 }],
     ['no term', { name: 'Declining' }],
     ['a zero term', { name: 'Declining', term: 0 }],
+    ['a decimal term', { name: 'Declining', term: 1.5 }],
     ['a text term', { name: 'Declining', term: '12' }],
     ['a creator in the body', { name: 'Declining', term: 12, creator_id: 9 }],
   ])('refuses a body with %s', async (_label, body) => {
@@ -170,14 +187,16 @@ describe('create', () => {
 });
 
 describe('update', () => {
-  it('changes the name and the term, publishes and logs', async () => {
+  it('changes the name and the term, publishes the updated event and logs', async () => {
     repository.update.mockResolvedValue({ id: 2, name: 'Five years', term: 60, creatorId: 1 });
 
     const result = await service.update({ id: '2' }, { name: 'Five years', term: 60 });
 
     expect(repository.update).toHaveBeenCalledWith(2, { name: 'Five years', term: 60 });
     expect(result).toEqual({ id: '2', name: 'Five years', term: 60 });
-    expect(transport.publish).toHaveBeenCalledTimes(1);
+    const { event, payload } = published();
+    expect(event).toBeInstanceOf(FixedEquipmentDepreciationsUpdatedV1);
+    expect(payload).toEqual({ id: 2, at: NOW });
     expect(logger.log).toHaveBeenCalledWith('depreciation updated', { id: 2 });
   });
 
@@ -201,17 +220,60 @@ describe('update', () => {
 });
 
 describe('remove', () => {
-  it('deletes, then publishes and logs (no in-use check, as in Perfex)', async () => {
+  beforeEach(() => {
+    repository.findById.mockResolvedValue({ id: 5, name: 'Declining', term: 24, creatorId: 3 });
+    repository.usage.mockResolvedValue({ models: 0, assets: 0 });
     repository.remove.mockResolvedValue(true);
+  });
+
+  it('deletes when nothing uses it, then publishes the deleted event and logs', async () => {
     await service.remove({ id: 5 });
+    expect(repository.findById).toHaveBeenCalledWith(5, 'all', 0);
+    expect(repository.usage).toHaveBeenCalledWith(5);
     expect(repository.remove).toHaveBeenCalledWith(5);
-    expect(transport.publish).toHaveBeenCalledTimes(1);
+    const { event, payload } = published();
+    expect(event).toBeInstanceOf(FixedEquipmentDepreciationsDeletedV1);
+    expect(payload).toEqual({ id: 5, at: NOW });
     expect(logger.log).toHaveBeenCalledWith('depreciation deleted', { id: 5 });
   });
 
-  it('answers ERP-CORE-0004 when the row is not there, and publishes nothing', async () => {
-    repository.remove.mockResolvedValue(false);
+  it.each([
+    ['an asset model', { models: 1, assets: 0 }],
+    ['an asset', { models: 0, assets: 2 }],
+    ['both', { models: 3, assets: 4 }],
+  ])(
+    'refuses with 409 ERP-FEDEPRECIATIONS-0001 while %s uses it, naming both counts; nothing is deleted or published',
+    async (_label, usage) => {
+      repository.usage.mockResolvedValue(usage);
+      await expect(service.remove({ id: 5 })).rejects.toMatchObject({
+        code: 'ERP-FEDEPRECIATIONS-0001',
+        message: `Depreciation is still in use. Usage counts: models=${String(usage.models)}, assets=${String(usage.assets)}`,
+      });
+      expect(repository.remove).not.toHaveBeenCalled();
+      expect(transport.publish).not.toHaveBeenCalled();
+    },
+  );
+
+  it('refuses with 409 ERP-FEDEPRECIATIONS-0002 when its use could not be counted, never a 500', async () => {
+    repository.usage.mockRejectedValue(new Error('the count failed'));
+    await expect(service.remove({ id: 5 })).rejects.toMatchObject({
+      code: 'ERP-FEDEPRECIATIONS-0002',
+      message: 'its use could not be counted',
+    });
+    expect(repository.remove).not.toHaveBeenCalled();
+    expect(transport.publish).not.toHaveBeenCalled();
+  });
+
+  it('answers ERP-CORE-0004 for a missing id, which is never counted', async () => {
+    repository.findById.mockResolvedValue(null);
     await expect(service.remove({ id: 9 })).rejects.toMatchObject({ code: 'ERP-CORE-0004' });
+    expect(repository.usage).not.toHaveBeenCalled();
+    expect(repository.remove).not.toHaveBeenCalled();
+  });
+
+  it('answers ERP-CORE-0004 when the row vanished between the count and the delete, and publishes nothing', async () => {
+    repository.remove.mockResolvedValue(false);
+    await expect(service.remove({ id: 5 })).rejects.toMatchObject({ code: 'ERP-CORE-0004' });
     expect(transport.publish).not.toHaveBeenCalled();
   });
 

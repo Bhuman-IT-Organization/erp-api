@@ -117,6 +117,8 @@ describe('FixedEquipmentDepreciationsController (Fastify inject, no network)', (
   });
 
   beforeEach(() => {
+    ctx.repo.usageOf.clear();
+    ctx.repo.usageFails = false;
     ctx.events.drain();
     ctx.logger.lines.length = 0;
     vi.restoreAllMocks();
@@ -255,6 +257,16 @@ describe('FixedEquipmentDepreciationsController (Fastify inject, no network)', (
       const body = JSON.parse(res.payload) as { rows: string[][] };
       for (const [id] of body.rows) expect(await creatorOf(id ?? '')).toBe(TEST_STAFF.owner);
     });
+
+    it('under view own, the export holds the member’s own rows only (the list gets the own scope)', async () => {
+      const mine = await created('Mine to export', TEST_BEARERS.owner);
+      const res = await send('GET', `${EXPORT}?format=print`, TEST_BEARERS.owner);
+      expect(res.statusCode).toBe(HTTP.ok);
+      const ids = (JSON.parse(res.payload) as { rows: string[][] }).rows.map((row) => row[0]);
+      expect(ids).toContain(mine);
+      expect(ids).not.toContain('1');
+      expect(ids).not.toContain('2');
+    });
   });
 
   describe('GET list and GET :id', () => {
@@ -293,6 +305,57 @@ describe('FixedEquipmentDepreciationsController (Fastify inject, no network)', (
       expect(missing.statusCode).toBe(HTTP.notFound);
       expect(problem(missing).code).toBe('ERP-CORE-0004');
     });
+
+    it('an id above 4294967295 is 400 ERP-VALIDATION-0001; 4294967295 itself is a plain 404', async () => {
+      const tooBig = await send('GET', record(4_294_967_296), TEST_BEARERS.admin);
+      expect(tooBig.statusCode).toBe(400);
+      expect(problem(tooBig).code).toBe('ERP-VALIDATION-0001');
+      const largest = await send('GET', record(4_294_967_295), TEST_BEARERS.admin);
+      expect(largest.statusCode).toBe(HTTP.notFound);
+    });
+  });
+
+  describe('paging with a cursor (the default sort, the id descending)', () => {
+    interface Page {
+      readonly data: readonly { readonly id: string }[];
+      readonly meta: { readonly nextCursor: string | null; readonly prevCursor: string | null };
+    }
+    const page = async (bearer: string, cursor?: string | null): Promise<Page> => {
+      const query =
+        cursor === undefined || cursor === null
+          ? '?limit=2'
+          : `?limit=2&cursor=${encodeURIComponent(cursor)}`;
+      const res = await send('GET', `${LIST}${query}`, bearer);
+      expect(res.statusCode).toBe(HTTP.ok);
+      return JSON.parse(res.payload) as Page;
+    };
+    const idsOf = (one: Page): string[] => one.data.map((row) => row.id);
+
+    it.each([
+      ['view', TEST_BEARERS.admin],
+      ['view own', TEST_BEARERS.owner],
+    ])(
+      'as %s, ?limit=2 walks forward with nextCursor and back with prevCursor',
+      async (_label, bearer) => {
+        for (const name of ['Walk one', 'Walk two', 'Walk three'])
+          await created(name, TEST_BEARERS.owner);
+
+        const first = await page(bearer);
+        expect(first.data).toHaveLength(2);
+        expect(first.meta.prevCursor).toBeNull();
+        expect(first.meta.nextCursor).not.toBeNull();
+        const firstIds = idsOf(first).map(Number);
+        expect(firstIds[0]).toBeGreaterThan(firstIds[1] ?? 0);
+
+        const second = await page(bearer, first.meta.nextCursor);
+        expect(second.data.length).toBeGreaterThan(0);
+        expect(idsOf(second).some((id) => idsOf(first).includes(id))).toBe(false);
+        expect(Math.max(...idsOf(second).map(Number))).toBeLessThan(Math.min(...firstIds));
+
+        const back = await page(bearer, second.meta.prevCursor);
+        expect(idsOf(back)).toEqual(idsOf(first));
+      },
+    );
   });
 
   describe('POST and PATCH', () => {
@@ -376,6 +439,33 @@ describe('FixedEquipmentDepreciationsController (Fastify inject, no network)', (
       expect(problem(res).code).toBe('ERP-CORE-0004');
       expect(ctx.events.count).toBe(0);
     });
+
+    it('while an asset model or an asset uses it is 409 ERP-FEDEPRECIATIONS-0001, the detail naming both counts: the row stays, no event, no log line', async () => {
+      const id = await created('In use');
+      ctx.repo.usageOf.set(Number(id), { models: 1, assets: 2 });
+      const total = await ctx.repo.count(ALL, 'all', 0);
+      const res = await send('DELETE', record(id), TEST_BEARERS.admin);
+      expect(res.statusCode).toBe(409);
+      const body = problem(res);
+      expect(body.code).toBe('ERP-FEDEPRECIATIONS-0001');
+      expect(body.detail).toBe('Depreciation is still in use. Usage counts: models=1, assets=2');
+      expect((await send('GET', record(id), TEST_BEARERS.admin)).statusCode).toBe(HTTP.ok);
+      expect(await ctx.repo.count(ALL, 'all', 0)).toBe(total);
+      expect(ctx.events.count).toBe(0);
+      expect(ctx.logger.lines).toEqual([]);
+    });
+
+    it('when its use could not be counted is 409 ERP-FEDEPRECIATIONS-0002, never a 500; the row stays', async () => {
+      const id = await created('Uncountable');
+      ctx.repo.usageFails = true;
+      const res = await send('DELETE', record(id), TEST_BEARERS.admin);
+      expect(res.statusCode).toBe(409);
+      const body = problem(res);
+      expect(body.code).toBe('ERP-FEDEPRECIATIONS-0002');
+      expect(body.detail).toBe('its use could not be counted');
+      expect((await send('GET', record(id), TEST_BEARERS.admin)).statusCode).toBe(HTTP.ok);
+      expect(ctx.events.count).toBe(0);
+    });
   });
 
   describe('GET export', () => {
@@ -417,6 +507,47 @@ describe('FixedEquipmentDepreciationsController (Fastify inject, no network)', (
       const body = JSON.parse(res.payload) as { headers: string[]; rows: string[][] };
       expect(body.headers).toEqual(['id', 'name', 'term']);
       expect(body.rows).toEqual([['4', 'Legacy', '']]);
+    });
+
+    it('format=print with blank= per column writes "-" in the Term cell of a row with no term; without blank= it is empty', async () => {
+      const legacy = await ctx.repo.create({
+        name: 'Blankterm legacy',
+        term: null as unknown as number,
+        creatorId: 1,
+      });
+
+      const withBlank = await send(
+        'GET',
+        `${EXPORT}?format=print&q=Blankterm&blank=&blank=&blank=-`,
+        TEST_BEARERS.admin,
+      );
+      expect(withBlank.statusCode).toBe(HTTP.ok);
+
+      const body = JSON.parse(withBlank.payload) as { headers: string[]; rows: string[][] };
+      expect(body.headers).toEqual(['id', 'name', 'term']);
+      expect(body.rows).toEqual([[String(legacy.id), 'Blankterm legacy', '-']]);
+
+      const without = await send('GET', `${EXPORT}?format=print&q=Blankterm`, TEST_BEARERS.admin);
+      const plain = JSON.parse(without.payload) as { rows: string[][] };
+      expect(plain.rows).toEqual([[String(legacy.id), 'Blankterm legacy', '']]);
+    });
+
+    it('?column=name exports that one column', async () => {
+      const res = await send('GET', `${EXPORT}?format=print&column=name`, TEST_BEARERS.admin);
+      expect(res.statusCode).toBe(HTTP.ok);
+      const body = JSON.parse(res.payload) as { headers: string[]; rows: string[][] };
+      expect(body.headers).toEqual(['name']);
+      expect(body.rows.every((row) => row.length === 1)).toBe(true);
+    });
+
+    it.each([
+      ['an unknown parameter', '?key=1'],
+      ['a page size', '?limit=10'],
+      ['a cursor', '?cursor=abc'],
+    ])('%s on the export is 400 ERP-VALIDATION-0001', async (_label, query) => {
+      const res = await send('GET', `${EXPORT}${query}`, TEST_BEARERS.admin);
+      expect(res.statusCode).toBe(400);
+      expect(problem(res).code).toBe('ERP-VALIDATION-0001');
     });
   });
 

@@ -21,8 +21,8 @@ import type {
 export interface FixedEquipmentDepreciationExportRow {
   readonly id: string;
   readonly name: string;
-  /** The number of months as text; empty for a row stored without one. */
-  readonly term: string;
+  /** `null` for an old Perfex row with no term: the export writes the sent blank label, or nothing. */
+  readonly term: number | null;
 }
 
 export const FIXED_EQUIPMENT_DEPRECIATIONS_EXPORT_CELLS = {
@@ -46,7 +46,7 @@ export function toResponse(
 }
 
 export function toExportRow(row: FixedEquipmentDepreciation): FixedEquipmentDepreciationExportRow {
-  return { id: String(row.id), name: row.name, term: row.term === null ? '' : String(row.term) };
+  return { id: String(row.id), name: row.name, term: row.term };
 }
 
 @Injectable()

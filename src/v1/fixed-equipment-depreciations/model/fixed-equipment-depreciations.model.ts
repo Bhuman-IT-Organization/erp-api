@@ -1,4 +1,4 @@
-import type { DecodedCursor } from '../../../shared/http/keyset.js';
+import type { DecodedCursor, ListPageMeta } from '../../../shared/http/keyset.js';
 
 export const FIXED_EQUIPMENT_DEPRECIATIONS_FACADE_MAX_ROWS = 1000;
 
@@ -34,10 +34,19 @@ export interface FixedEquipmentDepreciationsListRequest {
   readonly limit: number;
 }
 
-export interface FixedEquipmentDepreciationsPage {
-  readonly items: FixedEquipmentDepreciation[];
-  readonly nextCursor: string | null;
-  readonly prevCursor: string | null;
-  readonly total: number;
-  readonly rangeStart: number;
+/** One keyset page and its pager meta (`shared/http/keyset.ts`). */
+export interface FixedEquipmentDepreciationsPage extends ListPageMeta {
+  readonly items: readonly FixedEquipmentDepreciation[];
+}
+
+/** Where a depreciation is in use: the asset models and the assets that carry its id. */
+export interface FixedEquipmentDepreciationUsage {
+  readonly models: number;
+  readonly assets: number;
+}
+
+/** What the facade says about itself: the module and its contract version. */
+export interface FixedEquipmentDepreciationsDescription {
+  readonly module: 'fixed-equipment-depreciations';
+  readonly version: 1;
 }

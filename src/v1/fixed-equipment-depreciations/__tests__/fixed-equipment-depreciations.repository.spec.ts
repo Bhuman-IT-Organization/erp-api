@@ -13,7 +13,8 @@ const depreciations = {
   update: vi.fn(),
   deleteMany: vi.fn(),
 };
-const prisma = { client: { tblfe_depreciations: depreciations } };
+const queryRaw = vi.fn();
+const prisma = { client: { tblfe_depreciations: depreciations, $queryRaw: queryRaw } };
 
 const SELECT = { id: true, name: true, term: true, creator_id: true };
 
@@ -191,6 +192,30 @@ describe('FixedEquipmentDepreciationsRepository', () => {
     expect(await repository.remove(3)).toBe(false);
   });
 
+  it('usage checks both columns exist, then counts each: models and assets', async () => {
+    queryRaw
+      .mockResolvedValueOnce([{ n: 1n }]) // tblfe_models.depreciation exists
+      .mockResolvedValueOnce([{ n: 1n }]) // tblfe_assets.depreciation exists
+      .mockResolvedValueOnce([{ n: 2n }]) // two asset models use it
+      .mockResolvedValueOnce([{ n: 0n }]); // no asset does
+    expect(await repository.usage(5)).toEqual({ models: 2, assets: 0 });
+    expect(queryRaw).toHaveBeenCalledTimes(4);
+  });
+
+  it('usage counts a column the installed schema lacks as 0, and never queries it', async () => {
+    queryRaw
+      .mockResolvedValueOnce([{ n: 0n }]) // no tblfe_models.depreciation
+      .mockResolvedValueOnce([{ n: 1n }]) // tblfe_assets.depreciation exists
+      .mockResolvedValueOnce([{ n: 3n }]); // three assets use it
+    expect(await repository.usage(5)).toEqual({ models: 0, assets: 3 });
+    expect(queryRaw).toHaveBeenCalledTimes(3);
+  });
+
+  it('usage lets a failed count through (the service turns it into ERP-FEDEPRECIATIONS-0002)', async () => {
+    queryRaw.mockRejectedValueOnce(new Error('db down'));
+    await expect(repository.usage(5)).rejects.toThrow('db down');
+  });
+
   it('lists all depreciations by name for the facade', async () => {
     depreciations.findMany.mockResolvedValue([
       { id: 1, name: 'Depreciation 1', term: 12, creator_id: 1 },
@@ -203,6 +228,31 @@ describe('FixedEquipmentDepreciationsRepository', () => {
       take: FIXED_EQUIPMENT_DEPRECIATIONS_FACADE_MAX_ROWS + 1,
       select: SELECT,
     });
+  });
+
+  it('an all-digit q up to 4294967295 also matches the id; above it, the name only (no id can be that large)', async () => {
+    depreciations.findMany.mockResolvedValue([]);
+    depreciations.count.mockResolvedValue(0);
+    const listWith = (search: string) =>
+      repository.list(
+        { search, sortField: 'id', order: 'desc', cursor: null, limit: 25 },
+        'all',
+        0,
+      );
+    /** The `where` of the last `findMany` call, as JSON. */
+    const lastWhere = (): string => {
+      const call = depreciations.findMany.mock.calls.at(-1) as
+        readonly [{ readonly where?: unknown }] | undefined;
+      return JSON.stringify(call?.[0].where);
+    };
+
+    await listWith('4294967295');
+    expect(lastWhere()).toContain('"id":4294967295');
+
+    await listWith('4294967296');
+    const where = lastWhere();
+    expect(where).toContain('"name"');
+    expect(where).not.toContain('"id":4294967296');
   });
 
   it('refuses the full list when there are more rows than the facade limit', async () => {

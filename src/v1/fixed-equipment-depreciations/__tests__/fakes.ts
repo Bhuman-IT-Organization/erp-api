@@ -9,6 +9,7 @@
 import { AppError } from '../../../shared/errors/app-error.js';
 import type { ReadScope } from '../../../shared/http/decorators/scope.decorator.js';
 import { compareKeys, encodeCursor, type KeyValue } from '../../../shared/http/keyset.js';
+import { MAX_UNSIGNED_INT_ID } from '../dto/fixed-equipment-depreciations.dto.js';
 import {
   FIXED_EQUIPMENT_DEPRECIATIONS_FACADE_MAX_ROWS,
   type FixedEquipmentDepreciation,
@@ -17,6 +18,7 @@ import {
   type FixedEquipmentDepreciationsPage,
   type FixedEquipmentDepreciationsSortField,
   type NewFixedEquipmentDepreciation,
+  type FixedEquipmentDepreciationUsage,
 } from '../model/fixed-equipment-depreciations.model.js';
 import type { FixedEquipmentDepreciationsRepository } from '../repository/fixed-equipment-depreciations.repository.js';
 
@@ -32,10 +34,13 @@ export const SEED_FIXED_EQUIPMENT_DEPRECIATIONS: readonly FixedEquipmentDeprecia
   { id: 4, name: 'Legacy', term: null, creatorId: null },
 ];
 
+/** Nothing refers to the depreciation. */
+export const ZERO_USAGE: FixedEquipmentDepreciationUsage = { models: 0, assets: 0 };
+
 /** The repository's public surface, which the fake answers method for method. */
 export type FixedEquipmentDepreciationsRepositoryPort = Pick<
   FixedEquipmentDepreciationsRepository,
-  'list' | 'count' | 'findById' | 'create' | 'update' | 'remove' | 'listAll'
+  'list' | 'count' | 'findById' | 'create' | 'update' | 'remove' | 'usage' | 'listAll'
 >;
 
 type Key = readonly [KeyValue, number];
@@ -50,7 +55,10 @@ function keyOf(
 export class InMemoryFixedEquipmentDepreciationsRepository implements FixedEquipmentDepreciationsRepositoryPort {
   private readonly rows = new Map<number, FixedEquipmentDepreciation>();
   private lastId = 0;
-
+  /** What `usage` answers for an id; any id not here answers `ZERO_USAGE`. */
+  readonly usageOf = new Map<number, FixedEquipmentDepreciationUsage>();
+  /** When true, `usage` rejects, as a failed count would. */
+  usageFails = false;
   /** Puts rows in exactly as given (ids included), as Perfex's own rows already exist. */
   seed(rows: readonly FixedEquipmentDepreciation[]): void {
     for (const row of rows) {
@@ -148,6 +156,11 @@ export class InMemoryFixedEquipmentDepreciationsRepository implements FixedEquip
     return Promise.resolve(this.rows.delete(id));
   }
 
+  usage(id: number): Promise<FixedEquipmentDepreciationUsage> {
+    if (this.usageFails) return Promise.reject(new Error('the count failed'));
+    return Promise.resolve(this.usageOf.get(id) ?? ZERO_USAGE);
+  }
+
   listAll(): Promise<readonly FixedEquipmentDepreciation[]> {
     const rows = [...this.rows.values()].sort((a, b) =>
       compareKeys(keyOf(a, 'name'), keyOf(b, 'name'), 'asc'),
@@ -168,7 +181,8 @@ export class InMemoryFixedEquipmentDepreciationsRepository implements FixedEquip
     const search = request.search;
     if (search === null) return scoped;
     const needle = search.toLowerCase();
-    const id = /^\d+$/.test(search) ? Number(search) : null;
+    const id =
+      /^\d+$/.test(search) && Number(search) <= MAX_UNSIGNED_INT_ID ? Number(search) : null;
     return scoped.filter((row) => row.name.toLowerCase().includes(needle) || row.id === id);
   }
 }

@@ -1,20 +1,24 @@
 /**
  * FixedEquipmentDepreciationsRepository against the local mirror (DATABASE_URL from
- * ../erp-infra/env/local/api.host.env).
+ * ../erp-infra/env/local/api.host.env), and the service's delete refusal over it.
  *
  * `tblfe_depreciations` is node-owned, so the ownership guard admits the writes this spec makes
- * through the typed delegate. The marker rows carry a creator no real staff member has
- * (`OWNER`), so `own` reads exactly them.
+ * through the typed delegate. `tblfe_models` and `tblfe_assets` are fixed_equipment's, and the guard
+ * refuses any write to them: the one asset model and the one asset this spec needs (each using a
+ * test depreciation) are written by a plain fixture client standing in for Perfex. The repository
+ * and the service under test keep the guarded client. The marker rows carry a creator no real staff
+ * member has (`OWNER`), so `own` reads exactly them.
  *
- * Everything this spec writes it creates itself and deletes again: `tblfe_depreciations` rows whose
- * name starts with `MARKER`, removed before the run (a leftover of a crashed run) and after it. No
- * seeded row is touched, and no value from the local data is read into an assertion message: ids
- * and counts are compared, never printed.
+ * Everything this spec writes it creates itself and deletes again: rows whose name starts with
+ * `MARKER` in `tblfe_depreciations`, `tblfe_models` (`model_name`) and `tblfe_assets`
+ * (`assets_name`), removed before the run (a leftover of a crashed run) and after it. No seeded row
+ * is touched, and no value from the local data is read into an assertion message.
  */
 import 'reflect-metadata';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { AppConfig } from '../../../shared/config/app-config.js';
+import { PrismaClient } from '../../../shared/db/generated/client.js';
 import { PrismaService } from '../../../shared/db/prisma.service.js';
 import { HealthService } from '../../../shared/health/health.service.js';
 import { decodeCursor } from '../../../shared/http/keyset.js';
@@ -25,6 +29,9 @@ import type {
   FixedEquipmentDepreciationsPage,
 } from '../model/fixed-equipment-depreciations.model.js';
 import { FixedEquipmentDepreciationsRepository } from '../repository/fixed-equipment-depreciations.repository.js';
+import { FixedEquipmentDepreciationsService } from '../service/fixed-equipment-depreciations.service.js';
+import { FixedEquipmentDepreciationsTransformer } from '../service/fixed-equipment-depreciations.transformer.js';
+import { FixedEquipmentDepreciationsValidator } from '../service/fixed-equipment-depreciations.validator.js';
 
 /** Every row this spec creates carries this prefix, so the cleanup deletes exactly its own rows. */
 const MARKER = 'int-spec-fed';
@@ -50,14 +57,35 @@ describe.skipIf(!process.env.DATABASE_URL)(
     const prisma = new PrismaService(new AppConfig(), new HealthService());
     const repository = new FixedEquipmentDepreciationsRepository(prisma);
     const client = prisma.client;
+    /**
+     * Perfex's side of the fixture: `tblfe_models` and `tblfe_assets` are fixed_equipment's, so the
+     * guarded client refuses them. This plain client stands in for Perfex and writes only the marker
+     * asset model and asset; the repository and the service under test keep the guarded client.
+     */
+    const perfex = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL ?? '' });
+    /** The real repository inside the real service; the transport and logger are inert. */
+    const service = new FixedEquipmentDepreciationsService(
+      new FixedEquipmentDepreciationsValidator(),
+      repository,
+      new FixedEquipmentDepreciationsTransformer(),
+      { publish: () => Promise.resolve() } as never,
+      { log: () => undefined } as never,
+    );
     let a: FixedEquipmentDepreciation;
     let b: FixedEquipmentDepreciation;
     let c: FixedEquipmentDepreciation;
     /** The id of a row this spec created and deleted: guaranteed missing (ids are never reused). */
     let missingId = 0;
 
-    const cleanup = () =>
-      client.tblfe_depreciations.deleteMany({ where: { name: { startsWith: MARKER } } });
+    const deleteFixtures = async () => {
+      await perfex.tblfe_models.deleteMany({ where: { model_name: { startsWith: MARKER } } });
+      await perfex.tblfe_assets.deleteMany({ where: { assets_name: { startsWith: MARKER } } });
+    };
+
+    const cleanup = async () => {
+      await deleteFixtures();
+      await client.tblfe_depreciations.deleteMany({ where: { name: { startsWith: MARKER } } });
+    };
 
     const create = (suffix: string, term = 12): Promise<FixedEquipmentDepreciation> =>
       repository.create({ name: `${MARKER}-${suffix}`, term, creatorId: OWNER });
@@ -75,6 +103,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
     afterAll(async () => {
       await cleanup();
       await client.$disconnect();
+      await perfex.$disconnect();
     });
 
     it('create answers the database id; findById returns the row byte for byte, term and creator included', async () => {
@@ -129,6 +158,39 @@ describe.skipIf(!process.env.DATABASE_URL)(
       expect(await repository.count(request(), 'all', 0)).toBe(3);
     });
 
+    it('under own, the id descending with limit 1 pages forward to the end and back, the creator’s rows only', async () => {
+      const own = (cursor: string | null, direction: 'next' | 'prev' = 'next') =>
+        repository
+          .list(
+            request({
+              search: null,
+              sortField: 'id',
+              order: 'desc',
+              limit: 1,
+              cursor: cursor === null ? null : decodeCursor(cursor, 'id'),
+            }),
+            'own',
+            OWNER,
+          )
+          .then((page) => ({ page, direction }));
+
+      const { page: first } = await own(null);
+      expect(ids(first)).toEqual([b.id]);
+      expect(first.total).toBe(3);
+      expect(first.prevCursor).toBeNull();
+      const { page: second } = await own(first.nextCursor);
+      expect(ids(second)).toEqual([a.id]);
+      expect(second.rangeStart).toBe(2);
+      const { page: third } = await own(second.nextCursor);
+      expect(ids(third)).toEqual([c.id]);
+      expect(third.nextCursor).toBeNull();
+      const { page: back } = await own(third.prevCursor, 'prev');
+      expect(ids(back)).toEqual([a.id]);
+      const { page: start } = await own(back.prevCursor, 'prev');
+      expect(ids(start)).toEqual([b.id]);
+      expect(start.prevCursor).toBeNull();
+    });
+
     it('own narrows the list and the count to the creator’s rows', async () => {
       expect(await repository.count(request(), 'own', OWNER)).toBe(3);
       expect(await repository.count(request(), 'own', STRANGER)).toBe(0);
@@ -145,6 +207,28 @@ describe.skipIf(!process.env.DATABASE_URL)(
     it('listAll reads the marker rows by name ascending', async () => {
       const own = (await repository.listAll()).filter((row) => row.name.startsWith(MARKER));
       expect(own.map((row) => row.id)).toEqual([a.id, b.id, c.id]);
+    });
+
+    it('usage counts the asset models and assets that carry the id; the delete is refused with 409 ERP-FEDEPRECIATIONS-0001 naming both counts; the row stays', async () => {
+      expect(await repository.usage(c.id)).toEqual({ models: 0, assets: 0 });
+      try {
+        await perfex.tblfe_models.create({
+          data: { model_name: `${MARKER}-model`, depreciation: c.id },
+        });
+        expect(await repository.usage(c.id)).toEqual({ models: 1, assets: 0 });
+        await perfex.tblfe_assets.create({
+          data: { assets_name: `${MARKER}-asset`, depreciation: c.id },
+        });
+        expect(await repository.usage(c.id)).toEqual({ models: 1, assets: 1 });
+        await expect(service.remove({ id: c.id })).rejects.toMatchObject({
+          code: 'ERP-FEDEPRECIATIONS-0001',
+          message: 'Depreciation is still in use. Usage counts: models=1, assets=1',
+        });
+        expect(await repository.findById(c.id, 'all', 0)).toEqual(c);
+      } finally {
+        await deleteFixtures();
+      }
+      expect(await repository.usage(c.id)).toEqual({ models: 0, assets: 0 });
     });
 
     it('remove answers true, then the row is gone, then false; 0 marker rows remain after the cleanup', async () => {

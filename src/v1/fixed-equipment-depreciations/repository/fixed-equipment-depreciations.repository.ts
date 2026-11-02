@@ -4,6 +4,7 @@ import { PrismaService } from '../../../shared/db/prisma.service.js';
 import { AppError } from '../../../shared/errors/app-error.js';
 import type { ReadScope } from '../../../shared/http/decorators/scope.decorator.js';
 import { encodeCursor, keysetWhere, type KeyValue } from '../../../shared/http/keyset.js';
+import { MAX_UNSIGNED_INT_ID } from '../dto/fixed-equipment-depreciations.dto.js';
 import {
   FIXED_EQUIPMENT_DEPRECIATIONS_FACADE_MAX_ROWS,
   type FixedEquipmentDepreciation,
@@ -12,19 +13,13 @@ import {
   type FixedEquipmentDepreciationsPage,
   type FixedEquipmentDepreciationsSortField,
   type NewFixedEquipmentDepreciation,
+  type FixedEquipmentDepreciationUsage,
 } from '../model/fixed-equipment-depreciations.model.js';
 
 const RECORD_NOT_FOUND = 'P2025';
 /** `tblfe_depreciations.id` is an unsigned INT. */
-const MAX_UNSIGNED_INT_ID = 4_294_967_295;
 
 const COLUMNS = { id: true, name: true, term: true, creator_id: true } as const;
-
-/** The Prisma column each API sort name reads. */
-const COLUMN_OF = { id: 'id', name: 'name' } as const satisfies Record<
-  FixedEquipmentDepreciationsSortField,
-  string
->;
 
 const rowSchema = z
   .object({
@@ -40,6 +35,9 @@ const rowSchema = z
     creatorId: row.creator_id,
   }));
 const rowsSchema = z.array(rowSchema);
+
+/** `COUNT(*)` comes back as a bigint from MySQL. */
+const countSchema = z.tuple([z.object({ n: z.union([z.bigint(), z.number()]).transform(Number) })]);
 
 type WhereValue = Record<string, unknown>;
 type Key = readonly [KeyValue, number];
@@ -112,7 +110,7 @@ export class FixedEquipmentDepreciationsRepository {
     staffId: number,
   ): Promise<FixedEquipmentDepreciationsPage> {
     const { sortField, order, cursor, limit } = request;
-    const column = COLUMN_OF[sortField];
+    const column = sortField;
     const match = whereOf(request.search, scope, staffId);
     const read = readDirection(request);
     const rows = await this.prisma.client.tblfe_depreciations.findMany({
@@ -202,6 +200,49 @@ export class FixedEquipmentDepreciationsRepository {
       where: { id },
     });
     return count > 0;
+  }
+
+  /**
+   * Where the depreciation is in use: Perfex's asset models (`tblfe_models.depreciation`) and assets
+   * (`tblfe_assets.depreciation`) carry its id. Each column is checked through
+   * `information_schema` first, so a column the installed schema lacks counts 0. Read-only SQL: the
+   * two tables are fixed_equipment's, and the ownership guard admits a SELECT.
+   */
+  async usage(id: number): Promise<FixedEquipmentDepreciationUsage> {
+    const [modelsColumn, assetsColumn] = await Promise.all([
+      this.hasColumn('tblfe_models', 'depreciation'),
+      this.hasColumn('tblfe_assets', 'depreciation'),
+    ]);
+    const [models, assets] = await Promise.all([
+      modelsColumn
+        ? this.countOf(
+            this.prisma.client.$queryRaw<unknown[]>`
+              SELECT COUNT(*) AS n FROM tblfe_models WHERE depreciation = ${id}`,
+          )
+        : Promise.resolve(0),
+      assetsColumn
+        ? this.countOf(
+            this.prisma.client.$queryRaw<unknown[]>`
+              SELECT COUNT(*) AS n FROM tblfe_assets WHERE depreciation = ${id}`,
+          )
+        : Promise.resolve(0),
+    ]);
+    return { models, assets };
+  }
+
+  /** Whether the installed schema has `table.column`. */
+  private async hasColumn(table: string, column: string): Promise<boolean> {
+    return (
+      (await this.countOf(
+        this.prisma.client.$queryRaw<unknown[]>`
+          SELECT COUNT(*) AS n FROM information_schema.columns
+          WHERE table_schema = DATABASE() AND table_name = ${table} AND column_name = ${column}`,
+      )) > 0
+    );
+  }
+
+  private async countOf(query: Promise<unknown>): Promise<number> {
+    return countSchema.parse(await query)[0].n;
   }
 
   async listAll(): Promise<readonly FixedEquipmentDepreciation[]> {

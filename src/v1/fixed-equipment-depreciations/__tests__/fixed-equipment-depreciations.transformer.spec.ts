@@ -28,16 +28,17 @@ describe('fixed-equipment-depreciations transformer', () => {
     expect(toResponse(legacy)).toEqual({ id: '8', name: 'Legacy', term: null });
   });
 
-  it('builds an export row with the three columns as text, an empty term for none', () => {
-    expect(toExportRow(row)).toEqual({ id: '7', name: 'Straight line', term: '60' });
-    expect(toExportRow(legacy)).toEqual({ id: '8', name: 'Legacy', term: '' });
+  it('builds an export row: the id as text, the name, and the term as stored (null for none, so ?blank= applies)', () => {
+    expect(toExportRow(row)).toEqual({ id: '7', name: 'Straight line', term: 60 });
+    expect(toExportRow(legacy)).toEqual({ id: '8', name: 'Legacy', term: null });
   });
 
-  it('reads each export cell from the export row', () => {
+  it('reads each export cell from the export row; a missing term stays null for the blank label', () => {
     const exportRow = toExportRow(row);
     expect(FIXED_EQUIPMENT_DEPRECIATIONS_EXPORT_CELLS.id.value(exportRow)).toBe('7');
     expect(FIXED_EQUIPMENT_DEPRECIATIONS_EXPORT_CELLS.name.value(exportRow)).toBe('Straight line');
-    expect(FIXED_EQUIPMENT_DEPRECIATIONS_EXPORT_CELLS.term.value(exportRow)).toBe('60');
+    expect(FIXED_EQUIPMENT_DEPRECIATIONS_EXPORT_CELLS.term.value(exportRow)).toBe(60);
+    expect(FIXED_EQUIPMENT_DEPRECIATIONS_EXPORT_CELLS.term.value(toExportRow(legacy))).toBeNull();
   });
 
   it('builds the list envelope with the page fields and both limits', () => {

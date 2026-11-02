@@ -149,10 +149,18 @@ export class FixedEquipmentDepreciationsController {
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions(remove)
   @ApiZod({
-    summary: 'Delete a depreciation (allowed while assets use it, as in Perfex)',
+    summary:
+      'Delete a depreciation; refused with 409 while an asset model or an asset uses it, or when its use cannot be counted',
     params: fixedEquipmentDepreciationsParamsSchema,
     responses: { [HTTP_STATUS.NO_CONTENT]: null },
-    errors: ['ERP-VALIDATION-0001', 'ERP-AUTH-0004', 'ERP-AUTH-0005', 'ERP-CORE-0004'],
+    errors: [
+      'ERP-VALIDATION-0001',
+      'ERP-AUTH-0004',
+      'ERP-AUTH-0005',
+      'ERP-CORE-0004',
+      'ERP-FEDEPRECIATIONS-0001',
+      'ERP-FEDEPRECIATIONS-0002',
+    ],
   })
   remove(@Param() params: unknown): Promise<void> {
     return this.service.remove(params);

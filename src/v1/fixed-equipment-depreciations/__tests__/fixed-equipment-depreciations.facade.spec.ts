@@ -1,31 +1,55 @@
-import { describe, expect, it, vi } from 'vitest';
+import 'reflect-metadata';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { FixedEquipmentDepreciationsFacade } from '../facade/fixed-equipment-depreciations.facade.js';
-import type { FixedEquipmentDepreciation } from '../model/fixed-equipment-depreciations.model.js';
-
-const ROW: FixedEquipmentDepreciation = {
-  id: 1,
-  name: 'Depreciation 1',
-  term: 12,
-  creatorId: 1,
-};
-
-function facadeWith(service: { listAll?: unknown; findById?: unknown }) {
-  return new FixedEquipmentDepreciationsFacade(service as never);
-}
+import {
+  createFixedEquipmentDepreciationsTestApp,
+  type FixedEquipmentDepreciationsTestApp,
+} from './create-fixed-equipment-depreciations-test-app.js';
+import { SEED_FIXED_EQUIPMENT_DEPRECIATIONS } from './fakes.js';
 
 describe('FixedEquipmentDepreciationsFacade', () => {
-  it('findAll answers every depreciation the service lists', async () => {
-    const listAll = vi.fn().mockResolvedValue([ROW]);
-    await expect(facadeWith({ listAll }).findAll()).resolves.toEqual([ROW]);
-    expect(listAll).toHaveBeenCalledTimes(1);
+  let context: FixedEquipmentDepreciationsTestApp;
+  let facade: FixedEquipmentDepreciationsFacade;
+
+  beforeAll(async () => {
+    context = await createFixedEquipmentDepreciationsTestApp();
+    facade = context.moduleRef.get(FixedEquipmentDepreciationsFacade);
+  });
+  afterAll(async () => {
+    await context.close();
   });
 
-  it('finds one depreciation by id, or null', async () => {
-    const findById = vi.fn().mockResolvedValueOnce(ROW).mockResolvedValueOnce(null);
-    const facade = facadeWith({ findById });
-    await expect(facade.findById(1)).resolves.toEqual(ROW);
-    await expect(facade.findById(99)).resolves.toBeNull();
-    expect(findById).toHaveBeenNthCalledWith(1, 1);
-    expect(findById).toHaveBeenNthCalledWith(2, 99);
+  it('resolves through the module and describes its version', () => {
+    expect(facade.describe()).toEqual({ module: 'fixed-equipment-depreciations', version: 1 });
+  });
+
+  it('listAll answers every depreciation, the name ascending, then the id', async () => {
+    const expected = [...SEED_FIXED_EQUIPMENT_DEPRECIATIONS]
+      .sort((x, y) => x.name.localeCompare(y.name) || x.id - y.id)
+      .map((row) => row.id);
+    expect((await facade.listAll()).map((row) => row.id)).toEqual(expected);
+  });
+
+  it('findById answers the depreciation, or null when absent', async () => {
+    const first = SEED_FIXED_EQUIPMENT_DEPRECIATIONS[0];
+    if (first === undefined) throw new Error('the fake has no seeded depreciation');
+    expect(await facade.findById(first.id)).toEqual(first);
+    expect(await facade.findById(404_404)).toBeNull();
+  });
+
+  it('does not require an actor for its module-to-module reads', () => {
+    const methods = FixedEquipmentDepreciationsFacade.prototype as unknown as Record<
+      string,
+      unknown
+    >;
+    for (const [name, arity] of [
+      ['findById', 1],
+      ['listAll', 0],
+    ] as const) {
+      const method = methods[name];
+      expect(typeof method, name).toBe('function');
+      if (typeof method !== 'function') continue;
+      expect(method.length, name).toBe(arity);
+    }
   });
 });

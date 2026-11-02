@@ -43,8 +43,11 @@ export const exportFixedEquipmentDepreciationsQuerySchema =
     timeZone: exportTimeZoneField,
   });
 
+/** `tblfe_depreciations.id` is an unsigned INT: no id is larger. */
+export const MAX_UNSIGNED_INT_ID = 4_294_967_295;
+
 export const fixedEquipmentDepreciationsParamsSchema = z.object({
-  id: z.coerce.number().int().positive(),
+  id: z.coerce.number().int().positive().max(MAX_UNSIGNED_INT_ID),
 });
 
 /** Perfex's form: Depreciation Name and Number of Months, both required. */

@@ -17,7 +17,11 @@ import {
   FIXED_EQUIPMENT_DEPRECIATIONS_EXPORT_COLUMNS,
   FIXED_EQUIPMENT_DEPRECIATIONS_EXPORT_FILE_STEM,
 } from '../fixed-equipment-depreciations.routes.js';
-import type { FixedEquipmentDepreciation } from '../model/fixed-equipment-depreciations.model.js';
+import type {
+  FixedEquipmentDepreciation,
+  FixedEquipmentDepreciationUsage,
+  FixedEquipmentDepreciationsDescription,
+} from '../model/fixed-equipment-depreciations.model.js';
 import { FixedEquipmentDepreciationsRepository } from '../repository/fixed-equipment-depreciations.repository.js';
 import {
   FIXED_EQUIPMENT_DEPRECIATIONS_EXPORT_CELLS,
@@ -103,15 +107,34 @@ export class FixedEquipmentDepreciationsService {
   }
 
   /**
-   * 404 for a missing id. No in-use check: Perfex's `delete_depreciations` deletes a depreciation
-   * even while an asset or model refers to it, and this keeps that behaviour.
+   * 404 for a missing id; 409 `ERP-FEDEPRECIATIONS-0001` while an asset model or an asset uses it
+   * (the detail names both counts); 409 `ERP-FEDEPRECIATIONS-0002` when its use could not be counted.
    */
   async remove(params: unknown): Promise<void> {
     const { id } = this.validator.parseParams(params);
+    if ((await this.repository.findById(id, 'all', ANY_OWNER)) === null) throw notFound();
+
+    let usage: FixedEquipmentDepreciationUsage;
+    try {
+      usage = await this.repository.usage(id);
+    } catch {
+      throw new AppError('ERP-FEDEPRECIATIONS-0002', 'its use could not be counted');
+    }
+    if (usage.models > 0 || usage.assets > 0) {
+      throw new AppError(
+        'ERP-FEDEPRECIATIONS-0001',
+        `Depreciation is still in use. Usage counts: models=${String(usage.models)}, assets=${String(usage.assets)}`,
+      );
+    }
+
     const at = this.now().toISOString();
     if (!(await this.repository.remove(id))) throw notFound();
     await this.transport.publish(new FixedEquipmentDepreciationsDeletedV1({ id, at }));
     this.logger.log('depreciation deleted', { id });
+  }
+
+  describe(): FixedEquipmentDepreciationsDescription {
+    return { module: 'fixed-equipment-depreciations', version: 1 };
   }
 
   /** Facade read: no actor, every owner. */
