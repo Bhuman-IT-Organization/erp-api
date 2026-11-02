@@ -300,6 +300,20 @@ describe('TicketStatusesService: CRUD', () => {
     expect(events.count).toBe(0);
   });
 
+  it('refuses deletion when reading the default reply setting fails', async () => {
+    const { service, repository, getOption, events } = build();
+    getOption.mockRejectedValueOnce(new Error('settings unavailable'));
+    const error = await rejection(service.remove(ADMIN, { id: '2' }));
+    expect([error.code, error.status, error.message]).toEqual([
+      'ERP-TICKETSTATUSES-0003',
+      409,
+      'default ticket reply status cannot be deleted',
+    ]);
+    expect(getOption).toHaveBeenCalledWith('default_ticket_reply_status');
+    expect(repository.removals).toBe(0);
+    expect(events.count).toBe(0);
+  });
+
   it.each(['03', ' 3'])(
     'coerces PHP-style default reply setting %j before comparing',
     async (setting) => {

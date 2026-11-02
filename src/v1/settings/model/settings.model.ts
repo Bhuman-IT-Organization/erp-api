@@ -24,6 +24,8 @@ export const SETTINGS_ALLOW_LIST = Object.freeze([
   'default_ticket_reply_status',
   // lead sources: the source new leads get
   'leads_default_source',
+  // ticket priorities: the priority an emailed ticket gets
+  'email_piping_default_priority',
 ] as const);
 
 /** A name on the allow-list; any other string is a compile-time error at the facade. */
