@@ -256,12 +256,12 @@ describe('AuthService', () => {
     }
     const fifth = await failure(login(SEED_EMAILS.active, 'wrong'));
     expect(fifth.code).toBe('ERP-AUTH-0006');
-    expect(fifth.extras?.retryAfter).toBeGreaterThanOrEqual(MIN_FIRST_LOCK_S);
+    expect(fifth.extras?.retryAfterS).toBeGreaterThanOrEqual(MIN_FIRST_LOCK_S);
 
     publisher.drain();
     const sixth = await failure(login(SEED_EMAILS.active, SEED_PASSWORDS.active));
     expect(sixth.code).toBe('ERP-AUTH-0006');
-    expect(sixth.extras?.retryAfter).toBeGreaterThanOrEqual(1);
+    expect(sixth.extras?.retryAfterS).toBeGreaterThanOrEqual(1);
     const [locked] = publisher.drain() as StaffLoginFailedV1[];
     expect(locked?.payload.reason).toBe('locked');
     // A locked attempt is not a verify: the counter does not move.

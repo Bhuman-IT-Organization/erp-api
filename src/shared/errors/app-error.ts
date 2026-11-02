@@ -7,16 +7,9 @@ import { ERROR_CODES, type ErrorCode } from './error-codes.js';
 
 export interface AppErrorExtras {
   /** Seconds the client should wait; becomes the `Retry-After` header. */
-  readonly retryAfter?: number;
+  readonly retryAfterS?: number;
   /** Validation issues; included in the body only for ERP-VALIDATION-0001. */
   readonly issues?: unknown;
-  /** Lead status usage counts for ERP-LEADSTATUSES-0001. */
-  readonly usage?: {
-    readonly leads: number;
-    readonly lastLeadStatus: number;
-    readonly emailIntegration: number;
-    readonly webToLead: number;
-  };
 }
 
 export class AppError extends Error {

@@ -77,7 +77,7 @@ describe('Breaker (opossum on a fake clock)', () => {
     const upstream = error as UpstreamUnavailableError;
     expect(upstream.code).toBe('ERP-UPSTREAM-0001');
     expect(upstream.upstream).toBe('legacy');
-    expect(upstream.extras?.retryAfter).toBe(10);
+    expect(upstream.extras?.retryAfterS).toBe(10);
     expect((error as { code?: string }).code).not.toBe('EOPENBREAKER');
   });
 
