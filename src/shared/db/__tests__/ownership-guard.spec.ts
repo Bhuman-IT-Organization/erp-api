@@ -495,20 +495,26 @@ describe('the committed register, today', () => {
       .map(([t]) => t)
       .sort();
     expect(nodeOwned).toEqual([
+      'tblcontracts_types',
       'tblcost_centers',
       'tblcurrencies',
+      'tblcustomers_groups',
       'tblexpenses_categories',
       'tblidentity_audit',
+      'tblleads_sources',
       'tblmail_sent_emails',
       'tblmail_template_versions',
       'tblmail_templates',
       'tblpayment_modes',
       'tblroles',
+      'tblservices',
       'tblstaff',
       'tblstaff_departments',
       'tblstaff_permissions',
       'tbltaxes',
       'tbltickets_predefined_replies',
+      'tbltickets_priorities',
+      'tbltickets_status',
     ]);
     const tables = loadModelTableMap();
     for (const table of map.keys()) {

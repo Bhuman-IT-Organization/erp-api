@@ -35,6 +35,11 @@ describe('reply-html', () => {
       text: 'Hello\nthere',
       hasOtherFormatting: false,
     });
+
+    expect(fromStoredHtml('<p>Hello<br />there</p>')).toEqual({
+      text: 'Hello\nthere',
+      hasOtherFormatting: false,
+    });
   });
 
   it('flags paragraph tags with attributes as other formatting', () => {

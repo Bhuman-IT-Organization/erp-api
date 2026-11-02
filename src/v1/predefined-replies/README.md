@@ -78,9 +78,9 @@ None.
 
 ## Resilience
 
-- **Breaker:** Follow the existing shared project patterns where applicable.
-- **Retry policy:** Avoid retries that could duplicate create operations.
-- **Pool budget:** Use the existing shared database connection pool.
+- **Breaker:** None; there is no outbound HTTP call.
+- **Retry policy:** None on writes; retrying an unkeyed `POST` could create duplicate replies.
+- **Pool budget:** The shared Prisma pool; no extra DB or Redis client.
 
 ## Layers
 
