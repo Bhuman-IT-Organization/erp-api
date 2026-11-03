@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { encodeCursor } from '../../../shared/http/keyset.js';
+import type { LeadStatusesListRequest } from '../model/lead-statuses.model.js';
 import { LeadStatusesRepository } from '../repository/lead-statuses.repository.js';
 
 type PrismaDependency = ConstructorParameters<typeof LeadStatusesRepository>[0];
@@ -170,6 +172,130 @@ describe('LeadStatusesRepository', () => {
         },
       }),
     );
+  });
+
+  describe('paging by cursor', () => {
+    const page = (overrides: Partial<LeadStatusesListRequest>): LeadStatusesListRequest => ({
+      search: null,
+      sortField: 'name',
+      order: 'asc',
+      cursor: null,
+      limit: 2,
+      ...overrides,
+    });
+    const third = row({ id: 3, name: 'C' });
+    const fourth = row({ id: 4, name: 'D' });
+
+    it('reads after the cursor: the keyset, the order and both page cursors', async () => {
+      const { repository, findMany, count } = createRepository();
+      findMany.mockResolvedValue([third, fourth]);
+      count.mockResolvedValueOnce(6).mockResolvedValueOnce(2);
+
+      const result = await repository.list(
+        page({ cursor: { sort: 'name', key: ['B', 2], direction: 'after' } }),
+      );
+
+      expect(findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { AND: [{}, { OR: [{ name: { gt: 'B' } }, { name: 'B', id: { gt: 2 } }] }] },
+          orderBy: [{ name: 'asc' }, { id: 'asc' }],
+          take: 2,
+        }),
+      );
+      expect(result.items.map((item) => item.id)).toEqual([3, 4]);
+      expect(result).toMatchObject({
+        total: 6,
+        rangeStart: 3,
+        nextCursor: encodeCursor('name', ['D', 4], 'after'),
+        prevCursor: encodeCursor('name', ['C', 3], 'before'),
+      });
+    });
+
+    it('reads before the cursor in reverse and answers the rows in list order', async () => {
+      const { repository, findMany, count } = createRepository();
+      findMany.mockResolvedValue([fourth, third]);
+      count.mockResolvedValueOnce(6).mockResolvedValueOnce(2);
+
+      const result = await repository.list(
+        page({ cursor: { sort: 'name', key: ['E', 5], direction: 'before' } }),
+      );
+
+      expect(findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { AND: [{}, { OR: [{ name: { lt: 'E' } }, { name: 'E', id: { lt: 5 } }] }] },
+          orderBy: [{ name: 'desc' }, { id: 'desc' }],
+        }),
+      );
+      expect(result.items.map((item) => item.id)).toEqual([3, 4]);
+      expect(count).toHaveBeenLastCalledWith({
+        where: { AND: [{}, { OR: [{ name: { lt: 'C' } }, { name: 'C', id: { lt: 3 } }] }] },
+      });
+      expect(result).toMatchObject({
+        rangeStart: 3,
+        nextCursor: encodeCursor('name', ['D', 4], 'after'),
+        prevCursor: encodeCursor('name', ['C', 3], 'before'),
+      });
+    });
+
+    it('reads after the cursor on a descending sort with the keyset flipped', async () => {
+      const { repository, findMany } = createRepository();
+
+      await repository.list(
+        page({ order: 'desc', cursor: { sort: 'name', key: ['B', 2], direction: 'after' } }),
+      );
+
+      expect(findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { AND: [{}, { OR: [{ name: { lt: 'B' } }, { name: 'B', id: { lt: 2 } }] }] },
+          orderBy: [{ name: 'desc' }, { id: 'desc' }],
+        }),
+      );
+    });
+
+    it('keeps the search beside the keyset', async () => {
+      const { repository, findMany } = createRepository();
+
+      await repository.list(
+        page({ search: 'Op', cursor: { sort: 'name', key: ['B', 2], direction: 'after' } }),
+      );
+
+      expect(findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            AND: [
+              { OR: [{ name: { contains: 'Op' } }] },
+              { OR: [{ name: { gt: 'B' } }, { name: 'B', id: { gt: 2 } }] },
+            ],
+          },
+        }),
+      );
+    });
+
+    it('answers no cursors on a page that holds every row', async () => {
+      const { repository, findMany, count } = createRepository();
+      findMany.mockResolvedValue([third, fourth]);
+      count.mockResolvedValueOnce(2).mockResolvedValueOnce(0);
+
+      await expect(repository.list(page({}))).resolves.toMatchObject({
+        total: 2,
+        rangeStart: 1,
+        nextCursor: null,
+        prevCursor: null,
+      });
+    });
+
+    it('answers rangeStart 0 and no cursors on an empty page, with no second count', async () => {
+      const { repository, count } = createRepository();
+
+      await expect(repository.list(page({}))).resolves.toMatchObject({
+        items: [],
+        total: 0,
+        rangeStart: 0,
+        nextCursor: null,
+        prevCursor: null,
+      });
+      expect(count).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('counts matching statuses', async () => {
