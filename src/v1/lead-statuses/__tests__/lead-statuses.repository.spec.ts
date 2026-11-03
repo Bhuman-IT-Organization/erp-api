@@ -144,6 +144,19 @@ describe('LeadStatusesRepository', () => {
       }),
     );
   });
+  it('matches the maximum signed 32-bit ID boundary', async () => {
+    const { repository, findMany } = createRepository();
+
+    await repository.list(request('2147483647'));
+
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          OR: [{ name: { contains: '2147483647' } }, { id: 2147483647 }],
+        },
+      }),
+    );
+  });
 
   it('does not match IDs above the signed 32-bit maximum', async () => {
     const { repository, findMany } = createRepository();
@@ -225,6 +238,17 @@ describe('LeadStatusesRepository', () => {
     });
   });
 
+  it('uses the default colour when an empty colour is supplied', async () => {
+    const { repository, create } = createRepository();
+
+    await repository.create({ name: 'Open', color: '' });
+
+    expect(create).toHaveBeenCalled();
+    expect(create.mock.calls[0]?.[0]).toMatchObject({
+      data: { color: '#757575' },
+    });
+  });
+
   it('preserves a supplied colour', async () => {
     const { repository, create } = createRepository();
 
@@ -232,6 +256,18 @@ describe('LeadStatusesRepository', () => {
 
     expect(create).toHaveBeenCalled();
     expect(create.mock.calls[0]?.[0]).toMatchObject({
+      data: { color: '#123456' },
+    });
+  });
+
+  it('passes the supplied colour to Prisma when updating a status', async () => {
+    const { repository, update } = createRepository();
+
+    await repository.update(1, { color: '#123456' });
+
+    expect(update).toHaveBeenCalled();
+    expect(update.mock.calls[0]?.[0]).toMatchObject({
+      where: { id: 1 },
       data: { color: '#123456' },
     });
   });
