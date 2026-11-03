@@ -1,5 +1,5 @@
 /**
- * The SMTP adapter against the local Mailpit (ADR-0049 decision 10): SMTP on 127.0.0.1:11025 and
+ * The SMTP adapter against the local Mailpit (ADR-0049 decision 10): SMTP on 127.0.0.1:1025 and
  * the REST API at MAILPIT_API_URL, both from ../erp-infra/env/local/api.host.env. Skips only when
  * MAILPIT_API_URL is absent; with it rendered and Mailpit down it fails, by design. Clears the
  * inbox before and after; the recipient is the synthetic user@example.test.

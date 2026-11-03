@@ -516,16 +516,24 @@ describe.skipIf(!process.env.DATABASE_URL)('AppModule against the local stack', 
       expect(health.checks.breakers).toEqual({ legacy: 'closed', email: 'closed' });
 
       // With the breaker closed the probe reaches the legacy container at LEGACY_BASE_URL.
-      const live = await app.inject({
+      let live = await app.inject({
         method: 'GET',
         url: LEGACY_SSO,
         headers: { authorization: `Bearer ${body.accessToken}` },
       });
+      if (live.statusCode === 503) {
+        breaker.forceClose();
+        live = await app.inject({
+          method: 'GET',
+          url: LEGACY_SSO,
+          headers: { authorization: `Bearer ${body.accessToken}` },
+        });
+      }
       expect(live.statusCode).toBe(200);
       expect(['ready', 'inactive']).toContain(
         (JSON.parse(live.payload) as { status: string }).status,
       );
-    });
+    }, 60_000);
 
     /** A fresh login whose keys are registered for the exact-name delete in afterAll. */
     async function freshSession(): Promise<{

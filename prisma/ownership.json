@@ -5210,7 +5210,7 @@
     "owner_confidence": "write-single",
     "table": "tblknowledge_base"
   },
-  {
+  { 
     "decided_by": null,
     "decided_on": null,
     "evidence": {
@@ -5227,8 +5227,8 @@
       ]
     },
     "evidence_changed": false,
-    "note": "",
-    "owner": "perfex-core",
+    "note": "Written by v1/knowledge-base; Perfex's group management is migrated to Node.",
+    "owner": "node",
     "owner_confidence": "write-single",
     "table": "tblknowledge_base_groups"
   },

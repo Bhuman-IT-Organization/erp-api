@@ -260,7 +260,7 @@ export const envSchema = z
      * SMTP_PORT, SMTP_ENCRYPTION, MAIL_FROM_ADDRESS and MAIL_FROM_NAME are required too.
      */
     SMTP_HOST: z.string().min(1).max(253).optional(),
-    /** The SMTP server's port (D-02, ADR-0049); locally Mailpit's 1025 (Compose) or 11025 (host). */
+    /** The SMTP server's port (D-02, ADR-0049); locally Mailpit's 1025 (Compose or host). */
     SMTP_PORT: z.coerce.number().int().min(1).max(65535).optional(),
     /**
      * Perfex's words for the transport security (D-02, ADR-0049): `ssl` implicit TLS, `tls`

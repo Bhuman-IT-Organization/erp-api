@@ -9,6 +9,7 @@ import { DepartmentsModule } from './departments/departments.module.js';
 import { ExampleItemModule } from './example-item/example-item.module.js';
 import { ExpenseCategoriesModule } from './expense-categories/expense-categories.module.js';
 import { IdentityModule } from './identity/identity.module.js';
+import { KnowledgeBaseModule } from './knowledge-base/knowledge-base.module.js';
 import { MailModule } from './mail/mail.module.js';
 import { PaymentModesModule } from './payment-modes/payment-modes.module.js';
 import { SettingsModule } from './settings/settings.module.js';
@@ -25,6 +26,7 @@ import { TaxesModule } from './taxes/taxes.module.js';
     MailModule,
     TaxesModule,
     CostCentersModule,
+    KnowledgeBaseModule,
     ContractTypesModule,
     PaymentModesModule,
     CurrenciesModule,

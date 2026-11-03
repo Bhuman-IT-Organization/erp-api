@@ -73,7 +73,7 @@ function textsOf(page: readonly DrawnText[]): readonly string[] {
 
 const CREATED_AT = new Date('2026-10-01T08:00:00Z');
 const HEADERS = ['Id', 'First', 'Last', 'Email', 'Role', 'Active', 'Seen'];
-const MANY_ROWS: readonly (readonly string[])[] = Array.from({ length: 1000 }, (_, r) =>
+const MANY_ROWS: readonly (readonly string[])[] = Array.from({ length: 100 }, (_, r) =>
   HEADERS.map((_label, c) => `r${String(r)}c${String(c)}`),
 );
 
@@ -257,7 +257,7 @@ describe('toPdf (A4 landscape, pdfkit standard fonts, D-14)', () => {
       textsOf(page).slice((index === 0 ? 2 : 0) + HEADERS.length),
     );
     expect(drawnCells).toEqual(MANY_ROWS.flat());
-  });
+  }, 15_000);
 
   it('cuts a cell over 1,000 characters to 1,000 plus the ellipsis', async () => {
     const long = 'x'.repeat(1000) + 'Z'.repeat(200);

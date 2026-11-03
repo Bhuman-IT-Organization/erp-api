@@ -60,6 +60,12 @@ export const ERROR_CODES = {
   'ERP-CONTRACTTYPES-0001': { status: 409, title: 'The contract type is still in use' },
   // v1/cost-centers (plan 04.1-18): 0001 refuses a delete while any referencing column still names the cost center (D-07, D-28).
   'ERP-COSTCENTERS-0001': { status: 409, title: 'The cost center is still in use' },
+  // v1/knowledge-base: 0001 refuses a delete while any referencing column still names the knowledge base (D-07, D-28).
+  'ERP-KNOWLEDGEBASE-0001': { status: 409, title: 'The knowledge base is still in use' },
+  'ERP-KNOWLEDGEBASE-0002': {
+    status: 409,
+    title: 'The knowledge base group has articles and cannot be deleted',
+  },
   // v1/payment-modes (plan 04.1-23): 0001 refuses a delete while a transactional column still names the mode (D-33), 0002 the credit expense mode (D-37).
   'ERP-PAYMENTMODES-0001': { status: 409, title: 'The payment mode is still in use' },
   'ERP-PAYMENTMODES-0002': { status: 409, title: 'The payment mode is the credit expense mode' },

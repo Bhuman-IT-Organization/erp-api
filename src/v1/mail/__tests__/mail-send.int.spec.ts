@@ -1,7 +1,7 @@
 /**
  * The mail sender on the wire (ADR-0049 decision 10, B4, B5): `MailModule` with the shared modules
  * it needs (`AppModule`'s, without uploads), the real SMTP adapter and a running queue worker
- * against the local stack (`api.host.env`: MySQL, Redis, Mailpit on 127.0.0.1:11025 and :18025).
+ * against the local stack (`api.host.env`: MySQL, Redis, Mailpit on 127.0.0.1:1025 and :18025).
  * Skips only when MAILPIT_API_URL is absent.
  *
  * - Queues on Redis db 3, not db 2 (the AppConfig stub sets QUEUE_REDIS_DB), so the stack's worker
