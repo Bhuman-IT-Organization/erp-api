@@ -7,8 +7,11 @@ import type { AccessTokenVerifier, AuthenticatedUser } from '../../auth/access-t
 import {
   PERMISSIONS_ANY_KEY,
   PERMISSIONS_KEY,
+  PERMISSIONS_READ_KEY,
   Permissions,
   PermissionsAny,
+  PermissionsRead,
+  type ReadCodes,
 } from '../../decorators/permissions.decorator.js';
 import type { ReadScope } from '../../decorators/scope.decorator.js';
 import { PermissionGuard } from '../permission.guard.js';
@@ -34,6 +37,17 @@ function handlerWith(...codes: string[]): () => void {
 function handlerWithAny(anyCodes: string[], allCodes: string[] = []): () => void {
   const handler = handlerWith(...allCodes);
   if (anyCodes.length > 0) Reflect.defineMetadata(PERMISSIONS_ANY_KEY, anyCodes, handler);
+  return handler;
+}
+
+/** A handler carrying what `@PermissionsRead(...)` writes, optionally beside the other forms. */
+function handlerWithRead(
+  read: ReadCodes,
+  anyCodes: string[] = [],
+  allCodes: string[] = [],
+): () => void {
+  const handler = handlerWithAny(anyCodes, allCodes);
+  Reflect.defineMetadata(PERMISSIONS_READ_KEY, read, handler);
   return handler;
 }
 
@@ -118,6 +132,23 @@ describe('PermissionsAny decorator', () => {
     }
     PermissionsAny('a.view', 'a.viewOwn')(Own);
     expect(Reflect.getMetadata(PERMISSIONS_ANY_KEY, Own)).toEqual(['a.view', 'a.viewOwn']);
+    expect(Reflect.getMetadata(PERMISSIONS_KEY, Own)).toBeUndefined();
+  });
+});
+
+describe('PermissionsRead decorator', () => {
+  it('stores both lists under its own key, leaving the other two keys untouched', () => {
+    class Own {
+      handle(): void {
+        return undefined;
+      }
+    }
+    PermissionsRead({ all: ['a.view'], own: ['a.viewOwn'] })(Own);
+    expect(Reflect.getMetadata(PERMISSIONS_READ_KEY, Own)).toEqual({
+      all: ['a.view'],
+      own: ['a.viewOwn'],
+    });
+    expect(Reflect.getMetadata(PERMISSIONS_ANY_KEY, Own)).toBeUndefined();
     expect(Reflect.getMetadata(PERMISSIONS_KEY, Own)).toBeUndefined();
   });
 });
@@ -247,5 +278,96 @@ describe('PermissionGuard — the any-of form and the ADR-0033 decision 5 row sc
     await expect(guard.canActivate(ctx)).resolves.toBe(true);
     expect(request.erpReadScope).toBe('all');
     expect(calls).toEqual([[7, 'a.view']]);
+  });
+});
+
+describe('PermissionGuard — @PermissionsRead, the read several permission groups open', () => {
+  const READ: ReadCodes = { all: ['a.view', 'b.view', 'c.view'], own: ['a.viewOwn', 'b.viewOwn'] };
+
+  it.each(['a.view', 'b.view', 'c.view'])('%s alone resolves the scope all', async (code) => {
+    const { port } = verifier({ [code]: true });
+    const guard = new PermissionGuard(new Reflector(), port);
+    const { ctx, request } = requestContext(handlerWithRead(READ), true);
+    await expect(guard.canActivate(ctx)).resolves.toBe(true);
+    expect(request.erpReadScope).toBe('all');
+  });
+
+  it.each(['a.viewOwn', 'b.viewOwn'])('%s alone resolves the scope own', async (code) => {
+    const { port } = verifier({ [code]: true });
+    const guard = new PermissionGuard(new Reflector(), port);
+    const { ctx, request } = requestContext(handlerWithRead(READ), true);
+    await expect(guard.canActivate(ctx)).resolves.toBe(true);
+    expect(request.erpReadScope).toBe('own');
+  });
+
+  it('a mixed holder reads every row: the all codes are checked first and own is never asked', async () => {
+    const { port, calls } = verifier({ 'a.viewOwn': true, 'c.view': true });
+    const guard = new PermissionGuard(new Reflector(), port);
+    const { ctx, request } = requestContext(handlerWithRead(READ), true);
+    await expect(guard.canActivate(ctx)).resolves.toBe(true);
+    expect(request.erpReadScope).toBe('all');
+    expect(calls).toEqual([
+      [7, 'a.view'],
+      [7, 'b.view'],
+      [7, 'c.view'],
+    ]);
+  });
+
+  it('throws ERP-AUTH-0005 naming every code when none of them holds', async () => {
+    const { port } = verifier({});
+    const guard = new PermissionGuard(new Reflector(), port);
+    const { ctx, request } = requestContext(handlerWithRead(READ), true);
+    const error = await failure(guard.canActivate(ctx));
+    expect(error?.code).toBe('ERP-AUTH-0005');
+    expect(error?.message).toBe(
+      'Missing permission a.view or b.view or c.view or a.viewOwn or b.viewOwn',
+    );
+    expect(request.erpReadScope).toBeUndefined();
+  });
+
+  it('throws ERP-AUTH-0004 when it is set but no user was attached', async () => {
+    const { port, calls } = verifier({ 'a.view': true });
+    const guard = new PermissionGuard(new Reflector(), port);
+    const error = await failure(guard.canActivate(context(handlerWithRead(READ), false)));
+    expect(error?.code).toBe('ERP-AUTH-0004');
+    expect(calls).toEqual([]);
+  });
+
+  it('beside an all-of code: the all-of code is still required', async () => {
+    const { port } = verifier({ 'a.view': true });
+    const guard = new PermissionGuard(new Reflector(), port);
+    const { ctx } = requestContext(handlerWithRead(READ, [], ['z.required']), true);
+    const error = await failure(guard.canActivate(ctx));
+    expect(error?.code).toBe('ERP-AUTH-0005');
+    expect(error?.message).toBe('Missing permission z.required');
+  });
+
+  it('beside an any-of list: it only narrows, so an any-of own stays own', async () => {
+    const { port } = verifier({ 'a.view': true, 'x.viewOwn': true });
+    const guard = new PermissionGuard(new Reflector(), port);
+    const { ctx, request } = requestContext(handlerWithRead(READ, ['x.view', 'x.viewOwn']), true);
+    await expect(guard.canActivate(ctx)).resolves.toBe(true);
+    expect(request.erpReadScope).toBe('own');
+  });
+
+  it('beside an any-of list: its own scope narrows an any-of all', async () => {
+    const { port } = verifier({ 'a.viewOwn': true, 'x.view': true });
+    const guard = new PermissionGuard(new Reflector(), port);
+    const { ctx, request } = requestContext(handlerWithRead(READ, ['x.view', 'x.viewOwn']), true);
+    await expect(guard.canActivate(ctx)).resolves.toBe(true);
+    expect(request.erpReadScope).toBe('own');
+  });
+
+  it('an admin resolves all through the ordinary path, with no branch in the guard', async () => {
+    const { port, calls } = adminVerifier();
+    const guard = new PermissionGuard(new Reflector(), port);
+    const { ctx, request } = requestContext(handlerWithRead(READ), true);
+    await expect(guard.canActivate(ctx)).resolves.toBe(true);
+    expect(request.erpReadScope).toBe('all');
+    expect(calls).toEqual([
+      [7, 'a.view'],
+      [7, 'b.view'],
+      [7, 'c.view'],
+    ]);
   });
 });
