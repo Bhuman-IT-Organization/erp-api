@@ -1,7 +1,8 @@
 /**
  * The row scope of a read, as resolved by `PermissionGuard` (ADR-0033 decision 5): `all` when the
  * caller holds the full-view code of an `@PermissionsAny(VIEW, VIEW_OWN)` handler, `own` when only
- * the `viewOwn` code admitted. An administrator holds every code, so an admin resolves to `all`
+ * the `viewOwn` code admitted, and the same from the two lists of `@PermissionsRead({ all, own })`.
+ * An administrator holds every code, so an admin resolves to `all`
  * through the ordinary path and the guard carries no `isAdmin` branch (ADR-0033 decision 4).
  *
  * This file deliberately decides nothing. It reads what the guard wrote onto the request and hands
