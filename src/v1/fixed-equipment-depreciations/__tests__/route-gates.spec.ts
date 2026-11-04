@@ -1,9 +1,9 @@
 /**
  * Every handler of the controller, classified against the three screens erp-web gates
  * (`/setup/fixed-equipment-depreciations`, `/new` and `/:id` in `ROUTE_GATES`), with its guards and
- * codes read from the decorators' own metadata. The codes are the catalogue's
- * `fixedEquipment.settingDepreciation` group (mapped from Perfex's
- * `fixed_equipment_setting_depreciation`), so a member's stored Perfex permission opens the module.
+ * codes read from the decorators' own metadata. The codes are `FIXED_EQUIPMENT_SETTINGS_CODES
+ * .depreciation`: the depreciation settings group (mapped from Perfex's
+ * `fixed_equipment_setting_depreciation`) and the four item groups Perfex's screen also serves.
  *
  * `SCREEN_READS` names the read each screen issues when it opens (`/new` reads no record);
  * `OTHER_HANDLERS` files every other handler under the screen that issues it. Their union must
@@ -11,16 +11,16 @@
  */
 import 'reflect-metadata';
 import { GUARDS_METADATA } from '@nestjs/common/constants.js';
-import { PERMISSIONS, ROUTE_GATES } from '@erp/contracts';
+import { FIXED_EQUIPMENT_SETTINGS_CODES, PERMISSIONS, ROUTE_GATES } from '@erp/contracts';
 import { describe, expect, it } from 'vitest';
 import {
   PERMISSIONS_ANY_KEY,
   PERMISSIONS_KEY,
+  PERMISSIONS_READ_KEY,
 } from '../../../shared/http/decorators/permissions.decorator.js';
 import { JwtAuthGuard } from '../../../shared/http/guards/jwt-auth.guard.js';
 import { PermissionGuard } from '../../../shared/http/guards/permission.guard.js';
 import { FixedEquipmentDepreciationsController } from '../controller/fixed-equipment-depreciations.controller.js';
-import { FIXED_EQUIPMENT_DEPRECIATIONS_PERMISSIONS } from '../fixed-equipment-depreciations.routes.js';
 
 type HandlerName = Exclude<keyof FixedEquipmentDepreciationsController, 'constructor'>;
 
@@ -39,10 +39,11 @@ const OTHER_HANDLERS: Readonly<Record<string, string>> = {
   update: `${LIST}/:id`,
 };
 
-/** The reads and the export: either view code admits, and the one that did decides the row scope. */
+/** The reads and the export: any group's full view reads every row, any group's view own the own. */
 const READS = ['list', 'get', 'exportCsv'] as const;
 
-const CODES = FIXED_EQUIPMENT_DEPRECIATIONS_PERMISSIONS;
+const codes = FIXED_EQUIPMENT_SETTINGS_CODES.depreciation;
+const FE = PERMISSIONS.fixedEquipment;
 
 const HANDLERS = FixedEquipmentDepreciationsController.prototype as unknown as Record<
   string,
@@ -73,29 +74,46 @@ describe('every fixed-equipment-depreciations handler is classified and gated', 
   });
 
   it.each(READS)(
-    '%s admits view or viewOwn (widest first) and declares no all-of code',
+    '%s is @PermissionsRead(codes.read) and declares no all-of or any-of code',
     (handler) => {
-      expect(metadata(PERMISSIONS_ANY_KEY, handler)).toEqual([CODES.view, CODES.viewOwn]);
+      expect(metadata(PERMISSIONS_READ_KEY, handler)).toEqual(codes.read);
+      expect(metadata(PERMISSIONS_ANY_KEY, handler)).toBeUndefined();
       expect(metadata(PERMISSIONS_KEY, handler)).toBeUndefined();
     },
   );
 
-  it('create, update and remove require exactly the create, edit and delete codes', () => {
-    expect(metadata(PERMISSIONS_KEY, 'create')).toEqual([CODES.create]);
-    expect(metadata(PERMISSIONS_ANY_KEY, 'create')).toBeUndefined();
-    expect(metadata(PERMISSIONS_KEY, 'update')).toEqual([CODES.edit]);
-    expect(metadata(PERMISSIONS_ANY_KEY, 'update')).toBeUndefined();
-    expect(metadata(PERMISSIONS_KEY, 'remove')).toEqual([CODES.delete]);
-    expect(metadata(PERMISSIONS_ANY_KEY, 'remove')).toBeUndefined();
+  it('create, update and remove admit any of the five groups’ create, edit and delete codes', () => {
+    expect(metadata(PERMISSIONS_ANY_KEY, 'create')).toEqual([...codes.create]);
+    expect(metadata(PERMISSIONS_ANY_KEY, 'update')).toEqual([...codes.edit]);
+    expect(metadata(PERMISSIONS_ANY_KEY, 'remove')).toEqual([...codes.delete]);
+    for (const handler of ['create', 'update', 'remove']) {
+      expect(metadata(PERMISSIONS_KEY, handler), handler).toBeUndefined();
+      expect(metadata(PERMISSIONS_READ_KEY, handler), handler).toBeUndefined();
+    }
   });
 
-  it("the codes are the catalogue's fixedEquipment.settingDepreciation group", () => {
-    expect(CODES).toEqual(PERMISSIONS.fixedEquipment.settingDepreciation);
+  it('the codes are the depreciation settings group first, then the four item groups', () => {
+    expect(codes.read.all).toEqual([
+      FE.settingDepreciation.view,
+      FE.assets.view,
+      FE.licenses.view,
+      FE.accessories.view,
+      FE.consumables.view,
+    ]);
+    expect(codes.read.own).toEqual([
+      FE.settingDepreciation.viewOwn,
+      FE.assets.viewOwn,
+      FE.licenses.viewOwn,
+      FE.accessories.viewOwn,
+      FE.consumables.viewOwn,
+    ]);
+    expect(codes.edit).toContain(FE.assets.edit);
+    expect(codes.read.all).not.toContain(FE.settingCategory.view);
   });
 });
 
 describe('ROUTE_GATES gates the three screens on the read codes the handlers declare', () => {
-  it.each(Object.keys(SCREEN_READS))('%s is gated on [view, viewOwn]', (screen) => {
-    expect(ROUTE_GATES[screen]).toEqual([CODES.view, CODES.viewOwn]);
+  it.each(Object.keys(SCREEN_READS))('%s is gated on [...read.all, ...read.own]', (screen) => {
+    expect(ROUTE_GATES[screen]).toEqual([...codes.read.all, ...codes.read.own]);
   });
 });

@@ -1,7 +1,7 @@
 /**
  * The module inside a real Nest + Fastify application, without a network or a database: the
  * repository is `InMemoryFixedEquipmentDepreciationsRepository` (`fakes.ts`) seeded with
- * `SEED_FIXED_EQUIPMENT_DEPRECIATIONS`, the access-token verifier is a stub with four known bearers,
+ * `SEED_FIXED_EQUIPMENT_DEPRECIATIONS`, the access-token verifier is a stub with eight known bearers,
  * the domain-event publisher is the recording one and the logger records its `log` lines.
  * Everything else (the module wiring, `JwtAuthGuard` and `PermissionGuard`, the request-id hook, the
  * global prefix, the problem-details filter) is the production code path, so `app.inject` proves the
@@ -10,6 +10,8 @@
  * The bearers cover each way in: an administrator (every code), a member holding the full `view` and
  * the writes (scope `all`), a member holding only `viewOwn` and `create` (scope `own`: the rows they
  * created), and a member holding none.
+ * and four members holding only the assets group's codes (an item group that reaches this tab):
+ * its view, its view own, both, and its edit.
  */
 import { Global, Module } from '@nestjs/common';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
@@ -39,6 +41,8 @@ import {
 } from './fakes.js';
 
 const CODES = PERMISSIONS.fixedEquipment.settingDepreciation;
+/** An item group that also reaches this tab (`FIXED_EQUIPMENT_SETTINGS_CODES.depreciation`). */
+const ASSETS = PERMISSIONS.fixedEquipment.assets;
 
 /** The bearers the stub verifier accepts; anything else is `null`, so 401 `ERP-AUTH-0004`. */
 export const TEST_BEARERS = {
@@ -50,6 +54,14 @@ export const TEST_BEARERS = {
   owner: 'valid-owner',
   /** Staff 4: authenticated, holds no code. */
   noPermission: 'valid-noperm',
+  /** Staff 5: only the assets group's full view: scope `all`. */
+  assetsViewer: 'valid-assets-viewer',
+  /** Staff 6: only the assets group's view own: scope `own`. */
+  assetsOwner: 'valid-assets-owner',
+  /** Staff 7: the assets group's full view and view own: the full view wins, scope `all`. */
+  assetsBoth: 'valid-assets-both',
+  /** Staff 8: only the assets group's edit: may change a depreciation, may not read the list. */
+  assetsEditor: 'valid-assets-editor',
 } as const;
 
 /** The staff id behind each bearer. */
@@ -58,6 +70,10 @@ export const TEST_STAFF = {
   viewer: 2,
   owner: 3,
   noPermission: 4,
+  assetsViewer: 5,
+  assetsOwner: 6,
+  assetsBoth: 7,
+  assetsEditor: 8,
 } as const;
 
 /** The codes each non-administrator holds. */
@@ -65,6 +81,10 @@ const HELD: Readonly<Record<number, readonly string[]>> = {
   [TEST_STAFF.viewer]: [CODES.view, CODES.create, CODES.edit, CODES.delete],
   [TEST_STAFF.owner]: [CODES.viewOwn, CODES.create],
   [TEST_STAFF.noPermission]: [],
+  [TEST_STAFF.assetsViewer]: [ASSETS.view],
+  [TEST_STAFF.assetsOwner]: [ASSETS.viewOwn],
+  [TEST_STAFF.assetsBoth]: [ASSETS.view, ASSETS.viewOwn],
+  [TEST_STAFF.assetsEditor]: [ASSETS.edit],
 };
 
 const FAR_FUTURE_EXPIRY_S = 4_102_444_800; // 2100-01-01T00:00:00Z
@@ -86,10 +106,14 @@ const USERS: Readonly<Record<string, AuthenticatedUser>> = {
   [TEST_BEARERS.viewer]: userOf(TEST_STAFF.viewer, false),
   [TEST_BEARERS.owner]: userOf(TEST_STAFF.owner, false),
   [TEST_BEARERS.noPermission]: userOf(TEST_STAFF.noPermission, false),
+  [TEST_BEARERS.assetsViewer]: userOf(TEST_STAFF.assetsViewer, false),
+  [TEST_BEARERS.assetsOwner]: userOf(TEST_STAFF.assetsOwner, false),
+  [TEST_BEARERS.assetsBoth]: userOf(TEST_STAFF.assetsBoth, false),
+  [TEST_BEARERS.assetsEditor]: userOf(TEST_STAFF.assetsEditor, false),
 };
 
 /**
- * Four bearers; no cryptography: the real verifier is `v1/auth`'s facade. As there, an administrator
+ * Eight bearers; no cryptography: the real verifier is `v1/auth`'s facade. As there, an administrator
  * holds every code; a member holds exactly the codes in `HELD`.
  */
 export class StubAccessTokenVerifier implements AccessTokenVerifier {

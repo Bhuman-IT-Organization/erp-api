@@ -351,6 +351,60 @@ describe('FixedEquipmentDepreciationsController (Fastify inject, no network)', (
     );
   });
 
+  describe('an item group reaches this tab: the assets group’s codes alone', () => {
+    const idsOf = (payload: string): string[] =>
+      (JSON.parse(payload) as { data: { id: string }[] }).data.map((row) => row.id);
+
+    it('a member holding only fixedEquipment.assets.view reads every row', async () => {
+      const res = await send('GET', LIST, TEST_BEARERS.assetsViewer);
+      expect(res.statusCode).toBe(HTTP.ok);
+      const ids = idsOf(res.payload);
+      expect(ids).toContain('1');
+      expect(ids).toContain('2');
+    });
+
+    it('a member holding only fixedEquipment.assets.viewOwn reads only their own rows', async () => {
+      const mine = await ctx.repo.create({
+        name: 'Assets own row',
+        term: 12,
+        creatorId: TEST_STAFF.assetsOwner,
+      });
+      const res = await send('GET', LIST, TEST_BEARERS.assetsOwner);
+      expect(res.statusCode).toBe(HTTP.ok);
+      expect(idsOf(res.payload)).toEqual([String(mine.id)]);
+      expect((await send('GET', record(1), TEST_BEARERS.assetsOwner)).statusCode).toBe(
+        HTTP.notFound,
+      );
+    });
+
+    it('a member holding both reads every row: the full view wins', async () => {
+      await ctx.repo.create({
+        name: 'Assets both row',
+        term: 12,
+        creatorId: TEST_STAFF.assetsBoth,
+      });
+      const res = await send('GET', LIST, TEST_BEARERS.assetsBoth);
+      expect(res.statusCode).toBe(HTTP.ok);
+      const ids = idsOf(res.payload);
+      expect(ids).toContain('1');
+      expect(ids).toContain('2');
+    });
+
+    it('a member holding only fixedEquipment.assets.edit can edit, and cannot read the list', async () => {
+      const res = await send('PATCH', record(1), TEST_BEARERS.assetsEditor, {
+        name: 'Edited by assets',
+        term: 24,
+      });
+      expect(res.statusCode).toBe(HTTP.ok);
+      expect(JSON.parse(res.payload)).toMatchObject({
+        id: '1',
+        name: 'Edited by assets',
+        term: 24,
+      });
+      expect((await send('GET', LIST, TEST_BEARERS.assetsEditor)).statusCode).toBe(HTTP.forbidden);
+    });
+  });
+
   describe('POST and PATCH', () => {
     it('POST 201 saves the caller as creator; PATCH changes the name and the term only; one event and one log line each', async () => {
       const res = await send('POST', LIST, TEST_BEARERS.viewer, {

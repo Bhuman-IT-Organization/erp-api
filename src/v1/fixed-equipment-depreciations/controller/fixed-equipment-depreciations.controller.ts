@@ -1,3 +1,4 @@
+import { FIXED_EQUIPMENT_SETTINGS_CODES } from '@erp/contracts';
 import {
   Body,
   Controller,
@@ -15,8 +16,8 @@ import type { FastifyReply } from 'fastify';
 import type { AuthenticatedUser } from '../../../shared/http/auth/access-token-verifier.js';
 import { CurrentUser } from '../../../shared/http/decorators/current-user.decorator.js';
 import {
-  Permissions,
   PermissionsAny,
+  PermissionsRead,
 } from '../../../shared/http/decorators/permissions.decorator.js';
 import { Scope, type ReadScope } from '../../../shared/http/decorators/scope.decorator.js';
 import { replyExport, type ExportFile } from '../../../shared/http/export.js';
@@ -35,21 +36,22 @@ import {
   type FixedEquipmentDepreciationsListResponseDto,
   type FixedEquipmentDepreciationsResponseDto,
 } from '../dto/fixed-equipment-depreciations.dto.js';
-import {
-  FIXED_EQUIPMENT_DEPRECIATIONS_PERMISSIONS,
-  FIXED_EQUIPMENT_DEPRECIATIONS_ROUTES,
-} from '../fixed-equipment-depreciations.routes.js';
+import { FIXED_EQUIPMENT_DEPRECIATIONS_ROUTES } from '../fixed-equipment-depreciations.routes.js';
 import { FixedEquipmentDepreciationsService } from '../service/fixed-equipment-depreciations.service.js';
 
-const { view, viewOwn, create, edit, delete: remove } = FIXED_EQUIPMENT_DEPRECIATIONS_PERMISSIONS;
+/** Who may do what on this tab: the depreciation settings group and the four item groups. */
+const codes = FIXED_EQUIPMENT_SETTINGS_CODES.depreciation;
 
 /**
  * Every handler names its guards and permission: `JwtAuthGuard` answers 401 `ERP-AUTH-0004`
  * without a valid bearer, `PermissionGuard` answers 403 `ERP-AUTH-0005` without the code;
- * `__tests__/route-gates.spec.ts` classifies every method. The reads and the export are the
- * ADR-0033 decision 5 read: `@PermissionsAny(view, viewOwn)` and `@Scope()`, the scope only
- * forwarded (the repository filters on `creator_id`). The writes need `create`, `edit` and `delete`.
- * Controllers hold no logic and never catch.
+ * `__tests__/route-gates.spec.ts` classifies every method. The codes are the tab's five groups
+ * (`FIXED_EQUIPMENT_SETTINGS_CODES.depreciation`: the depreciation settings group and the assets,
+ * licenses, accessories and consumables groups). The reads and the export are
+ * `@PermissionsRead(codes.read)` and `@Scope()`: any group's full view reads every row, else any
+ * group's view own reads the member's own, and the scope is only forwarded (the repository filters
+ * on `creator_id`). Each write needs that action's code in any of the five groups. Controllers hold
+ * no logic and never catch.
  */
 @Controller(FIXED_EQUIPMENT_DEPRECIATIONS_ROUTES.base)
 export class FixedEquipmentDepreciationsController {
@@ -57,10 +59,10 @@ export class FixedEquipmentDepreciationsController {
 
   @Get(FIXED_EQUIPMENT_DEPRECIATIONS_ROUTES.list)
   @UseGuards(JwtAuthGuard, PermissionGuard)
-  @PermissionsAny(view, viewOwn)
+  @PermissionsRead(codes.read)
   @ApiZod({
     summary:
-      'List depreciations (keyset paging, one sort, q); narrowed to the own rows under viewOwn',
+      'List depreciations (keyset paging, one sort, q); narrowed to the own rows under a view own',
     query: listFixedEquipmentDepreciationsQuerySchema,
     responses: { [HTTP_STATUS.OK]: fixedEquipmentDepreciationsListResponseSchema },
     errors: ['ERP-VALIDATION-0001', 'ERP-AUTH-0004', 'ERP-AUTH-0005'],
@@ -75,7 +77,7 @@ export class FixedEquipmentDepreciationsController {
 
   @Get(FIXED_EQUIPMENT_DEPRECIATIONS_ROUTES.export)
   @UseGuards(JwtAuthGuard, PermissionGuard)
-  @PermissionsAny(view, viewOwn)
+  @PermissionsRead(codes.read)
   @ApiZod({
     summary: 'Export every depreciation the list query matches as CSV, Excel, PDF or print rows',
     query: exportFixedEquipmentDepreciationsQuerySchema,
@@ -95,9 +97,9 @@ export class FixedEquipmentDepreciationsController {
 
   @Get(FIXED_EQUIPMENT_DEPRECIATIONS_ROUTES.record)
   @UseGuards(JwtAuthGuard, PermissionGuard)
-  @PermissionsAny(view, viewOwn)
+  @PermissionsRead(codes.read)
   @ApiZod({
-    summary: 'Read one depreciation; missing or hidden by viewOwn is the same 404',
+    summary: 'Read one depreciation; missing or hidden by a view own is the same 404',
     params: fixedEquipmentDepreciationsParamsSchema,
     responses: { [HTTP_STATUS.OK]: fixedEquipmentDepreciationsResponseSchema },
     errors: ['ERP-VALIDATION-0001', 'ERP-AUTH-0004', 'ERP-AUTH-0005', 'ERP-CORE-0004'],
@@ -113,7 +115,7 @@ export class FixedEquipmentDepreciationsController {
   @Post(FIXED_EQUIPMENT_DEPRECIATIONS_ROUTES.list)
   @HttpCode(HTTP_STATUS.CREATED)
   @UseGuards(JwtAuthGuard, PermissionGuard)
-  @Permissions(create)
+  @PermissionsAny(...codes.create)
   @ApiZod({
     summary: 'Create a depreciation; the creator is the signed-in member',
     body: createFixedEquipmentDepreciationsBodySchema,
@@ -129,7 +131,7 @@ export class FixedEquipmentDepreciationsController {
 
   @Patch(FIXED_EQUIPMENT_DEPRECIATIONS_ROUTES.record)
   @UseGuards(JwtAuthGuard, PermissionGuard)
-  @Permissions(edit)
+  @PermissionsAny(...codes.edit)
   @ApiZod({
     summary: 'Change a depreciation’s name and number of months',
     params: fixedEquipmentDepreciationsParamsSchema,
@@ -147,10 +149,10 @@ export class FixedEquipmentDepreciationsController {
   @Delete(FIXED_EQUIPMENT_DEPRECIATIONS_ROUTES.record)
   @HttpCode(HTTP_STATUS.NO_CONTENT)
   @UseGuards(JwtAuthGuard, PermissionGuard)
-  @Permissions(remove)
+  @PermissionsAny(...codes.delete)
   @ApiZod({
     summary:
-      'Delete a depreciation; refused with 409 while an asset model or an asset uses it, or when its use cannot be counted',
+      'Delete a depreciation; refused with 409 while an asset model or an asset uses it, or when its use cannot be checked',
     params: fixedEquipmentDepreciationsParamsSchema,
     responses: { [HTTP_STATUS.NO_CONTENT]: null },
     errors: [
