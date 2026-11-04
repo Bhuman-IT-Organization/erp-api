@@ -496,6 +496,7 @@ describe('the committed register, today', () => {
     // Customer Groups claimed tblcustomers_groups for v1/customer-groups; tblcustomer_groups stays Perfex's.
     // Update this expectation in the same PR that changes either register.
     // Contract Types claimed tblcontracts_types for v1/contract-types.
+    // Estimate Request Statuses claims tblestimate_request_status; Perfex remains a co-writer.
     const nodeOwned = [...map.entries()]
       .filter(([, o]) => o === 'node')
       .map(([t]) => t)
@@ -505,6 +506,7 @@ describe('the committed register, today', () => {
       'tblcost_centers',
       'tblcurrencies',
       'tblcustomers_groups',
+      'tblestimate_request_status',
       'tblexpenses_categories',
       'tblidentity_audit',
       'tblleads_sources',

@@ -1642,16 +1642,18 @@
       ],
       "no_writer_reason": null,
       "readers": [
+        "estimate-request-statuses",
         "perfex-core"
       ],
       "writers": [
+        "estimate-request-statuses",
         "perfex-core"
       ]
     },
-    "evidence_changed": false,
-    "note": "",
-    "owner": "perfex-core",
-    "owner_confidence": "ddl-single",
+    "evidence_changed": true,
+    "note": "The Node estimate-request-statuses API writes name, color and statusorder. Perfex remains a co-writer during coexistence; its delete still checks tblestimate_requests.status only.",
+    "owner": "node",
+    "owner_confidence": "conflict",
     "table": "tblestimate_request_status"
   },
   {

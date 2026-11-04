@@ -81,6 +81,8 @@ export type RouteGate = PermissionCode | readonly PermissionCode[] | typeof ADMI
  * administrator-only).
  * `/setup/ticket-statuses*` is administrator-only as well (plan 06-ticket-statuses): the API
  * asserts the administrator flag for every handler.
+ * `/setup/estimate-request-statuses*` is administrator-only as well (Estimate_request.php:210,
+ * 221, 253); the API asserts the administrator flag for every handler.
  *
  * The Email screens (plan 04.3-07): `/setup/email-templates*` is gated on the mapped Perfex view code
  * (D-09: the editor is read-only without `.edit`, which the api's save and test send declare);
@@ -114,6 +116,9 @@ export const ROUTE_GATES: Readonly<Record<string, RouteGate>> = Object.freeze({
   '/setup/contract-types': ADMIN_GATE,
   '/setup/contract-types/new': ADMIN_GATE,
   '/setup/contract-types/:id': ADMIN_GATE,
+  '/setup/estimate-request-statuses': ADMIN_GATE,
+  '/setup/estimate-request-statuses/new': ADMIN_GATE,
+  '/setup/estimate-request-statuses/:id': ADMIN_GATE,
   '/setup/payment-modes': ADMIN_GATE,
   '/setup/payment-modes/new': ADMIN_GATE,
   '/setup/payment-modes/:id': ADMIN_GATE,
