@@ -508,6 +508,8 @@ describe('the committed register, today', () => {
       'tblexpenses_categories',
       'tblidentity_audit',
       'tblleads_sources',
+      // Lead Statuses: written by v1/lead-statuses; Perfex Kanban still updates order and colour.
+      'tblleads_status',
       'tblmail_sent_emails',
       'tblmail_template_versions',
       'tblmail_templates',

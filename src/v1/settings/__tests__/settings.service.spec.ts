@@ -50,6 +50,7 @@ describe('SETTINGS_ALLOW_LIST (D-22, D-37, lead sources, ticket status, ticket p
       'default_ticket_reply_status',
       ...LEAD_SOURCES_NAMES,
       'email_piping_default_priority',
+      'leads_default_status',
     ];
     expect(SETTINGS_ALLOW_LIST).toHaveLength(expected.length);
     expect(new Set(SETTINGS_ALLOW_LIST).size).toBe(SETTINGS_ALLOW_LIST.length);
@@ -73,6 +74,11 @@ describe('SettingsService', () => {
   it("getOption('expense_credit_payment_mode') answers its row's value (D-37)", async () => {
     const { service } = serviceWith([{ name: 'expense_credit_payment_mode', value: '7' }]);
     await expect(service.getOption('expense_credit_payment_mode')).resolves.toBe('7');
+  });
+
+  it("getOption('leads_default_status') returns its value", async () => {
+    const { service } = serviceWith([{ name: 'leads_default_status', value: '5' }]);
+    await expect(service.getOption('leads_default_status')).resolves.toBe('5');
   });
 
   it("getOption('leads_default_source') answers its row's value", async () => {
