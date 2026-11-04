@@ -251,13 +251,6 @@ describe('FixedEquipmentDepreciationsController (Fastify inject, no network)', (
       expect(JSON.parse(mine.payload)).toEqual({ id: '3', name: 'Straight line', term: 60 });
     });
 
-    it('the export holds only the member’s rows', async () => {
-      const res = await send('GET', `${EXPORT}?format=print&sort=id`, TEST_BEARERS.owner);
-      expect(res.statusCode).toBe(HTTP.ok);
-      const body = JSON.parse(res.payload) as { rows: string[][] };
-      for (const [id] of body.rows) expect(await creatorOf(id ?? '')).toBe(TEST_STAFF.owner);
-    });
-
     it('under view own, the export holds the member’s own rows only (the list gets the own scope)', async () => {
       const mine = await created('Mine to export', TEST_BEARERS.owner);
       const res = await send('GET', `${EXPORT}?format=print`, TEST_BEARERS.owner);

@@ -17,7 +17,6 @@ import {
 } from '../model/fixed-equipment-depreciations.model.js';
 
 const RECORD_NOT_FOUND = 'P2025';
-/** `tblfe_depreciations.id` is an unsigned INT. */
 
 const COLUMNS = { id: true, name: true, term: true, creator_id: true } as const;
 
