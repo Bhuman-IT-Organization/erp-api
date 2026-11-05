@@ -138,6 +138,9 @@ describe('ROUTE_GATES is a well-formed declaration', () => {
 
   it('covers exactly the declared routes, each an absolute path with at most one :name segment', () => {
     expect(GATED_ROUTES).toEqual([
+      '/setup/contract-types',
+      '/setup/contract-types/:id',
+      '/setup/contract-types/new',
       '/setup/cost-centers',
       '/setup/cost-centers/:id',
       '/setup/cost-centers/new',
@@ -173,7 +176,9 @@ describe('ROUTE_GATES is a well-formed declaration', () => {
       '/setup/taxes',
       '/setup/taxes/:id',
       '/setup/taxes/new',
-
+      '/setup/ticket-priorities',
+      '/setup/ticket-priorities/:id',
+      '/setup/ticket-priorities/new',
       '/setup/ticket-statuses',
       '/setup/ticket-statuses/:id',
       '/setup/ticket-statuses/new',

@@ -35,7 +35,7 @@ function build() {
 
 describe('TicketStatusesRepository', () => {
   it('lists pages with ticket counts and the default id-desc ordering', async () => {
-    const { repository } = build();
+    const { repository, client } = build();
     const page = await repository.list({
       search: null,
       sortField: 'id',
@@ -44,6 +44,17 @@ describe('TicketStatusesRepository', () => {
       limit: 50,
     });
     expect(page.items[0]).toMatchObject({ ticketstatusid: 3, ticket_count: 5 });
+    expect(client.tbltickets.groupBy).toHaveBeenCalledWith({
+      by: ['status'],
+      where: { status: { in: [3] } },
+      _count: { _all: true },
+    });
+    await repository.listAll();
+    expect(client.tbltickets.groupBy).toHaveBeenLastCalledWith({
+      by: ['status'],
+      where: { status: { in: [3] } },
+      _count: { _all: true },
+    });
     expect(page.total).toBeGreaterThanOrEqual(1);
   });
 
@@ -53,6 +64,20 @@ describe('TicketStatusesRepository', () => {
     await expect(repository.update(404, { name: 'Missing' })).resolves.toBeNull();
     await expect(repository.hasTicketReferences(3)).resolves.toBe(true);
     expect(client.tbltickets.count).toHaveBeenCalledWith({ where: { status: 3 } });
+  });
+
+  it('treats digit-only searches above MySQL INT as names only', async () => {
+    const { repository, client } = build();
+    await repository.list({
+      search: '2147483648',
+      sortField: 'id',
+      order: 'desc',
+      cursor: null,
+      limit: 50,
+    });
+    expect(client.tbltickets_status.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { OR: [{ name: { contains: '2147483648' } }] } }),
+    );
   });
 
   it('deletes only when the row exists and count failures propagate', async () => {

@@ -12,13 +12,22 @@
  * later code is `own` — and writes it onto the request, the one place `scopeFrom` reads it
  * (threat T-3.1-12). An admin needs no branch here: the verifier answers true for every code
  * (ADR-0033 decision 4), so index 0 holds and the scope is `all`.
+ *
+ * `@PermissionsRead({ all, own })` is the read several permission groups open: any `all` code is the
+ * scope `all`, else any `own` code is the scope `own`, else ERP-AUTH-0005 naming every code. Declared
+ * beside the other forms it can only add a requirement and only narrow the scope, never widen it.
  */
 import { Inject, Injectable, type CanActivate, type ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { FastifyRequest } from 'fastify';
 import { AppError } from '../../errors/app-error.js';
 import { ACCESS_TOKEN_VERIFIER, type AccessTokenVerifier } from '../auth/access-token-verifier.js';
-import { PERMISSIONS_ANY_KEY, PERMISSIONS_KEY } from '../decorators/permissions.decorator.js';
+import {
+  PERMISSIONS_ANY_KEY,
+  PERMISSIONS_KEY,
+  PERMISSIONS_READ_KEY,
+  type ReadCodes,
+} from '../decorators/permissions.decorator.js';
 import type { ReadScope } from '../decorators/scope.decorator.js';
 
 @Injectable()
@@ -34,7 +43,11 @@ export class PermissionGuard implements CanActivate {
       this.reflector.getAllAndOverride<string[] | undefined>(PERMISSIONS_KEY, targets) ?? [];
     const anyCodes =
       this.reflector.getAllAndOverride<string[] | undefined>(PERMISSIONS_ANY_KEY, targets) ?? [];
-    if (codes.length === 0 && anyCodes.length === 0) return true;
+    const read = this.reflector.getAllAndOverride<ReadCodes | undefined>(
+      PERMISSIONS_READ_KEY,
+      targets,
+    );
+    if (codes.length === 0 && anyCodes.length === 0 && read === undefined) return true;
     const request = context.switchToHttp().getRequest<FastifyRequest>();
     const { user } = request;
     if (user === undefined) throw new AppError('ERP-AUTH-0004');
@@ -57,7 +70,23 @@ export class PermissionGuard implements CanActivate {
       }
       scope = admitted === anyCodes[0] ? 'all' : 'own';
     }
+    if (read !== undefined && (await this.readScope(user.staffId, read)) === 'own') scope = 'own';
     request.erpReadScope = scope;
     return true;
+  }
+
+  /** The scope `@PermissionsRead` gives: widest first, and a refusal names every code it tried. */
+  private async readScope(staffId: number, read: ReadCodes): Promise<ReadScope> {
+    if (await this.holdsAny(staffId, read.all)) return 'all';
+    if (await this.holdsAny(staffId, read.own)) return 'own';
+    throw new AppError(
+      'ERP-AUTH-0005',
+      `Missing permission ${[...read.all, ...read.own].join(' or ')}`,
+    );
+  }
+
+  private async holdsAny(staffId: number, codes: readonly string[]): Promise<boolean> {
+    const held = await Promise.all(codes.map((code) => this.verifier.hasPermission(staffId, code)));
+    return held.includes(true);
   }
 }

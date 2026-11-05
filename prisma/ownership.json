@@ -1141,8 +1141,8 @@
       ]
     },
     "evidence_changed": false,
-    "note": "",
-    "owner": "perfex-core",
+    "note": "Written by v1/contract-types; Perfex's delete is closed at Nginx; the quick add on the contract form stays on Perfex.",
+    "owner": "node",
     "owner_confidence": "write-single",
     "table": "tblcontracts_types"
   },
@@ -8356,8 +8356,8 @@
       ]
     },
     "evidence_changed": false,
-    "note": "",
-    "owner": "perfex-core",
+    "note": "Ticket Priority claimed tbltickets_priorities for v1/ticket-priorities. Perfex's screen is closed at Nginx.",
+    "owner": "node",
     "owner_confidence": "write-single",
     "table": "tbltickets_priorities"
   },

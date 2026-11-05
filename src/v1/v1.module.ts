@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from './auth/auth.module.js';
 import { BrandingModule } from './branding/branding.module.js';
+import { ContractTypesModule } from './contract-types/contract-types.module.js';
 import { CostCentersModule } from './cost-centers/cost-centers.module.js';
 import { CurrenciesModule } from './currencies/currencies.module.js';
 import { CustomFieldsModule } from './custom-fields/custom-fields.module.js';
@@ -17,6 +18,8 @@ import { TaxesModule } from './taxes/taxes.module.js';
 import { ServicesModule } from './services/services.module.js';
 import { TicketStatusesModule } from './ticket-statuses/ticket-statuses.module.js';
 import { TodoModule } from './todo/todo.module.js';
+import { TicketPrioritiesModule } from './ticket-priorities/ticket-priorities.module.js';
+
 /** Registers every v1 module. Route prefix `api/v1` is applied globally in main.ts. */
 @Module({
   imports: [
@@ -29,6 +32,7 @@ import { TodoModule } from './todo/todo.module.js';
     MailModule,
     TaxesModule,
     CostCentersModule,
+    ContractTypesModule,
     PaymentModesModule,
     CurrenciesModule,
     DepartmentsModule,
@@ -38,6 +42,7 @@ import { TodoModule } from './todo/todo.module.js';
     TicketStatusesModule,
     CustomerGroupsModule,
     TodoModule,
+    TicketPrioritiesModule,
   ],
 })
 export class V1Module {}

@@ -5,4 +5,5 @@
 export * from './permissions.catalogue.js';
 export * from './perfex-mapping.js';
 export * from './route-gates.js';
+export * from './fixed-equipment-settings.js';
 export * from './currency-code.js';

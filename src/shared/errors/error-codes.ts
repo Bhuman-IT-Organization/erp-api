@@ -61,6 +61,8 @@ export const ERROR_CODES = {
   },
   'ERP-TAXES-0003': { status: 409, title: 'A tax with that name already exists' },
   'ERP-TAXES-0004': { status: 409, title: 'The tax is a default tax in Settings' },
+  // v1/contract-types (Task card 04): 0001 refuses a delete while any contract (or goal) still names the contract type.
+  'ERP-CONTRACTTYPES-0001': { status: 409, title: 'The contract type is still in use' },
   // v1/cost-centers (plan 04.1-18): 0001 refuses a delete while any referencing column still names the cost center (D-07, D-28).
   'ERP-COSTCENTERS-0001': { status: 409, title: 'The cost center is still in use' },
   // v1/services: 0001 refuses a delete while any ticket still uses the service.
@@ -99,6 +101,8 @@ export const ERROR_CODES = {
   'ERP-FILES-0002': { status: 413, title: 'File too large' },
   'ERP-UPSTREAM-0001': { status: 503, title: 'An upstream system is unavailable' }, // ADR-0031 §7 load shedding
   'ERP-INTERNAL-0001': { status: 500, title: 'Internal error' },
+  'ERP-TICKETPRIORITIES-0001': { status: 409, title: 'Priority in use by a ticket' },
+  'ERP-TICKETPRIORITIES-0002': { status: 409, title: 'Priority is the email-piping default' },
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_CODES;
