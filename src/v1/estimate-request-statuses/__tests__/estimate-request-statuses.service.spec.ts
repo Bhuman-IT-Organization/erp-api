@@ -1,7 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AppError } from '../../../shared/errors/app-error.js';
+import type { DomainEvent } from '../../../shared/events/domain-event.js';
+import { CSV_BOM } from '../../../shared/http/csv.js';
 import type { AuthenticatedUser } from '../../../shared/http/auth/access-token-verifier.js';
 import type { LoggerService } from '../../../shared/logger/logger.service.js';
+import {
+  EstimateRequestStatusCreatedV1,
+  EstimateRequestStatusDeletedV1,
+  EstimateRequestStatusUpdatedV1,
+  type EstimateRequestStatusesEventPayload,
+} from '../events/published.js';
 import type { EstimateRequestStatusRow } from '../model/estimate-request-statuses.model.js';
 import type { EstimateRequestStatusesRepository } from '../repository/estimate-request-statuses.repository.js';
 import { EstimateRequestStatusesService } from '../service/estimate-request-statuses.service.js';
@@ -30,8 +38,14 @@ const ROW: EstimateRequestStatusRow = {
 
 function build(overrides: Partial<EstimateRequestStatusesRepository> = {}) {
   const methods = {
-    list: vi.fn(),
-    count: vi.fn(),
+    list: vi.fn().mockResolvedValue({
+      items: [ROW],
+      nextCursor: null,
+      prevCursor: null,
+      total: 1,
+      rangeStart: 1,
+    }),
+    count: vi.fn().mockResolvedValue(2),
     findById: vi.fn().mockResolvedValue(ROW),
     create: vi.fn().mockResolvedValue(ROW),
     update: vi.fn().mockResolvedValue(ROW),
@@ -43,7 +57,11 @@ function build(overrides: Partial<EstimateRequestStatusesRepository> = {}) {
     ...methods,
     ...overrides,
   } as unknown as EstimateRequestStatusesRepository;
-  const transport = { publish: vi.fn().mockResolvedValue(undefined) };
+  const transport = {
+    publish: vi
+      .fn<(event: DomainEvent<string, EstimateRequestStatusesEventPayload>) => Promise<void>>()
+      .mockResolvedValue(undefined),
+  };
   const logger = { log: vi.fn() } as unknown as LoggerService;
   const service = new EstimateRequestStatusesService(
     new EstimateRequestStatusesValidator(),
@@ -85,6 +103,71 @@ describe('EstimateRequestStatusesService', () => {
     expect(transport.publish).toHaveBeenCalledOnce();
   });
 
+  it('uses the existing row count plus one when statusorder is omitted', async () => {
+    const { service, methods } = build();
+    await service.create(ADMIN, { name: 'Ready' });
+    expect(methods.count).toHaveBeenCalledWith({
+      search: null,
+      sortField: 'name',
+      order: 'asc',
+      cursor: null,
+      limit: 1,
+    });
+    expect(methods.create).toHaveBeenCalledWith({
+      name: 'Ready',
+      color: null,
+      statusorder: 3,
+    });
+  });
+
+  it('publishes the create event class and { id, at } payload', async () => {
+    const { service, transport } = build();
+    await service.create(ADMIN, { name: 'Ready', statusorder: 3 });
+    const event = transport.publish.mock.calls[0]?.[0];
+    expect(event).toBeInstanceOf(EstimateRequestStatusCreatedV1);
+    expect(event?.payload).toEqual({ id: 3, at: '2026-10-24T10:30:00.000Z' });
+  });
+
+  it('updates, returns 404 for a missing row, and publishes the update event', async () => {
+    const { service, methods, transport } = build();
+    await expect(service.update(ADMIN, { id: '3' }, { name: 'Available' })).resolves.toMatchObject({
+      id: '3',
+      name: 'Ready',
+    });
+    expect(methods.update).toHaveBeenCalledWith(3, { name: 'Available' });
+    const event = transport.publish.mock.calls[0]?.[0];
+    expect(event).toBeInstanceOf(EstimateRequestStatusUpdatedV1);
+    expect(event?.payload).toEqual({ id: 3, at: '2026-10-24T10:30:00.000Z' });
+    const missing = build({ update: vi.fn().mockResolvedValue(null) });
+    const error = await failure(missing.service.update(ADMIN, { id: '4' }, { name: 'Missing' }));
+    expect(error.code).toBe('ERP-CORE-0004');
+  });
+
+  it('gets and lists stored statuses through the transformer', async () => {
+    const { service, methods } = build();
+    await expect(service.get(ADMIN, { id: '3' })).resolves.toMatchObject({
+      id: '3',
+      name: 'Ready',
+    });
+    await expect(service.list(ADMIN, { sort: 'name' })).resolves.toMatchObject({
+      data: [{ id: '3', name: 'Ready' }],
+      meta: { total: 1 },
+    });
+    expect(methods.list).toHaveBeenCalledWith({
+      search: null,
+      sortField: 'name',
+      order: 'asc',
+      cursor: null,
+      limit: 50,
+    });
+  });
+
+  it('exports rows as CSV', async () => {
+    const { service } = build();
+    const file = await service.exportCsv(ADMIN, {});
+    expect(file.body).toContain(`${CSV_BOM}id,name,total_request\r\n3,Ready,0`);
+  });
+
   it('returns the reference error before checking a flagged status', async () => {
     const flagged = { ...ROW, flag: 'default' };
     const findById = vi.fn().mockResolvedValue(flagged);
@@ -115,12 +198,22 @@ describe('EstimateRequestStatusesService', () => {
     });
     const error = await failure(service.remove(ADMIN, { id: '3' }));
     expect(error.code).toBe('ERP-ESTIMATEREQUESTSTATUSES-0001');
+    expect(error.message).toBe('its use could not be counted');
+  });
+
+  it('distinguishes a failed count from a positive reference count', async () => {
+    const { service } = build({ deleteReferenceCount: vi.fn().mockResolvedValue(1) });
+    const error = await failure(service.remove(ADMIN, { id: '3' }));
+    expect(error.code).toBe('ERP-ESTIMATEREQUESTSTATUSES-0001');
+    expect(error.message).toBe('estimate request status is still referenced');
   });
 
   it('deletes an unreferenced, unflagged row', async () => {
     const { service, methods, transport } = build();
     await expect(service.remove(ADMIN, { id: '3' })).resolves.toBeUndefined();
     expect(methods.remove).toHaveBeenCalledWith(3);
-    expect(transport.publish).toHaveBeenCalledOnce();
+    const event = transport.publish.mock.calls[0]?.[0];
+    expect(event).toBeInstanceOf(EstimateRequestStatusDeletedV1);
+    expect(event?.payload).toEqual({ id: 3, at: '2026-10-24T10:30:00.000Z' });
   });
 });

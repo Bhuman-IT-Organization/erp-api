@@ -1,6 +1,7 @@
 import type { DecodedCursor, ListPageMeta } from '../../../shared/http/keyset.js';
 
 export const ESTIMATE_REQUEST_STATUS_ID_MAX = 4_294_967_295;
+export const ESTIMATE_REQUEST_STATUSES_FACADE_MAX_ROWS = 1000;
 
 export interface EstimateRequestStatusRow {
   readonly id: number;

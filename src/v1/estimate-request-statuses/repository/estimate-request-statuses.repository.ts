@@ -1,10 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { z } from 'zod';
 import { Prisma } from '../../../shared/db/generated/client.js';
+import { AppError } from '../../../shared/errors/app-error.js';
 import { PrismaService } from '../../../shared/db/prisma.service.js';
 import { encodeCursor, keysetWhere, type KeyValue } from '../../../shared/http/keyset.js';
-import { LIST_QUERY_LIMITS } from '../../../shared/http/pagination.js';
-import { ESTIMATE_REQUEST_STATUS_ID_MAX } from '../model/estimate-request-statuses.model.js';
+import {
+  ESTIMATE_REQUEST_STATUS_ID_MAX,
+  ESTIMATE_REQUEST_STATUSES_FACADE_MAX_ROWS,
+} from '../model/estimate-request-statuses.model.js';
 import type {
   EstimateRequestStatusPatch,
   EstimateRequestStatusRow,
@@ -28,14 +31,6 @@ const countRowsSchema = z.array(z.object({ n: z.union([z.bigint(), z.number().in
 const groupedCountsSchema = z.array(
   z.object({ status: z.number().int().nullable(), _count: z.object({ _all: z.number().int() }) }),
 );
-const DEFAULT_LIST_REQUEST: EstimateRequestStatusesListRequest = {
-  search: null,
-  sortField: 'name',
-  order: 'asc',
-  cursor: null,
-  limit: LIST_QUERY_LIMITS.default,
-};
-
 type WhereValue = Record<string, unknown>;
 type Key = readonly [KeyValue, number];
 
@@ -99,9 +94,8 @@ export class EstimateRequestStatusesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async list(request: EstimateRequestStatusesListRequest): Promise<EstimateRequestStatusesPage> {
-    const normalized = { ...DEFAULT_LIST_REQUEST, ...request };
-    const { sortField, order, cursor, limit } = normalized;
-    const match = matchOf(normalized.search);
+    const { search, sortField, order, cursor, limit } = request;
+    const match = matchOf(search);
     let read = order;
     if (cursor?.direction === 'before') read = order === 'asc' ? 'desc' : 'asc';
     const rows = rowsSchema.parse(
@@ -235,9 +229,13 @@ export class EstimateRequestStatusesRepository {
     const rows = rowsSchema.parse(
       await this.prisma.client.tblestimate_request_status.findMany({
         orderBy: [{ name: 'asc' }, { id: 'asc' }],
+        take: ESTIMATE_REQUEST_STATUSES_FACADE_MAX_ROWS + 1,
         select: COLUMNS,
       }),
     );
+    if (rows.length > ESTIMATE_REQUEST_STATUSES_FACADE_MAX_ROWS) {
+      throw new AppError('ERP-INTERNAL-0001', 'too many estimate request statuses');
+    }
     if (rows.length === 0) return [];
     const ids = rows.map(({ id }) => id);
     const counts = groupedCountsSchema.parse(

@@ -38,6 +38,10 @@ function inUse(): AppError {
   );
 }
 
+function useCouldNotBeCounted(): AppError {
+  return new AppError('ERP-ESTIMATEREQUESTSTATUSES-0001', 'its use could not be counted');
+}
+
 function builtIn(): AppError {
   return new AppError(
     'ERP-ESTIMATEREQUESTSTATUSES-0002',
@@ -82,10 +86,20 @@ export class EstimateRequestStatusesService {
   async create(actor: AuthenticatedUser, body: unknown): Promise<EstimateRequestStatusResponseDto> {
     this.assertAdministrator(actor);
     const input = this.validator.parseCreateBody(body);
+    const statusorder =
+      input.statusorder === undefined
+        ? (await this.repository.count({
+            search: null,
+            sortField: 'name',
+            order: 'asc',
+            cursor: null,
+            limit: 1,
+          })) + 1
+        : input.statusorder;
     const row = await this.repository.create({
       name: input.name,
       color: input.color === '' ? '#757575' : (input.color ?? null),
-      statusorder: input.statusorder ?? null,
+      statusorder,
     });
     await this.transport.publish(
       new EstimateRequestStatusCreatedV1({ id: row.id, at: this.now().toISOString() }),
@@ -126,7 +140,7 @@ export class EstimateRequestStatusesService {
     try {
       references = await this.repository.deleteReferenceCount(id);
     } catch {
-      throw inUse();
+      throw useCouldNotBeCounted();
     }
     if (references > 0) throw inUse();
     if (row.flag !== null && row.flag !== '') throw builtIn();

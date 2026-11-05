@@ -10,7 +10,7 @@ Administrator-only API for the Estimate Request Statuses Setup screen. API route
 
 - `tblestimate_request_status` is claimed by this module in `prisma/ownership.json`. Prisma writes
   only `name`, `color`, and `statusorder`; `id` is database-generated and `flag` is never writable.
-  Perfex remains a co-writer during coexistence.
+  Perfex's status add, edit, and delete routes are closed at Nginx.
 - `tblestimate_requests.status` and `tblestimate_request_forms.status` are discovered from
   `information_schema.COLUMNS` and read to refuse deleting a referenced status. Missing columns are
   skipped; a probe/count error refuses deletion with `ERP-ESTIMATEREQUESTSTATUSES-0001`.
@@ -18,8 +18,10 @@ Administrator-only API for the Estimate Request Statuses Setup screen. API route
 
 ## Facade surface
 
+- `describe()` returns `{ module: 'estimate-request-statuses', version: 1 }`.
 - `findById(id)` returns the stored status or `null`.
-- `listAll()` returns all statuses with estimate-request counts.
+- `listAll()` returns all statuses with estimate-request counts. It refuses above 1000 rows with
+  `ERP-INTERNAL-0001`; it never truncates.
 
 The facade is read-only and has no actor; it does not assert an administrator flag.
 
@@ -41,13 +43,23 @@ The three setup screen routes are `ADMIN_GATE`s in `@erp/contracts`.
 Responses preserve the web contract: `id` is a string and each record contains `name`, `color`,
 `statusorder`, `flag`, and `total_request`. Request bodies are strict; `flag`, `id`, and all other
 undeclared fields are rejected. Names are trimmed and limited to 50 characters, colors are limited
-to 10 characters, and order accepts a whole number or blank/null (`null` is stored). On create only,
-a blank color is stored as `#757575`.
+to 10 characters, and order accepts a whole number or blank/null (`null` is stored); when omitted on
+create, order defaults to the current status row count plus one. On create only, a blank color is
+stored as `#757575`.
 
 Delete checks both reference columns discovered in `information_schema.COLUMNS`. **Difference:**
 Perfex checks only `tblestimate_requests.status`; this API also checks `tblestimate_request_forms.status`.
 The reference check runs before the built-in `flag` check, so a referenced flagged status returns
 `ERP-ESTIMATEREQUESTSTATUSES-0001`.
+
+## Legacy parity
+
+| Behavior               | Perfex                                                                    | Node                                                                                           | Difference                                                                                                 |
+| ---------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Name storage           | Uses the submitted name.                                                  | Trims the name and limits it to 50 characters.                                                 | **Difference:** trimming provides a normalized value; the legacy column is `VARCHAR(50)`.                  |
+| Default order          | Uses the current status row count plus one when `statusorder` is omitted. | Uses the same count-plus-one default; an explicit blank is stored as `null`.                   | **Difference:** explicit blank is represented as `null` to preserve the distinction from an omitted order. |
+| Search                 | Searches by status name.                                                  | Searches by name and an all-digit status id.                                                   | **Difference:** id matching supports direct lookup from the list without changing name matching.           |
+| Delete reference check | Checks `tblestimate_requests.status`.                                     | Checks both `tblestimate_requests.status` and `tblestimate_request_forms.status` when present. | **Difference:** the additional forms check prevents deleting a status still used by a form.                |
 
 ## Events published
 

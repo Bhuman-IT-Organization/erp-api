@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AppError } from '../../../shared/errors/app-error.js';
+import { encodeCursor } from '../../../shared/http/keyset.js';
 import {
   ESTIMATE_REQUEST_STATUS_COLOR_MAX,
   ESTIMATE_REQUEST_STATUS_NAME_MAX,
@@ -35,11 +36,40 @@ describe('EstimateRequestStatusesValidator', () => {
     });
   });
 
+  it('uses the last repeated q and treats an empty q as no search', () => {
+    expect(validator.parseListQuery({ q: ['first', 'last'] }).search).toBe('last');
+    expect(validator.parseListQuery({ q: '' }).search).toBeNull();
+  });
+
+  it('refuses page paging, foreign cursors, and tampered cursors', () => {
+    expect(rejected(() => validator.parseListQuery({ page: '2' })).extras?.issues).toEqual([
+      expect.objectContaining({ path: ['page'] }),
+    ]);
+    expect(
+      rejected(() =>
+        validator.parseListQuery({
+          cursor: encodeCursor('id', [3, 3], 'after'),
+          sort: 'name',
+        }),
+      ).extras?.issues,
+    ).toEqual([expect.objectContaining({ path: ['cursor'] })]);
+    const tampered = Buffer.from(
+      JSON.stringify({ s: 'name', k: ['Ready', 3], d: 'sideways' }),
+    ).toString('base64url');
+    expect(rejected(() => validator.parseListQuery({ cursor: tampered })).extras?.issues).toEqual([
+      expect.objectContaining({ path: ['cursor'] }),
+    ]);
+  });
+
   it('validates ids, strict bodies, and never accepts flag as a writable field', () => {
     expect(validator.parseParams({ id: String(ESTIMATE_REQUEST_STATUS_ID_MAX) }).id).toBe(
       ESTIMATE_REQUEST_STATUS_ID_MAX,
     );
     expect(rejected(() => validator.parseParams({ id: '0' })).code).toBe('ERP-VALIDATION-0001');
+    expect(
+      rejected(() => validator.parseParams({ id: String(ESTIMATE_REQUEST_STATUS_ID_MAX + 1) }))
+        .code,
+    ).toBe('ERP-VALIDATION-0001');
     expect(
       rejected(() => validator.parseCreateBody({ name: 'Ready', flag: 'built-in' })).code,
     ).toBe('ERP-VALIDATION-0001');

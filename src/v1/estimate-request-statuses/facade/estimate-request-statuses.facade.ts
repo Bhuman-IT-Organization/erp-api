@@ -15,6 +15,7 @@ export class EstimateRequestStatusesFacade {
     return this.service.findById(id);
   }
 
+  /** Refuses with ERP-INTERNAL-0001 above the 1000-row facade limit; it never truncates. */
   listAll(): Promise<readonly EstimateRequestStatusRow[]> {
     return this.service.listAll();
   }

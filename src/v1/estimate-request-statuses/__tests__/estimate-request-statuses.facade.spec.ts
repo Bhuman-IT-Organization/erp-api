@@ -1,24 +1,38 @@
-import { describe, expect, it, vi } from 'vitest';
-import type { EstimateRequestStatusesService } from '../service/estimate-request-statuses.service.js';
+import 'reflect-metadata';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { EstimateRequestStatusesFacade } from '../facade/estimate-request-statuses.facade.js';
+import {
+  createEstimateRequestStatusesTestApp,
+  type EstimateRequestStatusesTestApp,
+} from './create-estimate-request-statuses-test-app.js';
 
 describe('EstimateRequestStatusesFacade', () => {
-  it('delegates read-only status lookup methods', async () => {
-    const row = {
-      id: 2,
-      name: 'Ready',
-      color: null,
-      statusorder: null,
-      flag: null,
-      total_request: 0,
-    };
-    const findById = vi.fn().mockResolvedValue(row);
-    const listAll = vi.fn().mockResolvedValue([row]);
-    const service = { findById, listAll } as unknown as EstimateRequestStatusesService;
-    const facade = new EstimateRequestStatusesFacade(service);
-    await expect(facade.findById(2)).resolves.toEqual(row);
-    await expect(facade.listAll()).resolves.toEqual([row]);
-    expect(findById).toHaveBeenCalledWith(2);
-    expect(listAll).toHaveBeenCalledOnce();
+  let ctx: EstimateRequestStatusesTestApp;
+  let facade: EstimateRequestStatusesFacade;
+
+  beforeAll(async () => {
+    ctx = await createEstimateRequestStatusesTestApp();
+    facade = ctx.moduleRef.get(EstimateRequestStatusesFacade);
+  });
+
+  afterAll(async () => {
+    await ctx.close();
+  });
+
+  it('resolves through the module and describes the module', () => {
+    expect(facade.describe()).toEqual({ module: 'estimate-request-statuses', version: 1 });
+  });
+
+  it('returns all statuses with estimate-request counts in name order', async () => {
+    expect((await facade.listAll()).map(({ id, name }) => [id, name])).toEqual([
+      [3, 'Closed'],
+      [1, 'Open'],
+      [2, 'Ready'],
+    ]);
+  });
+
+  it('returns a stored status or null when absent', async () => {
+    await expect(facade.findById(2)).resolves.toMatchObject({ id: 2, name: 'Ready' });
+    await expect(facade.findById(404)).resolves.toBeNull();
   });
 });
