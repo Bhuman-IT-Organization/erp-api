@@ -15,12 +15,13 @@ import {
 import { registerRequestId } from '../../../shared/http/request-id.js';
 import { LoggerModule } from '../../../shared/logger/logger.module.js';
 import { LoggerService } from '../../../shared/logger/logger.service.js';
+import { SettingsFacade } from '../../settings/index.js';
+import { SettingsModule } from '../../settings/settings.module.js';
 import type { TodoListRequest, TodoRow } from '../model/todo.model.js';
 import { TodoRepository } from '../repository/todo.repository.js';
 import { TodoService } from '../service/todo.service.js';
 import { TodoModule } from '../todo.module.js';
 import { TODO_ROUTES } from '../todo.routes.js';
-import { SettingsFacade } from '../../settings/index.js';
 
 const HTTP = {
   ok: 200,
@@ -77,6 +78,19 @@ class TodoTestVerifier implements AccessTokenVerifier {
   exports: [ACCESS_TOKEN_VERIFIER],
 })
 class TodoTestVerifierModule {}
+
+@Module({
+  providers: [
+    {
+      provide: SettingsFacade,
+      useValue: {
+        getOption: vi.fn().mockResolvedValue('UTC'),
+      },
+    },
+  ],
+  exports: [SettingsFacade],
+})
+class TodoTestSettingsModule {}
 
 function createTodoRow(
   id: number,
@@ -157,6 +171,7 @@ function createRepository() {
     remove: vi.fn((staffId: number, id: number) => {
       const index = rows.findIndex((row) => row.staffId === staffId && row.id === id);
       if (index < 0) return false;
+
       rows.splice(index, 1);
       return true;
     }),
@@ -173,7 +188,7 @@ function createRepository() {
 }
 
 describe('TodoController (Fastify inject)', () => {
-  let app: NestFastifyApplication;
+  let app: NestFastifyApplication | undefined;
   let rows: TodoRow[];
   let repository: ReturnType<typeof createRepository>['repository'];
 
@@ -189,6 +204,14 @@ describe('TodoController (Fastify inject)', () => {
     authorization: `Bearer ${token}`,
   });
 
+  function getApp(): NestFastifyApplication {
+    if (!app) {
+      throw new Error('Test application was not initialized');
+    }
+
+    return app;
+  }
+
   beforeAll(async () => {
     const fake = createRepository();
     repository = fake.repository;
@@ -197,12 +220,10 @@ describe('TodoController (Fastify inject)', () => {
     const moduleRef = await Test.createTestingModule({
       imports: [LoggerModule, EventsModule, TodoTestVerifierModule, TodoModule],
     })
+      .overrideModule(SettingsModule)
+      .useModule(TodoTestSettingsModule)
       .overrideProvider(TodoRepository)
       .useValue(repository)
-      .overrideProvider(SettingsFacade)
-      .useValue({
-        getOption: vi.fn().mockResolvedValue('UTC'),
-      })
       .overrideProvider(DOMAIN_EVENT_PUBLISHER)
       .useValue({ publish })
       .overrideProvider(LoggerService)
@@ -213,25 +234,34 @@ describe('TodoController (Fastify inject)', () => {
 
     app = moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
 
-    registerRequestId(app);
-    app.setGlobalPrefix(API_PREFIX, { exclude: [...UNPREFIXED_ROUTES] });
-    app.useGlobalFilters(new ProblemDetailsFilter(logger as unknown as LoggerService));
+    registerRequestId(getApp());
+    getApp().setGlobalPrefix(API_PREFIX, { exclude: [...UNPREFIXED_ROUTES] });
+    getApp().useGlobalFilters(new ProblemDetailsFilter(logger as unknown as LoggerService));
 
-    await app.init();
-    await app.getHttpAdapter().getInstance().ready();
+    await getApp().init();
+    await getApp().getHttpAdapter().getInstance().ready();
   });
 
   afterAll(async () => {
-    await app.close();
+    if (app) {
+      await app.close();
+    }
   });
 
   beforeEach(() => {
+    rows.splice(
+      0,
+      rows.length,
+      createTodoRow(1, 1, 'Admin todo'),
+      createTodoRow(2, 2, 'Member todo'),
+    );
+
     publish.mockClear();
     vi.clearAllMocks();
   });
 
   it('returns 401 without a valid bearer', async () => {
-    const response = await app.inject({
+    const response = await getApp().inject({
       method: 'GET',
       url: `${LIST}?status=unfinished`,
     });
@@ -240,7 +270,7 @@ describe('TodoController (Fastify inject)', () => {
   });
 
   it('allows a signed-in non-admin member to create a todo', async () => {
-    const response = await app.inject({
+    const response = await getApp().inject({
       method: 'POST',
       url: LIST,
       headers: bearer(TEST_BEARERS.member),
@@ -256,7 +286,7 @@ describe('TodoController (Fastify inject)', () => {
   });
 
   it('lists only the signed-in member todos', async () => {
-    const response = await app.inject({
+    const response = await getApp().inject({
       method: 'GET',
       url: `${LIST}?status=unfinished`,
       headers: bearer(TEST_BEARERS.member),
@@ -271,11 +301,11 @@ describe('TodoController (Fastify inject)', () => {
 
     expect(body.data.map((item) => item.description)).toContain('Member todo');
     expect(body.data.map((item) => item.description)).not.toContain('Admin todo');
-    expect(body.meta.total).toBe(2);
+    expect(body.meta.total).toBe(1);
   });
 
   it('does not allow a member to read another member todo', async () => {
-    const response = await app.inject({
+    const response = await getApp().inject({
       method: 'GET',
       url: record(1),
       headers: bearer(TEST_BEARERS.member),
@@ -285,7 +315,7 @@ describe('TodoController (Fastify inject)', () => {
   });
 
   it('updates the description of the member todo', async () => {
-    const response = await app.inject({
+    const response = await getApp().inject({
       method: 'PATCH',
       url: record(2),
       headers: bearer(TEST_BEARERS.member),
@@ -299,7 +329,7 @@ describe('TodoController (Fastify inject)', () => {
   });
 
   it('finishes and reopens the member todo', async () => {
-    const finished = await app.inject({
+    const finished = await getApp().inject({
       method: 'PATCH',
       url: `${record(2)}/finished`,
       headers: bearer(TEST_BEARERS.member),
@@ -309,7 +339,7 @@ describe('TodoController (Fastify inject)', () => {
     expect(finished.statusCode).toBe(HTTP.ok);
     expect((JSON.parse(finished.payload) as { finished: boolean }).finished).toBe(true);
 
-    const reopened = await app.inject({
+    const reopened = await getApp().inject({
       method: 'PATCH',
       url: `${record(2)}/finished`,
       headers: bearer(TEST_BEARERS.member),
@@ -321,7 +351,7 @@ describe('TodoController (Fastify inject)', () => {
   });
 
   it('rejects an invalid create body', async () => {
-    const response = await app.inject({
+    const response = await getApp().inject({
       method: 'POST',
       url: LIST,
       headers: bearer(TEST_BEARERS.member),
@@ -332,7 +362,7 @@ describe('TodoController (Fastify inject)', () => {
   });
 
   it('returns 204 when the member deletes their own todo', async () => {
-    const created = await app.inject({
+    const created = await getApp().inject({
       method: 'POST',
       url: LIST,
       headers: bearer(TEST_BEARERS.member),
@@ -341,7 +371,7 @@ describe('TodoController (Fastify inject)', () => {
 
     const id = (JSON.parse(created.payload) as { id: string }).id;
 
-    const deleted = await app.inject({
+    const deleted = await getApp().inject({
       method: 'DELETE',
       url: record(id),
       headers: bearer(TEST_BEARERS.member),
@@ -352,7 +382,7 @@ describe('TodoController (Fastify inject)', () => {
   });
 
   it('does not delete another member todo', async () => {
-    const response = await app.inject({
+    const response = await getApp().inject({
       method: 'DELETE',
       url: record(1),
       headers: bearer(TEST_BEARERS.member),
