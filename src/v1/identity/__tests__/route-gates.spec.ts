@@ -26,7 +26,9 @@ import 'reflect-metadata';
 import { describe, expect, it } from 'vitest';
 import {
   ADMIN_GATE,
+  AUTHENTICATED_GATE,
   GATED_ROUTES,
+  isAuthenticatedGate,
   isPermissionCode,
   PERMISSION_CODES,
   PERMISSIONS,
@@ -125,7 +127,8 @@ describe('ROUTE_GATES is a well-formed declaration', () => {
         ? gate.length > 0 &&
           new Set(gate).size === gate.length &&
           gate.every((code) => isPermissionCode(code))
-        : gate === ADMIN_GATE || isPermissionCode(gate);
+        : gate !== undefined &&
+          (gate === ADMIN_GATE || isAuthenticatedGate(gate) || isPermissionCode(gate));
       expect(
         declared,
         `${route}: ${String(gate)} is neither 'admin', a catalogue code nor a list of distinct codes`,
@@ -174,6 +177,9 @@ describe('ROUTE_GATES is a well-formed declaration', () => {
       '/setup/ticket-statuses',
       '/setup/ticket-statuses/:id',
       '/setup/ticket-statuses/new',
+      '/setup/todo',
+      '/setup/todo/:id',
+      '/setup/todo/new',
     ]);
     for (const route of GATED_ROUTES) {
       expect(route.startsWith('/'), route).toBe(true);
@@ -190,6 +196,9 @@ describe('ROUTE_GATES is a well-formed declaration', () => {
     expect(routeGateOf('/setup/staff/12?tab=permissions')).toBe(ROUTE_GATES['/setup/staff/:id']);
     expect(routeGateOf('/admin/roles')).toBeUndefined();
     expect(routeGateOf('/setup/roles/12/edit')).toBeUndefined();
+    expect(routeGateOf('/setup/todo')).toBe(AUTHENTICATED_GATE);
+    expect(routeGateOf('/setup/todo/new')).toBe(AUTHENTICATED_GATE);
+    expect(routeGateOf('/setup/todo/12')).toBe(AUTHENTICATED_GATE);
   });
 
   it('declares the staff and roles screens under /setup (plan 04.2-27)', () => {

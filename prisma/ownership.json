@@ -1422,28 +1422,28 @@
     "table": "tblcustomer_groups"
   },
   {
-  "decided_by": "migration lead",
-  "decided_on": "2026-10-27",
-  "evidence": {
-    "ddl": [],
-    "forms": [
-      "db_prefix_concat"
-    ],
-    "no_writer_reason": null,
-    "readers": [
-      "fixed_equipment",
-      "perfex-core"
-    ],
-    "writers": [
-      "perfex-core"
-    ]
+    "decided_by": "migration lead",
+    "decided_on": "2026-10-27",
+    "evidence": {
+      "ddl": [],
+      "forms": [
+        "db_prefix_concat"
+      ],
+      "no_writer_reason": null,
+      "readers": [
+        "fixed_equipment",
+        "perfex-core"
+      ],
+      "writers": [
+        "perfex-core"
+      ]
+    },
+    "evidence_changed": false,
+    "note": "Written by v1/customer-groups; Perfex's delete is closed at Nginx; the quick add on the customer profile stays on Perfex.",
+    "owner": "node",
+    "owner_confidence": "write-single",
+    "table": "tblcustomers_groups"
   },
-  "evidence_changed": false,
-  "note": "Written by v1/customer-groups; Perfex's delete is closed at Nginx; the quick add on the customer profile stays on Perfex.",
-  "owner": "node",
-  "owner_confidence": "write-single",
-  "table": "tblcustomers_groups"
-},
   {
     "decided_by": null,
     "decided_on": null,
@@ -8937,20 +8937,16 @@
     "decided_on": null,
     "evidence": {
       "ddl": [],
-      "forms": [
-        "db_prefix_concat"
-      ],
+      "forms": [],
       "no_writer_reason": null,
-      "readers": [
-        "perfex-core"
-      ],
+      "readers": [],
       "writers": [
-        "perfex-core"
+        "node"
       ]
     },
     "evidence_changed": false,
-    "note": "",
-    "owner": "perfex-core",
+    "note": "Written by v1/todo; Perfex's admin/todo is closed at Nginx.",
+    "owner": "node",
     "owner_confidence": "write-single",
     "table": "tbltodos"
   },

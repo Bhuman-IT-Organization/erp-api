@@ -16,7 +16,7 @@ import { SettingsModule } from './settings/settings.module.js';
 import { TaxesModule } from './taxes/taxes.module.js';
 import { ServicesModule } from './services/services.module.js';
 import { TicketStatusesModule } from './ticket-statuses/ticket-statuses.module.js';
-
+import { TodoModule } from './todo/todo.module.js';
 /** Registers every v1 module. Route prefix `api/v1` is applied globally in main.ts. */
 @Module({
   imports: [
@@ -37,6 +37,7 @@ import { TicketStatusesModule } from './ticket-statuses/ticket-statuses.module.j
     LeadSourcesModule,
     TicketStatusesModule,
     CustomerGroupsModule,
+    TodoModule,
   ],
 })
 export class V1Module {}
