@@ -2,6 +2,7 @@
 export const TODO_ROUTES = {
   base: 'todo',
   list: '',
+  order: 'order',
   record: ':id',
   finished: ':id/finished',
 } as const;

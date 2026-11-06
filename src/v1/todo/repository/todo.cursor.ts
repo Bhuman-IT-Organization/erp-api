@@ -1,10 +1,6 @@
 import { z } from 'zod';
 import { AppError } from '../../../shared/errors/app-error.js';
-
-export interface TodoCursor {
-  readonly itemOrder: number | null;
-  readonly todoid: number;
-}
+import type { TodoCursor } from '../model/todo.model.js';
 
 const todoCursorSchema = z.strictObject({
   itemOrder: z.number().int().nullable(),
@@ -26,19 +22,14 @@ export function encodeTodoCursor(todo: TodoCursor): string {
   return Buffer.from(JSON.stringify(todo), 'utf8').toString('base64url');
 }
 
-export function decodeTodoCursor(raw: string | null): TodoCursor | null {
-  if (raw === null) {
-    return null;
-  }
+export function decodeTodoCursor(raw: string | null | undefined): TodoCursor | null {
+  if (raw === null || raw === undefined) return null;
 
   try {
-    const decoded = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8'));
-
+    const decoded: unknown = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8'));
     const parsed = todoCursorSchema.safeParse(decoded);
 
-    if (!parsed.success) {
-      return invalidCursor();
-    }
+    if (!parsed.success) return invalidCursor();
 
     return parsed.data;
   } catch {
@@ -52,7 +43,7 @@ export function decodeTodoCursor(raw: string | null): TodoCursor | null {
  * 2. Non-NULL item_order values
  * 3. todoid breaks ties
  */
-export function todoCursorWhere(cursor: TodoCursor): Record<string, unknown> {
+export function todoCursorWhere(cursor: TodoCursor) {
   if (cursor.itemOrder === null) {
     return {
       OR: [

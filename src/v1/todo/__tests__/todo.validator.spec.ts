@@ -2,19 +2,20 @@ import { describe, expect, it } from 'vitest';
 import { AppError } from '../../../shared/errors/app-error.js';
 import { LIST_QUERY_LIMITS } from '../../../shared/http/pagination.js';
 import { TODO_DEFAULT_LIMIT, TODO_DESCRIPTION_MAX } from '../dto/todo.dto.js';
-import { encodeOffsetCursor } from '../service/todo.transformer.js';
+import { encodeTodoCursor } from '../repository/todo.cursor.js';
 import { TodoValidator } from '../service/todo.validator.js';
 
 const validator = new TodoValidator();
 
 describe('TodoValidator', () => {
   describe('parseListQuery', () => {
-    it('reads the panel, defaults to 20 rows and offset 0', () => {
+    it('defaults to 10 rows and starts without a cursor', () => {
       expect(validator.parseListQuery({ status: 'unfinished' })).toEqual({
         status: 'unfinished',
         limit: TODO_DEFAULT_LIMIT,
-        offset: 0,
+        cursor: null,
       });
+
       expect(validator.parseListQuery({ status: 'finished' }).status).toBe('finished');
     });
 
@@ -25,25 +26,46 @@ describe('TodoValidator', () => {
 
     it('reads limit as a number and refuses one outside the shared bounds', () => {
       expect(validator.parseListQuery({ status: 'unfinished', limit: '5' }).limit).toBe(5);
+
       expect(() =>
         validator.parseListQuery({
           status: 'unfinished',
           limit: String(LIST_QUERY_LIMITS.max + 1),
         }),
       ).toThrow(AppError);
+
       expect(() => validator.parseListQuery({ status: 'unfinished', limit: '0' })).toThrow(
         AppError,
       );
     });
 
-    it('decodes the opaque cursor to its offset', () => {
+    it('decodes the keyset cursor', () => {
+      const cursor = { itemOrder: 4, todoid: 40 };
+
       expect(
-        validator.parseListQuery({ status: 'unfinished', cursor: encodeOffsetCursor(40) }).offset,
-      ).toBe(40);
+        validator.parseListQuery({
+          status: 'unfinished',
+          cursor: encodeTodoCursor(cursor),
+        }).cursor,
+      ).toEqual(cursor);
     });
 
-    it('refuses a cursor that is not one of ours, with the issue on cursor', () => {
-      for (const cursor of ['not-a-cursor', Buffer.from('{"o":-1}').toString('base64url')]) {
+    it('decodes a cursor with null item order', () => {
+      const cursor = { itemOrder: null, todoid: 40 };
+
+      expect(
+        validator.parseListQuery({
+          status: 'unfinished',
+          cursor: encodeTodoCursor(cursor),
+        }).cursor,
+      ).toEqual(cursor);
+    });
+
+    it('refuses an invalid cursor', () => {
+      for (const cursor of [
+        'not-a-cursor',
+        Buffer.from('{"itemOrder":-1,"todoid":0}').toString('base64url'),
+      ]) {
         expect(() => validator.parseListQuery({ status: 'unfinished', cursor })).toThrow(AppError);
       }
     });
@@ -64,7 +86,10 @@ describe('TodoValidator', () => {
       expect(validator.parseCreateBody({ description: '  Call Ali  ' })).toEqual({
         description: 'Call Ali',
       });
-      expect(validator.parseUpdateBody({ description: ' x ' })).toEqual({ description: 'x' });
+
+      expect(validator.parseUpdateBody({ description: ' x ' })).toEqual({
+        description: 'x',
+      });
     });
 
     it('refuses a missing, empty or blank description', () => {
@@ -75,12 +100,17 @@ describe('TodoValidator', () => {
 
     it('accepts the maximum length and refuses one more', () => {
       const ok = 'a'.repeat(TODO_DESCRIPTION_MAX);
-      expect(validator.parseCreateBody({ description: ok })).toEqual({ description: ok });
+
+      expect(validator.parseCreateBody({ description: ok })).toEqual({
+        description: ok,
+      });
+
       expect(() => validator.parseCreateBody({ description: `${ok}a` })).toThrow(AppError);
     });
 
     it('is strict: any other key is a 400 (staffid, finished, ...)', () => {
       expect(() => validator.parseCreateBody({ description: 'a', staffid: 9 })).toThrow(AppError);
+
       expect(() => validator.parseUpdateBody({ description: 'a', finished: true })).toThrow(
         AppError,
       );
@@ -95,13 +125,19 @@ describe('TodoValidator', () => {
 
   describe('parseFinishBody', () => {
     it('reads a boolean', () => {
-      expect(validator.parseFinishBody({ finished: true })).toEqual({ finished: true });
-      expect(validator.parseFinishBody({ finished: false })).toEqual({ finished: false });
+      expect(validator.parseFinishBody({ finished: true })).toEqual({
+        finished: true,
+      });
+
+      expect(validator.parseFinishBody({ finished: false })).toEqual({
+        finished: false,
+      });
     });
 
     it('refuses a non-boolean, a missing key and any other key', () => {
       expect(() => validator.parseFinishBody({ finished: 'yes' })).toThrow(AppError);
       expect(() => validator.parseFinishBody({})).toThrow(AppError);
+
       expect(() => validator.parseFinishBody({ finished: true, description: 'x' })).toThrow(
         AppError,
       );

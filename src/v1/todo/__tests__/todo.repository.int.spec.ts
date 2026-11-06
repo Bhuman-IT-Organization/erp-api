@@ -23,14 +23,17 @@ describe.skipIf(!process.env.DATABASE_URL)('TodoRepository integration', () => {
 
   let firstId = 0;
   let secondId = 0;
+  let firstDateAdded = new Date();
 
   beforeAll(async () => {
     await cleanup();
 
+    firstDateAdded = new Date();
+
     const first = await repository.create({
       staffId: STAFF_ID,
       description: `${MARKER}-first`,
-      dateAdded: new Date(),
+      dateAdded: firstDateAdded,
     });
 
     const second = await repository.create({
@@ -56,15 +59,34 @@ describe.skipIf(!process.env.DATABASE_URL)('TodoRepository integration', () => {
     expect(await repository.findById(STAFF_ID + 1, firstId)).toBeNull();
   });
 
-  it('lists unfinished records for the staff member', async () => {
+  it('stores dateadded with the supplied wall-clock timestamp', async () => {
+    const stored = await client.tbltodos.findFirst({
+      where: {
+        todoid: firstId,
+        staffid: STAFF_ID,
+      },
+      select: {
+        dateadded: true,
+      },
+    });
+
+    expect(stored).not.toBeNull();
+    expect(stored?.dateadded.getTime()).toBe(Math.round(firstDateAdded.getTime() / 1000) * 1000);
+  });
+
+  it('lists unfinished marker records for the staff member', async () => {
     const page = await repository.list(STAFF_ID, {
       status: 'unfinished',
       limit: 25,
-      offset: 0,
+      cursor: null,
     });
 
-    expect(page.items.map((row) => row.id)).toContain(firstId);
-    expect(page.items.map((row) => row.id)).toContain(secondId);
+    const markerIds = page.items
+      .filter((row) => row.description.startsWith(MARKER))
+      .map((row) => row.id);
+
+    expect(markerIds).toContain(firstId);
+    expect(markerIds).toContain(secondId);
     expect(page.total).toBeGreaterThanOrEqual(2);
   });
 

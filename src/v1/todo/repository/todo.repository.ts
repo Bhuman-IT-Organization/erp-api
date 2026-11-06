@@ -8,9 +8,17 @@ import type {
   TodoRow,
   TodoStatus,
 } from '../model/todo.model.js';
-
+import { todoCursorWhere } from './todo.cursor.js';
 const FINISHED = { yes: true, no: false } as const;
-
+const RECORD_NOT_FOUND = 'P2025';
+function isRecordNotFound(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === RECORD_NOT_FOUND
+  );
+}
 const COLUMNS = {
   todoid: true,
   description: true,
@@ -40,36 +48,51 @@ const rowSchema = z
     dateFinished: row.datefinished,
     itemOrder: row.item_order,
   }));
+
 const rowsSchema = z.array(rowSchema);
 
 const flagOf = (status: TodoStatus): boolean =>
   status === 'finished' ? FINISHED.yes : FINISHED.no;
 
-/** Perfex's orders: the unfinished by `item_order`, the finished by `datefinished` descending. */
-function orderOf(status: TodoStatus) {
-  return status === 'finished'
-    ? [{ datefinished: 'desc' as const }, { todoid: 'desc' as const }]
-    : [{ item_order: 'asc' as const }, { todoid: 'asc' as const }];
+/** Perfex sorts both panels by `item_order` ascending, then `todoid` ascending. */
+function orderOf() {
+  return [{ item_order: 'asc' as const }, { todoid: 'asc' as const }];
 }
 
 @Injectable()
 export class TodoRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** One page of one panel and the panel's total. */
+  /** One keyset page of one panel and the panel's total. */
   async list(staffId: number, request: TodoListRequest): Promise<TodoPage> {
-    const where = { staffid: staffId, finished: flagOf(request.status) };
+    const baseWhere = {
+      staffid: staffId,
+      finished: flagOf(request.status),
+    };
+
+    const where = {
+      ...baseWhere,
+      ...(request.cursor === null ? {} : todoCursorWhere(request.cursor)),
+    };
+
     const [rows, total] = await Promise.all([
       this.prisma.client.tbltodos.findMany({
         where,
-        orderBy: orderOf(request.status),
-        skip: request.offset,
-        take: request.limit,
+        orderBy: orderOf(),
+        take: request.limit + 1,
         select: COLUMNS,
       }),
-      this.prisma.client.tbltodos.count({ where }),
+      this.prisma.client.tbltodos.count({ where: baseWhere }),
     ]);
-    return { items: rowsSchema.parse(rows), total };
+
+    const parsedRows = rowsSchema.parse(rows);
+    const hasMore = parsedRows.length > request.limit;
+
+    return {
+      items: parsedRows.slice(0, request.limit),
+      total,
+      hasMore,
+    };
   }
 
   async findById(staffId: number, id: number): Promise<TodoRow | null> {
@@ -77,15 +100,12 @@ export class TodoRepository {
       where: { todoid: id, staffid: staffId },
       select: COLUMNS,
     });
+
     return row === null ? null : rowSchema.parse(row);
   }
 
-  /** Inserts an unfinished to do at the end of the caller's own order. */
+  /** Inserts an unfinished to do with an empty order, placing it first like Perfex. */
   async create(input: NewTodo): Promise<TodoRow> {
-    const last = await this.prisma.client.tbltodos.aggregate({
-      where: { staffid: input.staffId },
-      _max: { item_order: true },
-    });
     const row = await this.prisma.client.tbltodos.create({
       data: {
         description: input.description,
@@ -93,10 +113,11 @@ export class TodoRepository {
         dateadded: input.dateAdded,
         finished: FINISHED.no,
         datefinished: null,
-        item_order: (last._max.item_order ?? 0) + 1,
+        item_order: null,
       },
       select: COLUMNS,
     });
+
     return rowSchema.parse(row);
   }
 
@@ -106,25 +127,72 @@ export class TodoRepository {
     id: number,
     description: string,
   ): Promise<TodoRow | null> {
-    const { count } = await this.prisma.client.tbltodos.updateMany({
-      where: { todoid: id, staffid: staffId },
-      data: { description },
-    });
-    return count === 0 ? null : this.findById(staffId, id);
+    try {
+      const row = await this.prisma.client.tbltodos.update({
+        where: { todoid: id, staffid: staffId },
+        data: { description },
+        select: COLUMNS,
+      });
+      return rowSchema.parse(row);
+    } catch (error) {
+      if (isRecordNotFound(error)) return null;
+      throw error;
+    }
   }
 
-  /** Finishes (with the wall clock) or reopens (`datefinished` NULL); `null` when not found. */
   async setFinished(
     staffId: number,
     id: number,
     finished: boolean,
     dateFinished: Date | null,
   ): Promise<TodoRow | null> {
-    const { count } = await this.prisma.client.tbltodos.updateMany({
-      where: { todoid: id, staffid: staffId },
-      data: { finished: finished ? FINISHED.yes : FINISHED.no, datefinished: dateFinished },
+    try {
+      const row = await this.prisma.client.tbltodos.update({
+        where: { todoid: id, staffid: staffId },
+        data: {
+          finished: finished ? FINISHED.yes : FINISHED.no,
+          datefinished: dateFinished,
+        },
+        select: COLUMNS,
+      });
+      return rowSchema.parse(row);
+    } catch (error) {
+      if (isRecordNotFound(error)) return null;
+      throw error;
+    }
+  }
+
+  /**
+   * Saves the requested order atomically. A missing or foreign id changes nothing.
+   * @complexity O(n) over the ordered ids
+   */
+  async reorder(staffId: number, finished: boolean, items: readonly number[]): Promise<boolean> {
+    return this.prisma.client.$transaction(async (tx) => {
+      const rows = await tx.tbltodos.findMany({
+        where: {
+          staffid: staffId,
+          finished,
+          todoid: { in: [...items] },
+        },
+        select: { todoid: true },
+      });
+
+      if (rows.length !== items.length) return false;
+
+      await Promise.all(
+        items.map((id, itemOrder) =>
+          tx.tbltodos.updateMany({
+            where: { todoid: id, staffid: staffId },
+            data: {
+              item_order: itemOrder,
+              finished,
+            },
+          }),
+        ),
+      );
+
+      return true;
     });
-    return count === 0 ? null : this.findById(staffId, id);
   }
 
   /** `false` when nothing was deleted (not the caller's, or gone). */
@@ -132,6 +200,7 @@ export class TodoRepository {
     const { count } = await this.prisma.client.tbltodos.deleteMany({
       where: { todoid: id, staffid: staffId },
     });
+
     return count > 0;
   }
 

@@ -121,11 +121,33 @@ function createRepository() {
         .filter(
           (row) => row.staffId === staffId && row.finished === (request.status === 'finished'),
         )
-        .sort((a, b) => (a.itemOrder ?? 0) - (b.itemOrder ?? 0));
+        .filter((row) => {
+          if (request.cursor === null) return true;
+
+          const cursor = request.cursor;
+
+          if (cursor.itemOrder === null) {
+            return row.itemOrder !== null || row.id > cursor.todoid;
+          }
+
+          return (
+            (row.itemOrder !== null && row.itemOrder > cursor.itemOrder) ||
+            (row.itemOrder === cursor.itemOrder && row.id > cursor.todoid)
+          );
+        })
+        .sort((a, b) => {
+          if (a.itemOrder === null && b.itemOrder !== null) return -1;
+          if (a.itemOrder !== null && b.itemOrder === null) return 1;
+
+          return (a.itemOrder ?? 0) - (b.itemOrder ?? 0) || a.id - b.id;
+        });
 
       return {
-        items: matching.slice(request.offset, request.offset + request.limit),
-        total: matching.length,
+        items: matching.slice(0, request.limit),
+        total: rows.filter(
+          (row) => row.staffId === staffId && row.finished === (request.status === 'finished'),
+        ).length,
+        hasMore: matching.length > request.limit,
       };
     }),
 
@@ -328,6 +350,26 @@ describe('TodoController (Fastify inject)', () => {
     expect(publish).toHaveBeenCalledTimes(1);
   });
 
+  it('does not update another member todo', async () => {
+    const originalRow = rows.find((row) => row.id === 1);
+    if (originalRow === undefined) throw new Error('Admin todo fixture not found');
+    const original = { ...originalRow };
+
+    const response = await getApp().inject({
+      method: 'PATCH',
+      url: record(1),
+      headers: bearer(TEST_BEARERS.member),
+      payload: { description: 'Unauthorized update' },
+    });
+
+    expect(response.statusCode).toBe(HTTP.notFound);
+    expect(response.headers['content-type']).toContain('application/problem+json');
+
+    const body = JSON.parse(response.payload) as { code: string };
+    expect(body.code).toBe('ERP-CORE-0004');
+    expect(rows.find((row) => row.id === 1)).toEqual(original);
+  });
+
   it('finishes and reopens the member todo', async () => {
     const finished = await getApp().inject({
       method: 'PATCH',
@@ -348,6 +390,26 @@ describe('TodoController (Fastify inject)', () => {
 
     expect(reopened.statusCode).toBe(HTTP.ok);
     expect((JSON.parse(reopened.payload) as { finished: boolean }).finished).toBe(false);
+  });
+
+  it('does not finish or reopen another member todo', async () => {
+    const originalRow = rows.find((row) => row.id === 1);
+    if (originalRow === undefined) throw new Error('Admin todo fixture not found');
+    const original = { ...originalRow };
+
+    const response = await getApp().inject({
+      method: 'PATCH',
+      url: `${record(1)}/finished`,
+      headers: bearer(TEST_BEARERS.member),
+      payload: { finished: true },
+    });
+
+    expect(response.statusCode).toBe(HTTP.notFound);
+    expect(response.headers['content-type']).toContain('application/problem+json');
+
+    const body = JSON.parse(response.payload) as { code: string };
+    expect(body.code).toBe('ERP-CORE-0004');
+    expect(rows.find((row) => row.id === 1)).toEqual(original);
   });
 
   it('rejects an invalid create body', async () => {

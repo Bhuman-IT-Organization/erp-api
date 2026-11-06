@@ -5,7 +5,12 @@ import { LoggerService } from '../../../shared/logger/logger.service.js';
 import type { TodoListResponseDto, TodoResponseDto } from '../dto/todo.dto.js';
 import { TodoCreatedV1, TodoDeletedV1, TodoUpdatedV1 } from '../events/published.js';
 import { TodoRepository } from '../repository/todo.repository.js';
-import { companyZone, TodoTransformer, wallClockAt } from './todo.transformer.js';
+import {
+  companyZone,
+  TodoTransformer,
+  toStoredDescription,
+  wallClockAt,
+} from './todo.transformer.js';
 import { TodoTransport } from './todo.transport.js';
 import { TodoValidator } from './todo.validator.js';
 
@@ -39,12 +44,8 @@ export class TodoService {
   async list(actor: AuthenticatedUser, input: unknown): Promise<TodoListResponseDto> {
     const request = this.validator.parseListQuery(input);
     const page = await this.repository.list(actor.staffId, request);
-    return this.transformer.toListResponse(
-      page.items,
-      page.total,
-      request.offset,
-      await this.zone(),
-    );
+
+    return this.transformer.toListResponse(page.items, page.total, page.hasMore, await this.zone());
   }
 
   /** `GET /api/v1/todo/:id`: one of the caller's to do's; anyone else's is `ERP-CORE-0004`. */
@@ -62,7 +63,7 @@ export class TodoService {
     const now = this.now();
     const row = await this.repository.create({
       staffId: actor.staffId,
-      description: input.description,
+      description: toStoredDescription(input.description),
       dateAdded: wallClockAt(now, zone),
     });
     await this.transport.publish(
@@ -76,14 +77,18 @@ export class TodoService {
   async update(actor: AuthenticatedUser, params: unknown, body: unknown): Promise<TodoResponseDto> {
     const { id } = this.validator.parseParams(params);
     const { description } = this.validator.parseUpdateBody(body);
-    const row = await this.repository.updateDescription(actor.staffId, id, description);
+    const row = await this.repository.updateDescription(
+      actor.staffId,
+      id,
+      toStoredDescription(description),
+    );
     if (row === null) throw notFound();
     await this.publishUpdated(actor, id);
     this.logger.log('to do updated', { id });
     return this.transformer.toResponse(row, await this.zone());
   }
 
-  /** `PATCH /api/v1/todo/:id/finished`: finish (wall clock now) or reopen (`datefinished` NULL). */
+  /** `PATCH /api/v1/todo/:id/finished`: finish or reopen; Perfex writes the current date for both. */
   async setFinished(
     actor: AuthenticatedUser,
     params: unknown,
@@ -92,12 +97,23 @@ export class TodoService {
     const { id } = this.validator.parseParams(params);
     const { finished } = this.validator.parseFinishBody(body);
     const zone = await this.zone();
-    const dateFinished = finished ? wallClockAt(this.now(), zone) : null;
+    const dateFinished = wallClockAt(this.now(), zone);
     const row = await this.repository.setFinished(actor.staffId, id, finished, dateFinished);
     if (row === null) throw notFound();
     await this.publishUpdated(actor, id);
     this.logger.log(finished ? 'to do finished' : 'to do reopened', { id });
     return this.transformer.toResponse(row, zone);
+  }
+
+  /** `PATCH /api/v1/todo/order`: saves the caller's order for one panel atomically. */
+  async reorder(actor: AuthenticatedUser, body: unknown): Promise<void> {
+    const { finished, items } = this.validator.parseReorderBody(body);
+    const saved = await this.repository.reorder(actor.staffId, finished, items);
+
+    if (!saved) throw notFound();
+
+    await Promise.all(items.map((id) => this.publishUpdated(actor, id)));
+    this.logger.log('to do order updated', { count: items.length, finished });
   }
 
   /** `DELETE /api/v1/todo/:id`: 204; another member's or a missing to do is `ERP-CORE-0004`. */

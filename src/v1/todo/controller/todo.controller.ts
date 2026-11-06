@@ -30,6 +30,7 @@ import {
   createTodoBodySchema,
   finishTodoBodySchema,
   listTodoQuerySchema,
+  reorderTodoBodySchema,
   todoListResponseSchema,
   todoParamsSchema,
   todoResponseSchema,
@@ -104,7 +105,19 @@ export class TodoController {
   ): Promise<TodoResponseDto> {
     return this.service.update(user, params, body);
   }
-
+  /** `PATCH /api/v1/todo/order`: 204; one of the ids is not the caller's: 404, nothing changed. */
+  @Patch(TODO_ROUTES.order)
+  @HttpCode(HTTP_STATUS.NO_CONTENT)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @ApiZod({
+    summary: "Save the new order of the caller's own to do's (drag and drop)",
+    body: reorderTodoBodySchema,
+    responses: { [HTTP_STATUS.NO_CONTENT]: null },
+    errors: ['ERP-VALIDATION-0001', 'ERP-AUTH-0004', 'ERP-CORE-0004'],
+  })
+  reorder(@CurrentUser() user: AuthenticatedUser, @Body() body: unknown): Promise<void> {
+    return this.service.reorder(user, body);
+  }
   /** `PATCH /api/v1/todo/:id/finished`: finish or reopen. */
   @Patch(TODO_ROUTES.finished)
   @UseGuards(JwtAuthGuard, PermissionGuard)

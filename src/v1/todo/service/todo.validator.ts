@@ -5,59 +5,41 @@ import {
   createTodoBodySchema,
   finishTodoBodySchema,
   listTodoQuerySchema,
+  reorderTodoBodySchema,
   todoParamsSchema,
   updateTodoBodySchema,
   type CreateTodoBody,
   type FinishTodoBody,
+  type ReorderTodoBody,
   type TodoParams,
   type UpdateTodoBody,
 } from '../dto/todo.dto.js';
 import type { TodoListRequest } from '../model/todo.model.js';
+import { decodeTodoCursor } from '../repository/todo.cursor.js';
 
 /** `safeParse` -> `AppError('ERP-VALIDATION-0001')` with the zod issues (BE-09). */
 function parse<T>(schema: z.ZodType<T>, input: unknown, detail: string): T {
   const parsed = schema.safeParse(input);
-  if (!parsed.success)
-    throw new AppError('ERP-VALIDATION-0001', detail, { issues: parsed.error.issues });
-  return parsed.data;
-}
 
-function refuseCursor(): never {
-  throw new AppError('ERP-VALIDATION-0001', 'Query is invalid', {
-    issues: [{ path: ['cursor'], message: 'cursor is not a cursor of this list' }],
-  });
-}
-
-/** The offset an opaque cursor names; anything that is not one of ours is a 400 on `cursor`. */
-function decodeOffsetCursor(cursor: string): number {
-  try {
-    const value: unknown = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8'));
-
-    if (typeof value !== 'object' || value === null || !('o' in value)) {
-      return refuseCursor();
-    }
-
-    const offset = value.o;
-
-    if (typeof offset === 'number' && Number.isInteger(offset) && offset >= 0) {
-      return offset;
-    }
-  } catch {
-    return refuseCursor();
+  if (!parsed.success) {
+    throw new AppError('ERP-VALIDATION-0001', detail, {
+      issues: parsed.error.issues,
+    });
   }
 
-  return refuseCursor();
+  return parsed.data;
 }
 
 @Injectable()
 export class TodoValidator {
-  /** `GET` list: `status` is required, `limit` defaults to 20, a missing `cursor` is offset 0. */
+  /** `GET` list: status is required, limit defaults to 10, cursor starts after the last row. */
   parseListQuery(input: unknown): TodoListRequest {
     const query = parse(listTodoQuerySchema, input, 'Query is invalid');
+
     return {
       status: query.status,
       limit: query.limit,
-      offset: query.cursor === undefined ? 0 : decodeOffsetCursor(query.cursor),
+      cursor: decodeTodoCursor(query.cursor),
     };
   }
 
@@ -79,5 +61,10 @@ export class TodoValidator {
   /** `PATCH :id/finished`: `{ finished }`, strict. */
   parseFinishBody(input: unknown): FinishTodoBody {
     return parse(finishTodoBodySchema, input, 'Request body is invalid');
+  }
+
+  /** `PATCH /order`: ordered ids and their finished panel. */
+  parseReorderBody(input: unknown): ReorderTodoBody {
+    return parse(reorderTodoBodySchema, input, 'Request body is invalid');
   }
 }

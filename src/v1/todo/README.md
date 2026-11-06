@@ -10,7 +10,7 @@ Each todo belongs to one staff member. Every authenticated staff member can mana
 
 - `tbltodos`: Todo records are accessed through Prisma's typed delegate in `repository/todo.repository.ts`. The repository reads and writes `todoid`, `description`, `staffid`, `dateadded`, `finished`, `datefinished` and `item_order`.
 - Every list, read, update, finish, reopen, delete and unfinished-count query is scoped to the relevant `staffid`.
-- New todos are created unfinished. The repository assigns the next `item_order` for the staff member.
+- New todos are created unfinished with `item_order = null`, matching Perfex.
 
 ## Facade surface
 
@@ -32,12 +32,13 @@ All endpoints require authentication. Every authenticated staff member can manag
 | `POST`   | ``             | 201 todo response                           | Create a todo                                |
 | `PATCH`  | `:id`          | 200 todo response                           | Update the description                       |
 | `PATCH`  | `:id/finished` | 200 todo response                           | Finish or reopen a todo                      |
+| `PATCH`  | `order`        | 204, no body                                | Reorder the caller's todos                   |
 | `DELETE` | `:id`          | 204, no body                                | Delete a todo                                |
 
 List query parameters:
 
 - `status`: required; `unfinished` or `finished`.
-- `limit`: optional page size; defaults to `1`, within the shared pagination limits.
+- `limit`: optional page size; defaults to `10`, within the shared pagination limits.
 - `cursor`: optional opaque pagination cursor. An invalid cursor returns `400 ERP-VALIDATION-0001`.
 
 Request bodies:
@@ -45,6 +46,7 @@ Request bodies:
 - `POST`: `{ "description": "Complete the assigned task" }`
 - `PATCH :id`: `{ "description": "Updated task description" }`
 - `PATCH :id/finished`: `{ "finished": true }` or `{ "finished": false }`
+- `PATCH order`: `{ "finished": false, "items": [12, 15, 18] }` (set `finished` to `true` for the finished list; `items` contains IDs in the new order).
 
 Create and update bodies are strict. Additional properties such as `staffid` or `finished` are rejected. Description is trimmed and must contain 1 to 10,000 characters.
 
@@ -83,8 +85,8 @@ None. The module does not define background jobs.
 | File                            | Responsibility                                                                                     |
 | ------------------------------- | -------------------------------------------------------------------------------------------------- |
 | `todo.module.ts`                | Registers Todo providers and controller; imports SettingsModule and exports TodoFacade             |
-| `todo.routes.ts`                | Defines the base, list, record and finished route constants                                        |
-| `controller/todo.controller.ts` | Authenticated HTTP handlers for list, read, create, update, finish/reopen and delete               |
+| `todo.routes.ts`                | Defines the base, list, record, finished and order route constants                                 |
+| `controller/todo.controller.ts` | Authenticated HTTP handlers for list, read, create, update, finish/reopen, reorder and delete      |
 | `service/todo.service.ts`       | Use cases, staff scoping, validation orchestration, event publishing and logging                   |
 | `service/todo.validator.ts`     | Validates list query, params, create, update and finish request bodies                             |
 | `service/todo.transformer.ts`   | Converts repository records into response DTOs and handles company timezone conversion             |
@@ -106,9 +108,20 @@ The module provides the staff Todo functionality through the new `/api/v1/todo` 
 - Staff members can view and manage their own todo records.
 - Creating, editing, finishing, reopening and deleting todos are supported.
 - Todos belonging to another staff member cannot be accessed or modified.
-- The completion timestamp is set when a todo is finished and cleared when it is reopened.
-- Todo ordering is maintained using `item_order` and `todoid`.
-- Pagination uses an opaque cursor and the requested status.
+- The completion timestamp is set to the current time when a todo is finished or reopened, matching Perfex.
+- Finished and unfinished lists use the same ordering: `item_order` ascending, then `todoid` ascending; empty ordering values come first.
+- Reordering is supported through `PATCH /api/v1/todo/order`.
+- Pagination uses keyset cursors based on `item_order` and `todoid`, scoped to the requested status.
+
+## Differences from Perfex
+
+| Behaviour               | Node API                                                        | Perfex                                                         |
+| ----------------------- | --------------------------------------------------------------- | -------------------------------------------------------------- |
+| Ownership check on edit | Checks that the todo belongs to the authenticated staff member. | `Todo_model.php:91` does not perform the same ownership check. |
+| Empty description       | Rejects empty descriptions.                                     | Does not apply the same validation.                            |
+| Description validation  | Trims descriptions and enforces a maximum of 10,000 characters. | Does not apply the same validation.                            |
+
+Todo descriptions retain Perfex-compatible line-break storage and are normalized when read by the API.
 
 ## How to run its tests
 

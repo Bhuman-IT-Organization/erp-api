@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { TodoRow } from '../model/todo.model.js';
+import { encodeTodoCursor } from '../repository/todo.cursor.js';
 import {
   companyZone,
-  encodeOffsetCursor,
   FALLBACK_ZONE,
   instantOf,
   toResponse,
@@ -83,19 +83,23 @@ describe('toResponse', () => {
 describe('TodoTransformer.toListResponse', () => {
   const t = new TodoTransformer();
 
-  it('offers the next cursor (the next offset) while rows remain after the page', () => {
-    const response = t.toListResponse([row({ id: 2 }), row({ id: 1 })], 5, 0, ZONE);
+  it('offers the next keyset cursor when more rows remain', () => {
+    const response = t.toListResponse([row({ id: 2 }), row({ id: 1 })], 5, true, ZONE);
+
     expect(response.data.map((one) => one.id)).toEqual(['2', '1']);
-    expect(response.meta).toEqual({ nextCursor: encodeOffsetCursor(2), total: 5 });
+    expect(response.meta).toEqual({
+      nextCursor: encodeTodoCursor({ itemOrder: 1, todoid: 1 }),
+      total: 5,
+    });
   });
 
   it('has no next cursor on the last page', () => {
-    const response = t.toListResponse([row()], 3, 2, ZONE);
+    const response = t.toListResponse([row()], 3, false, ZONE);
     expect(response.meta).toEqual({ nextCursor: null, total: 3 });
   });
 
   it('answers an empty page as an empty data array', () => {
-    const response = t.toListResponse([], 0, 0, ZONE);
+    const response = t.toListResponse([], 0, false, ZONE);
     expect(response.data).toEqual([]);
     expect(response.meta).toEqual({ nextCursor: null, total: 0 });
   });

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { LIST_QUERY_LIMITS } from '../../../shared/http/pagination.js';
 export const TODO_DESCRIPTION_MAX = 10_000;
-export const TODO_DEFAULT_LIMIT = 1;
+export const TODO_DEFAULT_LIMIT = 10;
 
 /** `GET ?status=unfinished|finished&limit&cursor`. */
 export const listTodoQuerySchema = z.object({
@@ -46,6 +46,19 @@ export const todoListResponseSchema = z
   })
   .readonly();
 
+/** The most to do's one reorder may carry. */
+export const TODO_REORDER_MAX = 1000;
+/** `PATCH order`: the ids in their new order and the finished state of the list they sit in. */
+export const reorderTodoBodySchema = z.strictObject({
+  finished: z.boolean(),
+  items: z
+    .array(z.coerce.number().int().positive())
+    .min(1)
+    .max(TODO_REORDER_MAX)
+    .refine((ids) => new Set(ids).size === ids.length, { message: 'items must not repeat an id' }),
+});
+
+export type ReorderTodoBody = z.infer<typeof reorderTodoBodySchema>;
 export type ListTodoQuery = z.infer<typeof listTodoQuerySchema>;
 export type TodoParams = z.infer<typeof todoParamsSchema>;
 export type CreateTodoBody = z.infer<typeof createTodoBodySchema>;

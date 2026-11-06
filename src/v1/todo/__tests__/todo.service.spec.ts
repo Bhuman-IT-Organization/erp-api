@@ -33,6 +33,7 @@ function build() {
     create: vi.fn(),
     updateDescription: vi.fn(),
     setFinished: vi.fn(),
+    reorder: vi.fn(),
     remove: vi.fn(),
     countUnfinished: vi.fn(),
   };
@@ -60,14 +61,18 @@ describe('TodoService', () => {
   describe('list', () => {
     it("reads the caller's own panel and answers the envelope with the next cursor", async () => {
       const { service, repository } = build();
-      repository.list.mockResolvedValue({ items: [row()], total: 3 });
+      repository.list.mockResolvedValue({
+        items: [row()],
+        total: 3,
+        hasMore: true,
+      });
 
       const response = await service.list(ME, { status: 'unfinished', limit: '1' });
 
       expect(repository.list).toHaveBeenCalledWith(5, {
         status: 'unfinished',
         limit: 1,
-        offset: 0,
+        cursor: null,
       });
       expect(response.data).toEqual([
         {
@@ -166,14 +171,13 @@ describe('TodoService', () => {
       expect(logger.log).toHaveBeenCalledWith('to do finished', { id: 7 });
     });
 
-    it('reopens with a NULL date finished and logs "to do reopened"', async () => {
+    it('reopens with the current wall clock date and logs "to do reopened"', async () => {
       const { service, repository, logger } = build();
-      repository.setFinished.mockResolvedValue(row());
-
+      repository.setFinished.mockResolvedValue(row({ finished: false, dateFinished: WALL }));
       const response = await service.setFinished(ME, { id: '7' }, { finished: false });
-
-      expect(repository.setFinished).toHaveBeenCalledWith(5, 7, false, null);
-      expect(response.dateFinished).toBeNull();
+      expect(repository.setFinished).toHaveBeenCalledWith(5, 7, false, WALL);
+      expect(response.finished).toBe(false);
+      expect(response.dateFinished).toBe('2026-10-02T20:30:15.000Z');
       expect(logger.log).toHaveBeenCalledWith('to do reopened', { id: 7 });
     });
 
@@ -186,7 +190,55 @@ describe('TodoService', () => {
       expect(transport.publish).not.toHaveBeenCalled();
     });
   });
+  describe('reorder', () => {
+    it('saves the order and publishes an update event for every item', async () => {
+      const { service, repository, transport, logger } = build();
+      repository.reorder.mockResolvedValue(true);
 
+      await service.reorder(ME, {
+        finished: true,
+        items: [8, 3, 7],
+      });
+
+      expect(repository.reorder).toHaveBeenCalledWith(5, true, [8, 3, 7]);
+      expect(transport.publish).toHaveBeenCalledTimes(3);
+
+      expect(transport.publish.mock.calls[0]?.[0]).toBeInstanceOf(TodoUpdatedV1);
+      expect(transport.publish.mock.calls[1]?.[0]).toBeInstanceOf(TodoUpdatedV1);
+      expect(transport.publish.mock.calls[2]?.[0]).toBeInstanceOf(TodoUpdatedV1);
+      expect(logger.log).toHaveBeenCalledWith('to do order updated', {
+        count: 3,
+        finished: true,
+      });
+    });
+
+    it('answers ERP-CORE-0004 and publishes nothing when an item is not found', async () => {
+      const { service, repository, transport } = build();
+      repository.reorder.mockResolvedValue(false);
+
+      await expect(
+        service.reorder(ME, {
+          finished: false,
+          items: [8, 99],
+        }),
+      ).rejects.toMatchObject({ code: 'ERP-CORE-0004' });
+
+      expect(transport.publish).not.toHaveBeenCalled();
+    });
+
+    it('rejects an invalid body without calling the repository', async () => {
+      const { service, repository } = build();
+
+      await expect(
+        service.reorder(ME, {
+          finished: 'false',
+          items: [],
+        }),
+      ).rejects.toBeInstanceOf(AppError);
+
+      expect(repository.reorder).not.toHaveBeenCalled();
+    });
+  });
   describe('remove', () => {
     it("deletes the caller's own to do, publishes the delete event and logs the id", async () => {
       const { service, repository, transport, logger } = build();

@@ -8,6 +8,11 @@ export interface TodoRow {
   readonly itemOrder: number | null;
 }
 
+export interface TodoCursor {
+  readonly itemOrder: number | null;
+  readonly todoid: number;
+}
+
 export interface NewTodo {
   readonly staffId: number;
   readonly description: string;
@@ -16,14 +21,15 @@ export interface NewTodo {
 
 export type TodoStatus = 'unfinished' | 'finished';
 
-/** One checked list request: the panel, the page size and the offset the cursor decoded to. */
+/** One checked list request: panel, page size and the last row of the previous page. */
 export interface TodoListRequest {
   readonly status: TodoStatus;
   readonly limit: number;
-  readonly offset: number;
+  readonly cursor: TodoCursor | null;
 }
 
 export interface TodoPage {
   readonly items: readonly TodoRow[];
   readonly total: number;
+  readonly hasMore: boolean;
 }
