@@ -326,7 +326,7 @@ describe('FixedEquipmentDepreciationsController (Fastify inject, no network)', (
     const idsOf = (one: Page): string[] => one.data.map((row) => row.id);
 
     it.each([
-      ['view', TEST_BEARERS.admin],
+      ['view', TEST_BEARERS.viewer],
       ['view own', TEST_BEARERS.owner],
     ])(
       'as %s, ?limit=2 walks forward with nextCursor and back with prevCursor',
