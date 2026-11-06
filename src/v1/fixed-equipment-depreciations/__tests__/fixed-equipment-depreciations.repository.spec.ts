@@ -211,7 +211,7 @@ describe('FixedEquipmentDepreciationsRepository', () => {
     expect(queryRaw).toHaveBeenCalledTimes(3);
   });
 
-  it('usage lets a failed count through (the service turns it into ERP-FEDEPRECIATIONS-0002)', async () => {
+  it('usage lets a failed count through (the service turns it into ERP-FIXEDEQUIPMENTDEPRECIATIONS-0002)', async () => {
     queryRaw.mockRejectedValueOnce(new Error('db down'));
     await expect(repository.usage(5)).rejects.toThrow('db down');
   });

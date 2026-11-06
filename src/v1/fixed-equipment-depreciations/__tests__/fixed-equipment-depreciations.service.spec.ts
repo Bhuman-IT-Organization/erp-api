@@ -242,11 +242,11 @@ describe('remove', () => {
     ['an asset', { models: 0, assets: 2 }],
     ['both', { models: 3, assets: 4 }],
   ])(
-    'refuses with 409 ERP-FEDEPRECIATIONS-0001 while %s uses it, naming both counts; nothing is deleted or published',
+    'refuses with 409 ERP-FIXEDEQUIPMENTDEPRECIATIONS-0001 while %s uses it, naming both counts; nothing is deleted or published',
     async (_label, usage) => {
       repository.usage.mockResolvedValue(usage);
       await expect(service.remove({ id: 5 })).rejects.toMatchObject({
-        code: 'ERP-FEDEPRECIATIONS-0001',
+        code: 'ERP-FIXEDEQUIPMENTDEPRECIATIONS-0001',
         message: `Depreciation is still in use. Usage counts: models=${String(usage.models)}, assets=${String(usage.assets)}`,
       });
       expect(repository.remove).not.toHaveBeenCalled();
@@ -254,10 +254,10 @@ describe('remove', () => {
     },
   );
 
-  it('refuses with 409 ERP-FEDEPRECIATIONS-0002 when its use could not be counted, never a 500', async () => {
+  it('refuses with 409 ERP-FIXEDEQUIPMENTDEPRECIATIONS-0002 when its use could not be counted, never a 500', async () => {
     repository.usage.mockRejectedValue(new Error('the count failed'));
     await expect(service.remove({ id: 5 })).rejects.toMatchObject({
-      code: 'ERP-FEDEPRECIATIONS-0002',
+      code: 'ERP-FIXEDEQUIPMENTDEPRECIATIONS-0002',
       message: 'its use could not be counted',
     });
     expect(repository.remove).not.toHaveBeenCalled();

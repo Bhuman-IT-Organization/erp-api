@@ -487,14 +487,14 @@ describe('FixedEquipmentDepreciationsController (Fastify inject, no network)', (
       expect(ctx.events.count).toBe(0);
     });
 
-    it('while an asset model or an asset uses it is 409 ERP-FEDEPRECIATIONS-0001, the detail naming both counts: the row stays, no event, no log line', async () => {
+    it('while an asset model or an asset uses it is 409 ERP-FIXEDEQUIPMENTDEPRECIATIONS-0001, the detail naming both counts: the row stays, no event, no log line', async () => {
       const id = await created('In use');
       ctx.repo.usageOf.set(Number(id), { models: 1, assets: 2 });
       const total = await ctx.repo.count(ALL, 'all', 0);
       const res = await send('DELETE', record(id), TEST_BEARERS.admin);
       expect(res.statusCode).toBe(409);
       const body = problem(res);
-      expect(body.code).toBe('ERP-FEDEPRECIATIONS-0001');
+      expect(body.code).toBe('ERP-FIXEDEQUIPMENTDEPRECIATIONS-0001');
       expect(body.detail).toBe('Depreciation is still in use. Usage counts: models=1, assets=2');
       expect((await send('GET', record(id), TEST_BEARERS.admin)).statusCode).toBe(HTTP.ok);
       expect(await ctx.repo.count(ALL, 'all', 0)).toBe(total);
@@ -502,13 +502,13 @@ describe('FixedEquipmentDepreciationsController (Fastify inject, no network)', (
       expect(ctx.logger.lines).toEqual([]);
     });
 
-    it('when its use could not be counted is 409 ERP-FEDEPRECIATIONS-0002, never a 500; the row stays', async () => {
+    it('when its use could not be counted is 409 ERP-FIXEDEQUIPMENTDEPRECIATIONS-0002, never a 500; the row stays', async () => {
       const id = await created('Uncountable');
       ctx.repo.usageFails = true;
       const res = await send('DELETE', record(id), TEST_BEARERS.admin);
       expect(res.statusCode).toBe(409);
       const body = problem(res);
-      expect(body.code).toBe('ERP-FEDEPRECIATIONS-0002');
+      expect(body.code).toBe('ERP-FIXEDEQUIPMENTDEPRECIATIONS-0002');
       expect(body.detail).toBe('its use could not be counted');
       expect((await send('GET', record(id), TEST_BEARERS.admin)).statusCode).toBe(HTTP.ok);
       expect(ctx.events.count).toBe(0);

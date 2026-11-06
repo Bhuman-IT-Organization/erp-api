@@ -107,8 +107,8 @@ export class FixedEquipmentDepreciationsService {
   }
 
   /**
-   * 404 for a missing id; 409 `ERP-FEDEPRECIATIONS-0001` while an asset model or an asset uses it
-   * (the detail names both counts); 409 `ERP-FEDEPRECIATIONS-0002` when its use could not be counted.
+   * 404 for a missing id; 409 `ERP-FIXEDEQUIPMENTDEPRECIATIONS-0001` while an asset model or an asset uses it
+   * (the detail names both counts); 409 `ERP-FIXEDEQUIPMENTDEPRECIATIONS-0002` when its use could not be counted.
    */
   async remove(params: unknown): Promise<void> {
     const { id } = this.validator.parseParams(params);
@@ -118,11 +118,11 @@ export class FixedEquipmentDepreciationsService {
     try {
       usage = await this.repository.usage(id);
     } catch {
-      throw new AppError('ERP-FEDEPRECIATIONS-0002', 'its use could not be counted');
+      throw new AppError('ERP-FIXEDEQUIPMENTDEPRECIATIONS-0002', 'its use could not be counted');
     }
     if (usage.models > 0 || usage.assets > 0) {
       throw new AppError(
-        'ERP-FEDEPRECIATIONS-0001',
+        'ERP-FIXEDEQUIPMENTDEPRECIATIONS-0001',
         `Depreciation is still in use. Usage counts: models=${String(usage.models)}, assets=${String(usage.assets)}`,
       );
     }

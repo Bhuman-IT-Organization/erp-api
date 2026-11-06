@@ -105,8 +105,14 @@ export const ERROR_CODES = {
   'ERP-TICKETPRIORITIES-0002': { status: 409, title: 'Priority is the email-piping default' },
   // v1/fixed-equipment-depreciations: 0001 refuses a delete while an asset model or an asset uses the
   // depreciation (the detail names both counts), 0002 when its use could not be counted.
-  'ERP-FEDEPRECIATIONS-0001': { status: 409, title: 'The depreciation is still in use' },
-  'ERP-FEDEPRECIATIONS-0002': { status: 409, title: 'The depreciation’s use could not be counted' },
+  'ERP-FIXEDEQUIPMENTDEPRECIATIONS-0001': {
+    status: 409,
+    title: 'The depreciation is still in use',
+  },
+  'ERP-FIXEDEQUIPMENTDEPRECIATIONS-0002': {
+    status: 409,
+    title: 'The depreciation’s use could not be counted',
+  },
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_CODES;

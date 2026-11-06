@@ -160,8 +160,8 @@ export class FixedEquipmentDepreciationsController {
       'ERP-AUTH-0004',
       'ERP-AUTH-0005',
       'ERP-CORE-0004',
-      'ERP-FEDEPRECIATIONS-0001',
-      'ERP-FEDEPRECIATIONS-0002',
+      'ERP-FIXEDEQUIPMENTDEPRECIATIONS-0001',
+      'ERP-FIXEDEQUIPMENTDEPRECIATIONS-0002',
     ],
   })
   remove(@Param() params: unknown): Promise<void> {

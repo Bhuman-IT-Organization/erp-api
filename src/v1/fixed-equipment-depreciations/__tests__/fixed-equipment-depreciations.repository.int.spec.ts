@@ -209,7 +209,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
       expect(own.map((row) => row.id)).toEqual([a.id, b.id, c.id]);
     });
 
-    it('usage counts the asset models and assets that carry the id; the delete is refused with 409 ERP-FEDEPRECIATIONS-0001 naming both counts; the row stays', async () => {
+    it('usage counts the asset models and assets that carry the id; the delete is refused with 409 ERP-FIXEDEQUIPMENTDEPRECIATIONS-0001 naming both counts; the row stays', async () => {
       expect(await repository.usage(c.id)).toEqual({ models: 0, assets: 0 });
       try {
         await perfex.tblfe_models.create({
@@ -221,7 +221,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
         });
         expect(await repository.usage(c.id)).toEqual({ models: 1, assets: 1 });
         await expect(service.remove({ id: c.id })).rejects.toMatchObject({
-          code: 'ERP-FEDEPRECIATIONS-0001',
+          code: 'ERP-FIXEDEQUIPMENTDEPRECIATIONS-0001',
           message: 'Depreciation is still in use. Usage counts: models=1, assets=1',
         });
         expect(await repository.findById(c.id, 'all', 0)).toEqual(c);
