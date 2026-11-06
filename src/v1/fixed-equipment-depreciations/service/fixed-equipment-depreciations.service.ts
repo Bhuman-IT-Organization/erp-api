@@ -27,6 +27,7 @@ import {
   FIXED_EQUIPMENT_DEPRECIATIONS_EXPORT_CELLS,
   FixedEquipmentDepreciationsTransformer,
   toExportRow,
+  toFixedEquipmentDepreciation,
 } from './fixed-equipment-depreciations.transformer.js';
 import { FixedEquipmentDepreciationsTransport } from './fixed-equipment-depreciations.transport.js';
 import { FixedEquipmentDepreciationsValidator } from './fixed-equipment-depreciations.validator.js';
@@ -160,14 +161,15 @@ export class FixedEquipmentDepreciationsService {
     return { module: 'fixed-equipment-depreciations', version: 1 };
   }
 
-  /** Facade read: no actor, every owner. */
-  findById(id: number): Promise<FixedEquipmentDepreciation | null> {
-    return this.repository.findById(id, 'all', ANY_OWNER);
+  /** The facade's read: one depreciation by id, every owner's rows, without `creatorId`. */
+  async findById(id: number): Promise<FixedEquipmentDepreciation | null> {
+    const row = await this.repository.findById(id, 'all', ANY_OWNER);
+    return row === null ? null : toFixedEquipmentDepreciation(row);
   }
 
-  /** Facade read: every depreciation, the name ascending. */
-  listAll(): Promise<readonly FixedEquipmentDepreciation[]> {
-    return this.repository.listAll();
+  /** The facade's read: every depreciation, the name ascending, then the id, without `creatorId`. */
+  async listAll(): Promise<readonly FixedEquipmentDepreciation[]> {
+    return (await this.repository.listAll()).map(toFixedEquipmentDepreciation);
   }
 
   /** `GET export`: every row the list's query and the row scope match. */

@@ -12,7 +12,7 @@ import { compareKeys, encodeCursor, type KeyValue } from '../../../shared/http/k
 import { MAX_UNSIGNED_INT_ID } from '../dto/fixed-equipment-depreciations.dto.js';
 import {
   FIXED_EQUIPMENT_DEPRECIATIONS_FACADE_MAX_ROWS,
-  type FixedEquipmentDepreciation,
+  type FixedEquipmentDepreciationRow,
   type FixedEquipmentDepreciationPatch,
   type FixedEquipmentDepreciationsListRequest,
   type FixedEquipmentDepreciationsPage,
@@ -27,7 +27,7 @@ import type { FixedEquipmentDepreciationsRepository } from '../repository/fixed-
  * view-own member in the test app) and one old Perfex row with no term and no creator. By the
  * default `-id` they read 4, 3, 2, 1; by name 1, 2, 4, 3.
  */
-export const SEED_FIXED_EQUIPMENT_DEPRECIATIONS: readonly FixedEquipmentDepreciation[] = [
+export const SEED_FIXED_EQUIPMENT_DEPRECIATIONS: readonly FixedEquipmentDepreciationRow[] = [
   { id: 1, name: 'Depreciation 1', term: 12, creatorId: 1 },
   { id: 2, name: 'Depreciation 2', term: 36, creatorId: 1 },
   { id: 3, name: 'Straight line', term: 60, creatorId: 3 },
@@ -46,21 +46,21 @@ export type FixedEquipmentDepreciationsRepositoryPort = Pick<
 type Key = readonly [KeyValue, number];
 
 function keyOf(
-  row: FixedEquipmentDepreciation,
+  row: FixedEquipmentDepreciationRow,
   sortField: FixedEquipmentDepreciationsSortField,
 ): Key {
   return sortField === 'name' ? [row.name, row.id] : [row.id, row.id];
 }
 
 export class InMemoryFixedEquipmentDepreciationsRepository implements FixedEquipmentDepreciationsRepositoryPort {
-  private readonly rows = new Map<number, FixedEquipmentDepreciation>();
+  private readonly rows = new Map<number, FixedEquipmentDepreciationRow>();
   private lastId = 0;
   /** What `usage` answers for an id; any id not here answers `ZERO_USAGE`. */
   readonly usageOf = new Map<number, FixedEquipmentDepreciationUsage>();
   /** When true, `usage` rejects, as a failed count would. */
   usageFails = false;
   /** Puts rows in exactly as given (ids included), as Perfex's own rows already exist. */
-  seed(rows: readonly FixedEquipmentDepreciation[]): void {
+  seed(rows: readonly FixedEquipmentDepreciationRow[]): void {
     for (const row of rows) {
       this.rows.set(row.id, row);
       this.lastId = Math.max(this.lastId, row.id);
@@ -78,11 +78,11 @@ export class InMemoryFixedEquipmentDepreciationsRepository implements FixedEquip
     staffId: number,
   ): Promise<FixedEquipmentDepreciationsPage> {
     const { sortField, order, cursor, limit } = request;
-    const key = (row: FixedEquipmentDepreciation): Key => keyOf(row, sortField);
+    const key = (row: FixedEquipmentDepreciationRow): Key => keyOf(row, sortField);
     const sorted = this.matching(request, scope, staffId).sort((a, b) =>
       compareKeys(key(a), key(b), order),
     );
-    let items: FixedEquipmentDepreciation[];
+    let items: FixedEquipmentDepreciationRow[];
     if (cursor?.direction === 'before') {
       const earlier = sorted.filter((row) => compareKeys(key(row), cursor.key, order) < 0);
       items = earlier.slice(Math.max(0, earlier.length - limit));
@@ -122,15 +122,15 @@ export class InMemoryFixedEquipmentDepreciationsRepository implements FixedEquip
     id: number,
     scope: ReadScope,
     staffId: number,
-  ): Promise<FixedEquipmentDepreciation | null> {
+  ): Promise<FixedEquipmentDepreciationRow | null> {
     const row = this.rows.get(id);
     if (row === undefined || !visible(row, scope, staffId)) return Promise.resolve(null);
     return Promise.resolve(row);
   }
 
-  create(input: NewFixedEquipmentDepreciation): Promise<FixedEquipmentDepreciation> {
+  create(input: NewFixedEquipmentDepreciation): Promise<FixedEquipmentDepreciationRow> {
     this.lastId += 1;
-    const row: FixedEquipmentDepreciation = {
+    const row: FixedEquipmentDepreciationRow = {
       id: this.lastId,
       name: input.name,
       term: input.term,
@@ -144,10 +144,10 @@ export class InMemoryFixedEquipmentDepreciationsRepository implements FixedEquip
   update(
     id: number,
     patch: FixedEquipmentDepreciationPatch,
-  ): Promise<FixedEquipmentDepreciation | null> {
+  ): Promise<FixedEquipmentDepreciationRow | null> {
     const row = this.rows.get(id);
     if (row === undefined) return Promise.resolve(null);
-    const updated: FixedEquipmentDepreciation = { ...row, name: patch.name, term: patch.term };
+    const updated: FixedEquipmentDepreciationRow = { ...row, name: patch.name, term: patch.term };
     this.rows.set(id, updated);
     return Promise.resolve(updated);
   }
@@ -161,7 +161,7 @@ export class InMemoryFixedEquipmentDepreciationsRepository implements FixedEquip
     return Promise.resolve(this.usageOf.get(id) ?? ZERO_USAGE);
   }
 
-  listAll(): Promise<readonly FixedEquipmentDepreciation[]> {
+  listAll(): Promise<readonly FixedEquipmentDepreciationRow[]> {
     const rows = [...this.rows.values()].sort((a, b) =>
       compareKeys(keyOf(a, 'name'), keyOf(b, 'name'), 'asc'),
     );
@@ -176,7 +176,7 @@ export class InMemoryFixedEquipmentDepreciationsRepository implements FixedEquip
     request: FixedEquipmentDepreciationsListRequest,
     scope: ReadScope,
     staffId: number,
-  ): FixedEquipmentDepreciation[] {
+  ): FixedEquipmentDepreciationRow[] {
     const scoped = [...this.rows.values()].filter((row) => visible(row, scope, staffId));
     const search = request.search;
     if (search === null) return scoped;
@@ -188,7 +188,7 @@ export class InMemoryFixedEquipmentDepreciationsRepository implements FixedEquip
 }
 
 /** `own` narrows to the caller's rows and never widens. */
-function visible(row: FixedEquipmentDepreciation, scope: ReadScope, staffId: number): boolean {
+function visible(row: FixedEquipmentDepreciationRow, scope: ReadScope, staffId: number): boolean {
   return scope === 'all' || row.creatorId === staffId;
 }
 

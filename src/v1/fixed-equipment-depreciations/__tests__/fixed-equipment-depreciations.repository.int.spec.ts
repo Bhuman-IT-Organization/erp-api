@@ -24,7 +24,7 @@ import { HealthService } from '../../../shared/health/health.service.js';
 import { decodeCursor } from '../../../shared/http/keyset.js';
 import { FIXED_EQUIPMENT_DEPRECIATIONS_NAME_MAX } from '../dto/fixed-equipment-depreciations.dto.js';
 import type {
-  FixedEquipmentDepreciation,
+  FixedEquipmentDepreciationRow,
   FixedEquipmentDepreciationsListRequest,
   FixedEquipmentDepreciationsPage,
 } from '../model/fixed-equipment-depreciations.model.js';
@@ -71,9 +71,9 @@ describe.skipIf(!process.env.DATABASE_URL)(
       { publish: () => Promise.resolve() } as never,
       { log: () => undefined } as never,
     );
-    let a: FixedEquipmentDepreciation;
-    let b: FixedEquipmentDepreciation;
-    let c: FixedEquipmentDepreciation;
+    let a: FixedEquipmentDepreciationRow;
+    let b: FixedEquipmentDepreciationRow;
+    let c: FixedEquipmentDepreciationRow;
     /** The id of a row this spec created and deleted: guaranteed missing (ids are never reused). */
     let missingId = 0;
 
@@ -87,7 +87,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
       await client.tblfe_depreciations.deleteMany({ where: { name: { startsWith: MARKER } } });
     };
 
-    const create = (suffix: string, term = 12): Promise<FixedEquipmentDepreciation> =>
+    const create = (suffix: string, term = 12): Promise<FixedEquipmentDepreciationRow> =>
       repository.create({ name: `${MARKER}-${suffix}`, term, creatorId: OWNER });
 
     beforeAll(async () => {

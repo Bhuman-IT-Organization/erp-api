@@ -296,18 +296,23 @@ describe('exportCsv', () => {
 });
 
 describe('facade reads', () => {
-  it('findById reads every owner, and answers the model or null', async () => {
-    const row = { id: 2, name: 'Depreciation 2', term: 36, creatorId: 1 };
-    repository.findById.mockResolvedValue(row);
-    expect(await service.findById(2)).toEqual(row);
+  it('findById reads every owner, and answers the public model (no creatorId) or null', async () => {
+    repository.findById.mockResolvedValue({
+      id: 2,
+      name: 'Depreciation 2',
+      term: 36,
+      creatorId: 1,
+    });
+    expect(await service.findById(2)).toEqual({ id: 2, name: 'Depreciation 2', term: 36 });
     expect(repository.findById).toHaveBeenCalledWith(2, 'all', 0);
     repository.findById.mockResolvedValue(null);
     expect(await service.findById(99)).toBeNull();
   });
 
-  it('listAll returns the model rows', async () => {
-    const rows = [{ id: 1, name: 'Depreciation 1', term: 12, creatorId: 1 }];
-    repository.listAll.mockResolvedValue(rows);
-    expect(await service.listAll()).toEqual(rows);
+  it('listAll maps every row to the public model', async () => {
+    repository.listAll.mockResolvedValue([
+      { id: 1, name: 'Depreciation 1', term: 12, creatorId: 1 },
+    ]);
+    expect(await service.listAll()).toEqual([{ id: 1, name: 'Depreciation 1', term: 12 }]);
   });
 });

@@ -2,30 +2,42 @@ import { describe, expect, it } from 'vitest';
 import { EXPORT_MAX_ROWS } from '../../../shared/http/csv.js';
 import { PRINT_MAX_ROWS } from '../../../shared/http/export.js';
 import type {
-  FixedEquipmentDepreciation,
+  FixedEquipmentDepreciationRow,
   FixedEquipmentDepreciationsPage,
 } from '../model/fixed-equipment-depreciations.model.js';
 import {
   FIXED_EQUIPMENT_DEPRECIATIONS_EXPORT_CELLS,
   FixedEquipmentDepreciationsTransformer,
   toExportRow,
+  toFixedEquipmentDepreciation,
   toResponse,
 } from '../service/fixed-equipment-depreciations.transformer.js';
 
 describe('fixed-equipment-depreciations transformer', () => {
-  const row: FixedEquipmentDepreciation = {
+  const row: FixedEquipmentDepreciationRow = {
     id: 7,
     name: 'Straight line',
     term: 60,
     creatorId: 3,
   };
-  const legacy: FixedEquipmentDepreciation = { id: 8, name: 'Legacy', term: null, creatorId: null };
+  const legacy: FixedEquipmentDepreciationRow = {
+    id: 8,
+    name: 'Legacy',
+    term: null,
+    creatorId: null,
+  };
   const transformer = new FixedEquipmentDepreciationsTransformer();
 
   it('turns the id into a string, keeps the name and the term, and never sends the creator', () => {
     expect(toResponse(row)).toEqual({ id: '7', name: 'Straight line', term: 60 });
     expect(transformer.toResponse(row)).toEqual({ id: '7', name: 'Straight line', term: 60 });
     expect(toResponse(legacy)).toEqual({ id: '8', name: 'Legacy', term: null });
+  });
+
+  it('maps a stored row to the model other modules see: id, name and term, never the creator', () => {
+    expect(toFixedEquipmentDepreciation(row)).toEqual({ id: 7, name: 'Straight line', term: 60 });
+    expect(toFixedEquipmentDepreciation(legacy)).toEqual({ id: 8, name: 'Legacy', term: null });
+    expect(Object.keys(toFixedEquipmentDepreciation(row)).sort()).toEqual(['id', 'name', 'term']);
   });
 
   it('builds an export row: the id as text, the name, and the term as stored (null for none, so ?blank= applies)', () => {

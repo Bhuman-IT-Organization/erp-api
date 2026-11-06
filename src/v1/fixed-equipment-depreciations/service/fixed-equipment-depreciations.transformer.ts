@@ -1,7 +1,7 @@
 /**
- * Transformer: entity to response DTO and the export rows. Every DTO is built field by field and
- * parsed through its zod schema, so nothing the wire shape does not declare can ride along. The
- * controller never imports this file (BE-08).
+ * Transformer: entity to response DTO, the export rows, and the stored row to the model other
+ * modules see. Every DTO is built field by field and parsed through its zod schema, so nothing the
+ * wire shape does not declare can ride along. The controller never imports this file (BE-08).
  */
 import { Injectable } from '@nestjs/common';
 import { EXPORT_MAX_ROWS } from '../../../shared/http/csv.js';
@@ -15,6 +15,7 @@ import {
 import { FIXED_EQUIPMENT_DEPRECIATIONS_EXPORT_COLUMNS } from '../fixed-equipment-depreciations.routes.js';
 import type {
   FixedEquipmentDepreciation,
+  FixedEquipmentDepreciationRow,
   FixedEquipmentDepreciationsPage,
 } from '../model/fixed-equipment-depreciations.model.js';
 
@@ -36,7 +37,7 @@ export const FIXED_EQUIPMENT_DEPRECIATIONS_EXPORT_CELLS = {
 
 /** The creator never reaches the wire: it only scopes the reads. */
 export function toResponse(
-  row: FixedEquipmentDepreciation,
+  row: FixedEquipmentDepreciationRow,
 ): FixedEquipmentDepreciationsResponseDto {
   return fixedEquipmentDepreciationsResponseSchema.parse({
     id: String(row.id),
@@ -45,13 +46,25 @@ export function toResponse(
   });
 }
 
-export function toExportRow(row: FixedEquipmentDepreciation): FixedEquipmentDepreciationExportRow {
+export function toExportRow(
+  row: FixedEquipmentDepreciationRow,
+): FixedEquipmentDepreciationExportRow {
   return { id: String(row.id), name: row.name, term: row.term };
+}
+
+/**
+ * A stored row as the model other modules see through the facade, field by field: the creator
+ * stays inside the module.
+ */
+export function toFixedEquipmentDepreciation(
+  row: FixedEquipmentDepreciationRow,
+): FixedEquipmentDepreciation {
+  return { id: row.id, name: row.name, term: row.term };
 }
 
 @Injectable()
 export class FixedEquipmentDepreciationsTransformer {
-  toResponse(row: FixedEquipmentDepreciation): FixedEquipmentDepreciationsResponseDto {
+  toResponse(row: FixedEquipmentDepreciationRow): FixedEquipmentDepreciationsResponseDto {
     return toResponse(row);
   }
 

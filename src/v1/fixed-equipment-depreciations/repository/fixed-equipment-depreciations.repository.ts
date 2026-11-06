@@ -7,7 +7,7 @@ import { encodeCursor, keysetWhere, type KeyValue } from '../../../shared/http/k
 import { MAX_UNSIGNED_INT_ID } from '../dto/fixed-equipment-depreciations.dto.js';
 import {
   FIXED_EQUIPMENT_DEPRECIATIONS_FACADE_MAX_ROWS,
-  type FixedEquipmentDepreciation,
+  type FixedEquipmentDepreciationRow,
   type FixedEquipmentDepreciationPatch,
   type FixedEquipmentDepreciationsListRequest,
   type FixedEquipmentDepreciationsPage,
@@ -27,7 +27,7 @@ const rowSchema = z
     term: z.number().nullable(),
     creator_id: z.number().int().nullable(),
   })
-  .transform((row): FixedEquipmentDepreciation => ({
+  .transform((row): FixedEquipmentDepreciationRow => ({
     id: row.id,
     name: row.name,
     term: row.term,
@@ -58,7 +58,7 @@ function whereOf(search: string | null, scope: ReadScope, staffId: number): Wher
 }
 
 function keyOf(
-  row: FixedEquipmentDepreciation,
+  row: FixedEquipmentDepreciationRow,
   sortField: FixedEquipmentDepreciationsSortField,
 ): Key {
   return sortField === 'name' ? [row.name, row.id] : [row.id, row.id];
@@ -159,7 +159,7 @@ export class FixedEquipmentDepreciationsRepository {
     id: number,
     scope: ReadScope,
     staffId: number,
-  ): Promise<FixedEquipmentDepreciation | null> {
+  ): Promise<FixedEquipmentDepreciationRow | null> {
     const row = await this.prisma.client.tblfe_depreciations.findFirst({
       where: scope === 'own' ? { id, creator_id: staffId } : { id },
       select: COLUMNS,
@@ -171,7 +171,7 @@ export class FixedEquipmentDepreciationsRepository {
    * `creator_id` is the member who created it. `date_creator` is sent by Prisma, the api's own time
    * in UTC (its `@default(now())`); Perfex's insert takes the database's clock instead.
    */
-  async create(input: NewFixedEquipmentDepreciation): Promise<FixedEquipmentDepreciation> {
+  async create(input: NewFixedEquipmentDepreciation): Promise<FixedEquipmentDepreciationRow> {
     const row = await this.prisma.client.tblfe_depreciations.create({
       data: { name: input.name, term: input.term, creator_id: input.creatorId },
       select: COLUMNS,
@@ -183,7 +183,7 @@ export class FixedEquipmentDepreciationsRepository {
   async update(
     id: number,
     patch: FixedEquipmentDepreciationPatch,
-  ): Promise<FixedEquipmentDepreciation | null> {
+  ): Promise<FixedEquipmentDepreciationRow | null> {
     try {
       const row = await this.prisma.client.tblfe_depreciations.update({
         where: { id },
@@ -247,7 +247,7 @@ export class FixedEquipmentDepreciationsRepository {
     return countSchema.parse(await query)[0].n;
   }
 
-  async listAll(): Promise<readonly FixedEquipmentDepreciation[]> {
+  async listAll(): Promise<readonly FixedEquipmentDepreciationRow[]> {
     const rows = rowsSchema.parse(
       await this.prisma.client.tblfe_depreciations.findMany({
         orderBy: [{ name: 'asc' }, { id: 'asc' }],

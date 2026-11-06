@@ -4,8 +4,8 @@ export const FIXED_EQUIPMENT_DEPRECIATIONS_FACADE_MAX_ROWS = 1000;
 
 export type FixedEquipmentDepreciationsSortField = 'id' | 'name';
 
-/** The model other modules see, and the shape of a stored row. */
-export interface FixedEquipmentDepreciation {
+/** One `tblfe_depreciations` row, stored form: what the repository reads and writes. */
+export interface FixedEquipmentDepreciationRow {
   readonly id: number;
   readonly name: string;
   /** The number of months (`tblfe_depreciations.term`); `null` on a row Perfex stored without one. */
@@ -14,6 +14,15 @@ export interface FixedEquipmentDepreciation {
   readonly creatorId: number | null;
 }
 
+/** The model other modules see through the facade: never `creatorId`. */
+export interface FixedEquipmentDepreciation {
+  readonly id: number;
+  readonly name: string;
+  /** The number of months; `null` on a row Perfex stored without one. */
+  readonly term: number | null;
+}
+
+/** What a create stores: the name, the term and the member who creates it. */
 export interface NewFixedEquipmentDepreciation {
   readonly name: string;
   readonly term: number;
@@ -36,7 +45,7 @@ export interface FixedEquipmentDepreciationsListRequest {
 
 /** One keyset page and its pager meta (`shared/http/keyset.ts`). */
 export interface FixedEquipmentDepreciationsPage extends ListPageMeta {
-  readonly items: readonly FixedEquipmentDepreciation[];
+  readonly items: readonly FixedEquipmentDepreciationRow[];
 }
 
 /** Where a depreciation is in use: the asset models and the assets that carry its id. */

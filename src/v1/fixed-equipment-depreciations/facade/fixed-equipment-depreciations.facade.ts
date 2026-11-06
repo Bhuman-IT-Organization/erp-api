@@ -8,6 +8,7 @@ import { FixedEquipmentDepreciationsService } from '../service/fixed-equipment-d
 /**
  * What other modules may ask of fixed-equipment-depreciations: module-to-module reads, no actor and
  * no scope (every owner's rows). Other modules import it from `../fixed-equipment-depreciations`.
+ * It hands out `FixedEquipmentDepreciation { id, name, term }`, never `creatorId`.
  */
 @Injectable()
 export class FixedEquipmentDepreciationsFacade {

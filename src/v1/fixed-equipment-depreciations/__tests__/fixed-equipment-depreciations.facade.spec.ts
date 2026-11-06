@@ -30,11 +30,26 @@ describe('FixedEquipmentDepreciationsFacade', () => {
     expect((await facade.listAll()).map((row) => row.id)).toEqual(expected);
   });
 
-  it('findById answers the depreciation, or null when absent', async () => {
+  it('findById answers the depreciation as other modules see it (id, name, term), or null when absent', async () => {
     const first = SEED_FIXED_EQUIPMENT_DEPRECIATIONS[0];
     if (first === undefined) throw new Error('the fake has no seeded depreciation');
-    expect(await facade.findById(first.id)).toEqual(first);
+    expect(await facade.findById(first.id)).toEqual({
+      id: first.id,
+      name: first.name,
+      term: first.term,
+    });
     expect(await facade.findById(404_404)).toBeNull();
+  });
+
+  it('never hands out creatorId: not from findById, not from listAll', async () => {
+    const first = SEED_FIXED_EQUIPMENT_DEPRECIATIONS[0];
+    if (first === undefined) throw new Error('the fake has no seeded depreciation');
+    expect(await facade.findById(first.id)).not.toHaveProperty('creatorId');
+    const all = await facade.listAll();
+    expect(all).toHaveLength(SEED_FIXED_EQUIPMENT_DEPRECIATIONS.length);
+    for (const row of all) {
+      expect(Object.keys(row).sort(), String(row.id)).toEqual(['id', 'name', 'term']);
+    }
   });
 
   it('does not require an actor for its module-to-module reads', () => {
