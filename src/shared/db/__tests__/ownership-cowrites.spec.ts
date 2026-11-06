@@ -45,59 +45,101 @@ const record = (over: Record<string, unknown> = {}) => ({
 const count = (map: CoWriteMap): number =>
   [...map.values()].reduce((n, records) => n + records.length, 0);
 
+/**
+ * These tests start a Nest app, hash with bcrypt or scan the whole source tree, so they can pass
+ * the 5 s default on a busy machine. TEST-06: a slow test gets its own timeout and a reason.
+ */
+const SLOW_TEST_TIMEOUT_MS = 30_000;
+
 describe('loadCoWrites (ADR-0050)', () => {
-  it('loads the committed register: no record today', () => {
-    const map = loadCoWrites(loadOwnership());
-    expect(count(map)).toBe(0);
-  });
+  it(
+    'loads the committed register: no record today',
+    () => {
+      const map = loadCoWrites(loadOwnership());
+      expect(count(map)).toBe(0);
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 
-  it('loads a valid fixture record keyed by its table', () => {
-    const map = loadCoWrites(ownership, register([record()]));
-    expect(map.get('tblperfex_thing')).toHaveLength(1);
-  });
+  it(
+    'loads a valid fixture record keyed by its table',
+    () => {
+      const map = loadCoWrites(ownership, register([record()]));
+      expect(map.get('tblperfex_thing')).toHaveLength(1);
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 
-  it('refuses a record for a node-owned table', () => {
-    expect(() => loadCoWrites(ownership, register([record({ table: 'tblours' })]))).toThrow(
-      /tblours/,
-    );
-  });
+  it(
+    'refuses a record for a node-owned table',
+    () => {
+      expect(() => loadCoWrites(ownership, register([record({ table: 'tblours' })]))).toThrow(
+        /tblours/,
+      );
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 
-  it('refuses a record for a table neither ownership register names', () => {
-    expect(() => loadCoWrites(ownership, register([record({ table: 'tblnowhere' })]))).toThrow(
-      /tblnowhere/,
-    );
-  });
+  it(
+    'refuses a record for a table neither ownership register names',
+    () => {
+      expect(() => loadCoWrites(ownership, register([record({ table: 'tblnowhere' })]))).toThrow(
+        /tblnowhere/,
+      );
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 
-  it('refuses a duplicate (table, operation)', () => {
-    expect(() => loadCoWrites(ownership, register([record(), record({ columns: ['c'] })]))).toThrow(
-      /more than once/,
-    );
-  });
+  it(
+    'refuses a duplicate (table, operation)',
+    () => {
+      expect(() =>
+        loadCoWrites(ownership, register([record(), record({ columns: ['c'] })])),
+      ).toThrow(/more than once/);
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 
-  it("refuses columns '*' with update, and admits it with insert", () => {
-    expect(() => loadCoWrites(ownership, register([record({ columns: '*' })]))).toThrow(/'\*'/);
-    expect(
-      loadCoWrites(ownership, register([record({ operation: 'insert', columns: '*' })])).size,
-    ).toBe(1);
-  });
+  it(
+    "refuses columns '*' with update, and admits it with insert",
+    () => {
+      expect(() => loadCoWrites(ownership, register([record({ columns: '*' })]))).toThrow(/'\*'/);
+      expect(
+        loadCoWrites(ownership, register([record({ operation: 'insert', columns: '*' })])).size,
+      ).toBe(1);
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 
-  it('refuses a duplicated column name', () => {
-    expect(() => loadCoWrites(ownership, register([record({ columns: ['a', 'a'] })]))).toThrow(
-      /column/,
-    );
-  });
+  it(
+    'refuses a duplicated column name',
+    () => {
+      expect(() => loadCoWrites(ownership, register([record({ columns: ['a', 'a'] })]))).toThrow(
+        /column/,
+      );
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 
-  it('refuses an unknown field (strict) and a record that is not the shape', () => {
-    expect(() => loadCoWrites(ownership, register([{ ...record(), extra: 1 }]))).toThrow();
-    expect(() => loadCoWrites(ownership, register([record({ operation: 'upsert' })]))).toThrow();
-    expect(() => loadCoWrites(ownership, register([record({ files: [] })]))).toThrow();
-    expect(() => loadCoWrites(ownership, register([record({ module: 'currencies' })]))).toThrow();
-    expect(() => loadCoWrites(ownership, register(record()))).toThrow();
-  });
+  it(
+    'refuses an unknown field (strict) and a record that is not the shape',
+    () => {
+      expect(() => loadCoWrites(ownership, register([{ ...record(), extra: 1 }]))).toThrow();
+      expect(() => loadCoWrites(ownership, register([record({ operation: 'upsert' })]))).toThrow();
+      expect(() => loadCoWrites(ownership, register([record({ files: [] })]))).toThrow();
+      expect(() => loadCoWrites(ownership, register([record({ module: 'currencies' })]))).toThrow();
+      expect(() => loadCoWrites(ownership, register(record()))).toThrow();
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 
-  it('refuses a missing file instead of loading an empty register', () => {
-    expect(() => loadCoWrites(ownership, pathToFileURL(join(scratch, 'absent.json')))).toThrow();
-  });
+  it(
+    'refuses a missing file instead of loading an empty register',
+    () => {
+      expect(() => loadCoWrites(ownership, pathToFileURL(join(scratch, 'absent.json')))).toThrow();
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 });
 
 describe('coWriteFor', () => {
@@ -110,27 +152,47 @@ describe('coWriteFor', () => {
     ]),
   );
 
-  it('admits a typed write whose keys sit inside the listed columns', () => {
-    expect(coWriteFor(map, 'tblperfex_thing', 'update', ['a'])?.table).toBe('tblperfex_thing');
-    expect(coWriteFor(map, 'tblperfex_thing', 'update', ['a', 'b'])).toBeDefined();
-  });
+  it(
+    'admits a typed write whose keys sit inside the listed columns',
+    () => {
+      expect(coWriteFor(map, 'tblperfex_thing', 'update', ['a'])?.table).toBe('tblperfex_thing');
+      expect(coWriteFor(map, 'tblperfex_thing', 'update', ['a', 'b'])).toBeDefined();
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 
-  it('refuses an extra column', () => {
-    expect(coWriteFor(map, 'tblperfex_thing', 'update', ['a', 'z'])).toBeUndefined();
-  });
+  it(
+    'refuses an extra column',
+    () => {
+      expect(coWriteFor(map, 'tblperfex_thing', 'update', ['a', 'z'])).toBeUndefined();
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 
-  it('refuses an operation the table has no record for, and an unlisted table', () => {
-    expect(coWriteFor(map, 'tblperfex_thing', 'insert', ['a'])).toBeUndefined();
-    expect(coWriteFor(map, 'tblunlisted', 'update', ['a'])).toBeUndefined();
-  });
+  it(
+    'refuses an operation the table has no record for, and an unlisted table',
+    () => {
+      expect(coWriteFor(map, 'tblperfex_thing', 'insert', ['a'])).toBeUndefined();
+      expect(coWriteFor(map, 'tblunlisted', 'update', ['a'])).toBeUndefined();
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 
-  it("admits any keys under '*'", () => {
-    expect(coWriteFor(map, 'tblother_thing', 'insert', ['x', 'y', 'z'])).toBeDefined();
-  });
+  it(
+    "admits any keys under '*'",
+    () => {
+      expect(coWriteFor(map, 'tblother_thing', 'insert', ['x', 'y', 'z'])).toBeDefined();
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 
-  it('never admits a typed write through a raw record', () => {
-    expect(coWriteFor(map, 'tblother_thing', 'update', ['v'])).toBeUndefined();
-  });
+  it(
+    'never admits a typed write through a raw record',
+    () => {
+      expect(coWriteFor(map, 'tblother_thing', 'update', ['v'])).toBeUndefined();
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 });
 
 // The structural half of ADR-0050 decision 4: the guard sees tables and columns, this scan sees
@@ -169,32 +231,44 @@ describe('structural scan: only the listed files write a co-write table (ADR-005
   const map = loadCoWrites(loadOwnership());
   const files = sourceFiles(SRC);
 
-  it('walks the source tree, skipping __tests__ and the generated client', () => {
-    expect(files.length).toBeGreaterThan(100);
-    expect(files.some((f) => f.includes(`${sep}__tests__${sep}`))).toBe(false);
-    expect(files.some((f) => f.startsWith(GENERATED))).toBe(false);
-  });
+  it(
+    'walks the source tree, skipping __tests__ and the generated client',
+    () => {
+      expect(files.length).toBeGreaterThan(100);
+      expect(files.some((f) => f.includes(`${sep}__tests__${sep}`))).toBe(false);
+      expect(files.some((f) => f.startsWith(GENERATED))).toBe(false);
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 
-  it('recognises a typed delegate write and a raw write, and not a read', () => {
-    const [delegate, raw] = writePatterns('tblpur_orders');
-    expect(delegate?.test('await tx.tblpur_orders.update({')).toBe(true);
-    expect(delegate?.test('await tx.tblpur_orders.findMany({')).toBe(false);
-    expect(raw?.test('`UPDATE tblpur_orders SET status_goods = 1`')).toBe(true);
-    expect(raw?.test('insert into `tblpur_orders` (a) values (1)')).toBe(true);
-    expect(raw?.test('SELECT * FROM tblpur_orders')).toBe(false);
-  });
+  it(
+    'recognises a typed delegate write and a raw write, and not a read',
+    () => {
+      const [delegate, raw] = writePatterns('tblpur_orders');
+      expect(delegate?.test('await tx.tblpur_orders.update({')).toBe(true);
+      expect(delegate?.test('await tx.tblpur_orders.findMany({')).toBe(false);
+      expect(raw?.test('`UPDATE tblpur_orders SET status_goods = 1`')).toBe(true);
+      expect(raw?.test('insert into `tblpur_orders` (a) values (1)')).toBe(true);
+      expect(raw?.test('SELECT * FROM tblpur_orders')).toBe(false);
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 
-  it('finds every writer of a co-write table inside the files its records list', () => {
-    const strays: string[] = [];
-    for (const file of files) {
-      const text = readFileSync(file, 'utf8');
-      const path = relative(ROOT, file).split(sep).join('/');
-      for (const [table, records] of map) {
-        if (!writePatterns(table).some((p) => p.test(text))) continue;
-        const allowed = records.flatMap((r) => r.files);
-        if (!allowed.includes(path)) strays.push(`${path} writes ${table}`);
+  it(
+    'finds every writer of a co-write table inside the files its records list',
+    () => {
+      const strays: string[] = [];
+      for (const file of files) {
+        const text = readFileSync(file, 'utf8');
+        const path = relative(ROOT, file).split(sep).join('/');
+        for (const [table, records] of map) {
+          if (!writePatterns(table).some((p) => p.test(text))) continue;
+          const allowed = records.flatMap((r) => r.files);
+          if (!allowed.includes(path)) strays.push(`${path} writes ${table}`);
+        }
       }
-    }
-    expect(strays).toEqual([]);
-  });
+      expect(strays).toEqual([]);
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 });
