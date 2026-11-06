@@ -4,6 +4,7 @@ import { BrandingModule } from './branding/branding.module.js';
 import { ContractTypesModule } from './contract-types/contract-types.module.js';
 import { CostCentersModule } from './cost-centers/cost-centers.module.js';
 import { CurrenciesModule } from './currencies/currencies.module.js';
+import { AnnouncementsModule } from './announcements/announcements.module.js';
 import { CustomFieldsModule } from './custom-fields/custom-fields.module.js';
 import { CustomerGroupsModule } from './customer-groups/customer-groups.module.js';
 import { DepartmentsModule } from './departments/departments.module.js';
@@ -41,6 +42,7 @@ import { TicketPrioritiesModule } from './ticket-priorities/ticket-priorities.mo
     TicketStatusesModule,
     CustomerGroupsModule,
     TicketPrioritiesModule,
+    AnnouncementsModule,
   ],
 })
 export class V1Module {}

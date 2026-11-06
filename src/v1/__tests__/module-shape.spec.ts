@@ -283,146 +283,166 @@ const tableNames = (body: string[]): string[] =>
 const eventNames = (source: string): string[] =>
   [...source.matchAll(/static readonly NAME = '([^']+)'/g)].map((m) => m[1] ?? '');
 
+/**
+ * These tests read every module source file, so they can take longer than the 5 s default on a busy machine.
+ * TEST-06: a slow test gets its own timeout and a reason, never a global one.
+ */
+const SLOW_TEST_TIMEOUT_MS = 30_000;
+
 describe('src/v1 module shape', () => {
-  it(`has at least ${String(MIN_MODULES)} modules beside __tests__`, () => {
-    expect(MODULES.length, `modules found: ${MODULES.join(', ')}`).toBeGreaterThanOrEqual(
-      MIN_MODULES,
-    );
-  });
+  it(
+    `has at least ${String(MIN_MODULES)} modules beside __tests__`,
+    () => {
+      expect(MODULES.length, `modules found: ${MODULES.join(', ')}`).toBeGreaterThanOrEqual(
+        MIN_MODULES,
+      );
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 
-  it('registers every module in v1.module.ts', () => {
-    const v1Module = read(V1, 'v1.module.ts');
-    for (const m of MODULES) {
-      expect(
-        v1Module.includes(`./${m}/${m}.module.js`),
-        `v1.module.ts does not import ./${m}/${m}.module.js`,
-      ).toBe(true);
-    }
-  });
-
-  it('allows @Global() only in src/v1/auth/auth.module.ts among v1 modules', () => {
-    for (const m of MODULES) {
-      const moduleFiles = listDir(join(V1, m)).filter((f) => f.endsWith('.module.ts'));
-      for (const file of moduleFiles) {
-        const isGlobal = read(V1, m, file).includes('@Global()');
-        const allowed = m === 'auth' && file === 'auth.module.ts';
+  it(
+    'registers every module in v1.module.ts',
+    () => {
+      const v1Module = read(V1, 'v1.module.ts');
+      for (const m of MODULES) {
         expect(
-          isGlobal && !allowed,
-          `${m}/${file} uses @Global(); only auth.module.ts may (it provides ACCESS_TOKEN_VERIFIER)`,
+          v1Module.includes(`./${m}/${m}.module.js`),
+          `v1.module.ts does not import ./${m}/${m}.module.js`,
+        ).toBe(true);
+      }
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    'allows @Global() only in src/v1/auth/auth.module.ts among v1 modules',
+    () => {
+      for (const m of MODULES) {
+        const moduleFiles = listDir(join(V1, m)).filter((f) => f.endsWith('.module.ts'));
+        for (const file of moduleFiles) {
+          const isGlobal = read(V1, m, file).includes('@Global()');
+          const allowed = m === 'auth' && file === 'auth.module.ts';
+          expect(
+            isGlobal && !allowed,
+            `${m}/${file} uses @Global(); only auth.module.ts may (it provides ACCESS_TOKEN_VERIFIER)`,
+          ).toBe(false);
+        }
+      }
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    'keeps src/shared to the allowlist (no loose .ts, README.md only)',
+    () => {
+      const entries = readdirSync(SHARED, { withFileTypes: true });
+      const dirs = entries
+        .filter((e) => e.isDirectory())
+        .map((e) => e.name)
+        .sort();
+      const files = entries.filter((e) => e.isFile()).map((e) => e.name);
+      expect(dirs, 'src/shared folders differ from SHARED_ALLOWLIST').toEqual(
+        [...SHARED_ALLOWLIST].sort(),
+      );
+      expect(files, 'src/shared may hold README.md and nothing else at its root').toEqual([
+        'README.md',
+      ]);
+      for (const reserved of SHARED_RESERVED) {
+        expect(
+          SHARED_ALLOWLIST.includes(reserved),
+          `${reserved} is reserved and allowlisted at once`,
         ).toBe(false);
       }
-    }
-  });
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 
-  it('keeps src/shared to the allowlist (no loose .ts, README.md only)', () => {
-    const entries = readdirSync(SHARED, { withFileTypes: true });
-    const dirs = entries
-      .filter((e) => e.isDirectory())
-      .map((e) => e.name)
-      .sort();
-    const files = entries.filter((e) => e.isFile()).map((e) => e.name);
-    expect(dirs, 'src/shared folders differ from SHARED_ALLOWLIST').toEqual(
-      [...SHARED_ALLOWLIST].sort(),
-    );
-    expect(files, 'src/shared may hold README.md and nothing else at its root').toEqual([
-      'README.md',
-    ]);
-    for (const reserved of SHARED_RESERVED) {
-      expect(
-        SHARED_ALLOWLIST.includes(reserved),
-        `${reserved} is reserved and allowlisted at once`,
-      ).toBe(false);
-    }
-  });
+  it(
+    `lets only v1/${IDENTITY_MODULE} name ${IDENTITY_TABLES.join(' and ')} (ADR-0034 decision 1)`,
+    () => {
+      const offences: string[] = [];
+      for (const { module, file, source } of clauseSources()) {
+        if (module === IDENTITY_MODULE) continue;
+        const code = stripComments(source);
+        for (const table of IDENTITY_TABLES) {
+          if (new RegExp(String.raw`\b${table}\b`).test(code)) {
+            offences.push(
+              `${file} names \`${table}\`; ADR-0034 decision 1 makes v1/${IDENTITY_MODULE} its only writer — ask identity.facade or subscribe to its event (BE-03)`,
+            );
+          }
+        }
+      }
+      expect(offences, offences.join('\n')).toEqual([]);
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 
-  it(`lets only v1/${IDENTITY_MODULE} name ${IDENTITY_TABLES.join(' and ')} (ADR-0034 decision 1)`, () => {
-    const offences: string[] = [];
-    for (const { module, file, source } of clauseSources()) {
-      if (module === IDENTITY_MODULE) continue;
-      const code = stripComments(source);
-      for (const table of IDENTITY_TABLES) {
-        if (new RegExp(String.raw`\b${table}\b`).test(code)) {
+  it(
+    `lets only ${STAFF_TABLE_ALLOWLIST.join(' and ')} name ${SHARED_STAFF_TABLE} (ADR-0034 decision 1, BE-04 column scope)`,
+    () => {
+      const offences: string[] = [];
+      for (const { module, file, source } of clauseSources()) {
+        if (STAFF_TABLE_ALLOWLIST.includes(module)) continue;
+        if (new RegExp(String.raw`\b${SHARED_STAFF_TABLE}\b`).test(stripComments(source))) {
           offences.push(
-            `${file} names \`${table}\`; ADR-0034 decision 1 makes v1/${IDENTITY_MODULE} its only writer — ask identity.facade or subscribe to its event (BE-03)`,
+            `${file} names \`${SHARED_STAFF_TABLE}\`; only ${STAFF_TABLE_ALLOWLIST.join(' and ')} may (ADR-0034 decision 1; auth's allowance is the three login columns of src/v1/auth/README.md § Owned tables)`,
           );
         }
       }
-    }
-    expect(offences, offences.join('\n')).toEqual([]);
-  });
+      expect(offences, offences.join('\n')).toEqual([]);
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 
-  it(`lets only ${STAFF_TABLE_ALLOWLIST.join(' and ')} name ${SHARED_STAFF_TABLE} (ADR-0034 decision 1, BE-04 column scope)`, () => {
-    const offences: string[] = [];
-    for (const { module, file, source } of clauseSources()) {
-      if (STAFF_TABLE_ALLOWLIST.includes(module)) continue;
-      if (new RegExp(String.raw`\b${SHARED_STAFF_TABLE}\b`).test(stripComments(source))) {
-        offences.push(
-          `${file} names \`${SHARED_STAFF_TABLE}\`; only ${STAFF_TABLE_ALLOWLIST.join(' and ')} may (ADR-0034 decision 1; auth's allowance is the three login columns of src/v1/auth/README.md § Owned tables)`,
-        );
+  it(
+    `lets no module but v1/${IDENTITY_MODULE} import ${IDENTITY_REPOSITORY_IMPORT} (ADR-0034 decision 1)`,
+    () => {
+      const offences: string[] = [];
+      for (const { module, file, source } of clauseSources()) {
+        if (module === IDENTITY_MODULE) continue;
+        if (stripComments(source).includes(IDENTITY_REPOSITORY_IMPORT)) {
+          offences.push(
+            `${file} imports \`${IDENTITY_REPOSITORY_IMPORT}\`; reach v1/${IDENTITY_MODULE} through its index.ts (the facade) only — ADR-0034 decision 1, BE-03`,
+          );
+        }
       }
-    }
-    expect(offences, offences.join('\n')).toEqual([]);
-  });
-
-  it(`lets no module but v1/${IDENTITY_MODULE} import ${IDENTITY_REPOSITORY_IMPORT} (ADR-0034 decision 1)`, () => {
-    const offences: string[] = [];
-    for (const { module, file, source } of clauseSources()) {
-      if (module === IDENTITY_MODULE) continue;
-      if (stripComments(source).includes(IDENTITY_REPOSITORY_IMPORT)) {
-        offences.push(
-          `${file} imports \`${IDENTITY_REPOSITORY_IMPORT}\`; reach v1/${IDENTITY_MODULE} through its index.ts (the facade) only — ADR-0034 decision 1, BE-03`,
-        );
-      }
-    }
-    expect(offences, offences.join('\n')).toEqual([]);
-  });
+      expect(offences, offences.join('\n')).toEqual([]);
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 });
 
 describe('topLevelProblems (optionalTop, facade-only)', () => {
   const complete = allowedTop('demo');
 
-  it('passes a module without jobs/ and one with it', () => {
-    expect(topLevelProblems('demo', complete)).toEqual({ extra: [], missing: [] });
-    expect(topLevelProblems('demo', [...complete, 'jobs'])).toEqual({ extra: [], missing: [] });
-  });
+  it(
+    'passes a module without jobs/ and one with it',
+    () => {
+      expect(topLevelProblems('demo', complete)).toEqual({ extra: [], missing: [] });
+      expect(topLevelProblems('demo', [...complete, 'jobs'])).toEqual({ extra: [], missing: [] });
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 
-  it('still fails an unknown entry and a missing required one', () => {
-    expect(topLevelProblems('demo', [...complete, 'helpers']).extra).toEqual(['helpers']);
-    expect(
-      topLevelProblems(
-        'demo',
-        complete.filter((e) => e !== 'facade'),
-      ).missing,
-    ).toEqual(['facade']);
-  });
+  it(
+    'still fails an unknown entry and a missing required one',
+    () => {
+      expect(topLevelProblems('demo', [...complete, 'helpers']).extra).toEqual(['helpers']);
+      expect(
+        topLevelProblems(
+          'demo',
+          complete.filter((e) => e !== 'facade'),
+        ).missing,
+      ).toEqual(['facade']);
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 
-  it('admits the facade-only shape for settings (D-23): no routes, controller, dto or events', () => {
-    expect(allowedTop('settings')).toEqual([
-      'settings.module.ts',
-      'index.ts',
-      'README.md',
-      'service',
-      'repository',
-      'model',
-      'facade',
-      '__tests__',
-    ]);
-    expect(topLevelProblems('settings', allowedTop('settings'))).toEqual({
-      extra: [],
-      missing: [],
-    });
-  });
-
-  it('still refuses a controller in settings', () => {
-    expect(topLevelProblems('settings', [...allowedTop('settings'), 'controller']).extra).toEqual([
-      'controller',
-    ]);
-  });
-
-  it('fails the same eight entries under any other name (the exception is by name, never inferred)', () => {
-    expect(
-      topLevelProblems('demo', [
-        'demo.module.ts',
+  it(
+    'admits the facade-only shape for settings (D-23): no routes, controller, dto or events',
+    () => {
+      expect(allowedTop('settings')).toEqual([
+        'settings.module.ts',
         'index.ts',
         'README.md',
         'service',
@@ -430,78 +450,144 @@ describe('topLevelProblems (optionalTop, facade-only)', () => {
         'model',
         'facade',
         '__tests__',
-      ]).missing,
-    ).toEqual(['demo.routes.ts', 'controller', 'dto', 'events']);
-  });
+      ]);
+      expect(topLevelProblems('settings', allowedTop('settings'))).toEqual({
+        extra: [],
+        missing: [],
+      });
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    'still refuses a controller in settings',
+    () => {
+      expect(topLevelProblems('settings', [...allowedTop('settings'), 'controller']).extra).toEqual(
+        ['controller'],
+      );
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    'fails the same eight entries under any other name (the exception is by name, never inferred)',
+    () => {
+      expect(
+        topLevelProblems('demo', [
+          'demo.module.ts',
+          'index.ts',
+          'README.md',
+          'service',
+          'repository',
+          'model',
+          'facade',
+          '__tests__',
+        ]).missing,
+      ).toEqual(['demo.routes.ts', 'controller', 'dto', 'events']);
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 });
 
 describe('topLevelProblems (tableless, Currencies planning answer 5)', () => {
-  it('names branding as the one tableless module', () => {
-    expect(TABLELESS_MODULES).toEqual(['branding']);
-  });
+  it(
+    'names branding as the one tableless module',
+    () => {
+      expect(TABLELESS_MODULES).toEqual(['branding']);
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 
-  it('drops repository from allowedTop for branding and keeps every other entry', () => {
-    expect(allowedTop('branding')).not.toContain('repository');
-    expect(allowedTop('branding')).toEqual(
-      allowedTop('demo')
-        .map((entry) => entry.replace('demo', 'branding'))
-        .filter((entry) => entry !== 'repository'),
-    );
-    expect(topLevelProblems('branding', allowedTop('branding'))).toEqual({
-      extra: [],
-      missing: [],
-    });
-  });
+  it(
+    'drops repository from allowedTop for branding and keeps every other entry',
+    () => {
+      expect(allowedTop('branding')).not.toContain('repository');
+      expect(allowedTop('branding')).toEqual(
+        allowedTop('demo')
+          .map((entry) => entry.replace('demo', 'branding'))
+          .filter((entry) => entry !== 'repository'),
+      );
+      expect(topLevelProblems('branding', allowedTop('branding'))).toEqual({
+        extra: [],
+        missing: [],
+      });
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 
-  it('refuses a repository folder in a tableless module (a module with no tables has none)', () => {
-    expect(topLevelProblems('branding', [...allowedTop('branding'), 'repository']).extra).toEqual([
-      'repository',
-    ]);
-  });
+  it(
+    'refuses a repository folder in a tableless module (a module with no tables has none)',
+    () => {
+      expect(topLevelProblems('branding', [...allowedTop('branding'), 'repository']).extra).toEqual(
+        ['repository'],
+      );
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 
-  it('fails the same entries under any other name (the exception is by name, never inferred)', () => {
-    const entries = allowedTop('branding').map((entry) => entry.replace('branding', 'demo'));
-    expect(topLevelProblems('demo', entries).missing).toEqual(['repository']);
-  });
+  it(
+    'fails the same entries under any other name (the exception is by name, never inferred)',
+    () => {
+      const entries = allowedTop('branding').map((entry) => entry.replace('branding', 'demo'));
+      expect(topLevelProblems('demo', entries).missing).toEqual(['repository']);
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 });
 
 describe.each(TABLELESS_MODULES)('tableless src/v1/%s', (m) => {
   const dir = join(V1, m);
 
-  it('README ## Owned tables says None', () => {
-    const readme = existsSync(join(dir, 'README.md')) ? read(dir, 'README.md') : '';
-    const firstText =
-      section(readme, '## Owned tables')
-        .map((line) => line.trim())
-        .find((line) => line.length > 0) ?? '';
-    expect(
-      firstText.startsWith('None'),
-      `${m}: README ## Owned tables must start with "None"`,
-    ).toBe(true);
-  });
+  it(
+    'README ## Owned tables says None',
+    () => {
+      const readme = existsSync(join(dir, 'README.md')) ? read(dir, 'README.md') : '';
+      const firstText =
+        section(readme, '## Owned tables')
+          .map((line) => line.trim())
+          .find((line) => line.length > 0) ?? '';
+      expect(
+        firstText.startsWith('None'),
+        `${m}: README ## Owned tables must start with "None"`,
+      ).toBe(true);
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 
-  it('names neither PrismaService nor this.prisma in a non-test .ts file (comments stripped)', () => {
-    const found: ClauseSource[] = [];
-    walkTs(dir, m, `src/v1/${m}`, found);
-    const offences = found
-      .filter(({ file }) => !file.includes('/__tests__/'))
-      .filter(({ source }) => /\bPrismaService\b|this\.prisma\b/.test(stripComments(source)))
-      .map(({ file }) => `${file} reaches the database; a tableless module reads through facades`);
-    expect(offences, offences.join('\n')).toEqual([]);
-  });
+  it(
+    'names neither PrismaService nor this.prisma in a non-test .ts file (comments stripped)',
+    () => {
+      const found: ClauseSource[] = [];
+      walkTs(dir, m, `src/v1/${m}`, found);
+      const offences = found
+        .filter(({ file }) => !file.includes('/__tests__/'))
+        .filter(({ source }) => /\bPrismaService\b|this\.prisma\b/.test(stripComments(source)))
+        .map(
+          ({ file }) => `${file} reaches the database; a tableless module reads through facades`,
+        );
+      expect(offences, offences.join('\n')).toEqual([]);
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 });
 
 describe.each(MODULES)('src/v1/%s', (m) => {
   const dir = join(V1, m);
   const readme = existsSync(join(dir, 'README.md')) ? read(dir, 'README.md') : '';
 
-  it('has exactly the allowed top-level entries', () => {
-    const { extra, missing } = topLevelProblems(m, listDir(dir));
-    expect(extra, `${m}: top-level entries not in the allowed set: ${extra.join(', ')}`).toEqual(
-      [],
-    );
-    expect(missing, `${m}: required top-level entries missing: ${missing.join(', ')}`).toEqual([]);
-  });
+  it(
+    'has exactly the allowed top-level entries',
+    () => {
+      const { extra, missing } = topLevelProblems(m, listDir(dir));
+      expect(extra, `${m}: top-level entries not in the allowed set: ${extra.join(', ')}`).toEqual(
+        [],
+      );
+      expect(missing, `${m}: required top-level entries missing: ${missing.join(', ')}`).toEqual(
+        [],
+      );
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 
   // A facade-only module has no events/ at all; topLevelProblems already refuses one (D-23).
   it.skipIf(isFacadeOnly(m))(
@@ -523,69 +609,89 @@ describe.each(MODULES)('src/v1/%s', (m) => {
     },
   );
 
-  it('has no jobs/ folder while src/shared/queue does not exist', () => {
-    const queueExists = existsSync(join(SHARED, 'queue'));
-    const jobsExists = existsSync(join(dir, 'jobs'));
-    expect(
-      jobsExists && !queueExists,
-      `${m}: jobs/ is rejected until src/shared/queue/ exists (then add 'jobs' to optionalTop in the same PR)`,
-    ).toBe(false);
-  });
-
-  it('names service/ files <m>.(service|validator|enricher|transformer|transport).ts or lists them in the README Layers table', () => {
-    const layers = section(readme, '## Layers').join('\n');
-    for (const file of listDir(join(dir, 'service'))) {
-      const ok = SERVICE_FILE(m).test(file) || layers.includes(`\`service/${file}\``);
+  it(
+    'has no jobs/ folder while src/shared/queue does not exist',
+    () => {
+      const queueExists = existsSync(join(SHARED, 'queue'));
+      const jobsExists = existsSync(join(dir, 'jobs'));
       expect(
-        ok,
-        `${m}: service/${file} matches neither ${m}.(service|${OPTIONAL_LAYERS.join('|')}).ts nor a backticked \`service/${file}\` row in README ## Layers`,
-      ).toBe(true);
-    }
-  });
+        jobsExists && !queueExists,
+        `${m}: jobs/ is rejected until src/shared/queue/ exists (then add 'jobs' to optionalTop in the same PR)`,
+      ).toBe(false);
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 
-  it('README has the ten mandatory headings in relative order', () => {
-    expect(readme.length, `${m}: README.md missing or empty`).toBeGreaterThan(0);
-    const headings = readme.split('\n').map((line) => line.trim());
-    let cursor = -1;
-    for (const heading of README_HEADINGS) {
-      const at = headings.indexOf(heading, cursor + 1);
-      expect(
-        at,
-        `${m}: README heading "${heading}" missing or out of order (must follow "${README_HEADINGS[README_HEADINGS.indexOf(heading) - 1] ?? '(start)'}")`,
-      ).toBeGreaterThan(cursor);
-      cursor = at;
-    }
-  });
+  it(
+    'names service/ files <m>.(service|validator|enricher|transformer|transport).ts or lists them in the README Layers table',
+    () => {
+      const layers = section(readme, '## Layers').join('\n');
+      for (const file of listDir(join(dir, 'service'))) {
+        const ok = SERVICE_FILE(m).test(file) || layers.includes(`\`service/${file}\``);
+        expect(
+          ok,
+          `${m}: service/${file} matches neither ${m}.(service|${OPTIONAL_LAYERS.join('|')}).ts nor a backticked \`service/${file}\` row in README ## Layers`,
+        ).toBe(true);
+      }
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 
-  it('README ## Resilience has the Breaker, Retry policy and Pool budget bullets', () => {
-    const body = section(readme, '## Resilience');
-    for (const prefix of RESILIENCE_BULLETS) {
-      expect(
-        body.some((line) => line.trimStart().startsWith(`- ${prefix}`)),
-        `${m}: README ## Resilience lacks a bullet starting "- ${prefix}"`,
-      ).toBe(true);
-    }
-  });
+  it(
+    'README has the ten mandatory headings in relative order',
+    () => {
+      expect(readme.length, `${m}: README.md missing or empty`).toBeGreaterThan(0);
+      const headings = readme.split('\n').map((line) => line.trim());
+      let cursor = -1;
+      for (const heading of README_HEADINGS) {
+        const at = headings.indexOf(heading, cursor + 1);
+        expect(
+          at,
+          `${m}: README heading "${heading}" missing or out of order (must follow "${README_HEADINGS[README_HEADINGS.indexOf(heading) - 1] ?? '(start)'}")`,
+        ).toBeGreaterThan(cursor);
+        cursor = at;
+      }
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 
-  it('README ## Events published table equals the NAME constants in events/published.ts', () => {
-    // No events/published.ts (a facade-only module) publishes nothing: the README then says None.
-    const published = join(dir, 'events', 'published.ts');
-    const inCode = existsSync(published) ? eventNames(read(published)).sort() : [];
-    const body = section(readme, '## Events published');
-    const inReadme = tableNames(body).sort();
-    if (inCode.length === 0 && inReadme.length === 0) {
-      const firstText = body.map((l) => l.trim()).find((l) => l.length > 0) ?? '';
+  it(
+    'README ## Resilience has the Breaker, Retry policy and Pool budget bullets',
+    () => {
+      const body = section(readme, '## Resilience');
+      for (const prefix of RESILIENCE_BULLETS) {
+        expect(
+          body.some((line) => line.trimStart().startsWith(`- ${prefix}`)),
+          `${m}: README ## Resilience lacks a bullet starting "- ${prefix}"`,
+        ).toBe(true);
+      }
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    'README ## Events published table equals the NAME constants in events/published.ts',
+    () => {
+      // No events/published.ts (a facade-only module) publishes nothing: the README then says None.
+      const published = join(dir, 'events', 'published.ts');
+      const inCode = existsSync(published) ? eventNames(read(published)).sort() : [];
+      const body = section(readme, '## Events published');
+      const inReadme = tableNames(body).sort();
+      if (inCode.length === 0 && inReadme.length === 0) {
+        const firstText = body.map((l) => l.trim()).find((l) => l.length > 0) ?? '';
+        expect(
+          firstText.startsWith('None'),
+          `${m}: no events in code and no table in README ## Events published — the section must start with "None"`,
+        ).toBe(true);
+        return;
+      }
       expect(
-        firstText.startsWith('None'),
-        `${m}: no events in code and no table in README ## Events published — the section must start with "None"`,
-      ).toBe(true);
-      return;
-    }
-    expect(
-      inReadme,
-      `${m}: README ## Events published names [${inReadme.join(', ')}] but events/published.ts declares [${inCode.join(', ')}]`,
-    ).toEqual(inCode);
-  });
+        inReadme,
+        `${m}: README ## Events published names [${inReadme.join(', ')}] but events/published.ts declares [${inCode.join(', ')}]`,
+      ).toEqual(inCode);
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 
   it.skipIf(PENDING_REGENERATION.includes(m))(
     `has one spec per layer present${PENDING_REGENERATION.includes(m) ? ' (skipped: pending regeneration by plan 02-05)' : ''}`,
