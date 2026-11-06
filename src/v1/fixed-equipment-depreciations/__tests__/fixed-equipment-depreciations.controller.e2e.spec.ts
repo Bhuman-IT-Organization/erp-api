@@ -5,7 +5,8 @@
  * every row, `viewOwn` only the rows the member created (another member's row is the same 404 as a
  * missing one), and each write needs its own code. Then the list in Perfex's order (the id
  * descending), create (the creator is the caller) and update (the name and the term only), the
- * DELETE (no in-use check, as in Perfex), the export of `id`, `name` and `term`, `x-request-id` on
+ * DELETE (refused with 409 while an asset model or an asset uses it, or when its use cannot be
+ * counted), the export of `id`, `name` and `term`, `x-request-id` on
  * every response, and the ADR-0030 route assertion.
  */
 import 'reflect-metadata';
@@ -495,7 +496,7 @@ describe('FixedEquipmentDepreciationsController (Fastify inject, no network)', (
       expect(res.statusCode).toBe(409);
       const body = problem(res);
       expect(body.code).toBe('ERP-FIXEDEQUIPMENTDEPRECIATIONS-0001');
-      expect(body.detail).toBe('Depreciation is still in use. Usage counts: models=1, assets=2');
+      expect(body.detail).toBe('used by 1 asset model and 2 assets');
       expect((await send('GET', record(id), TEST_BEARERS.admin)).statusCode).toBe(HTTP.ok);
       expect(await ctx.repo.count(ALL, 'all', 0)).toBe(total);
       expect(ctx.events.count).toBe(0);

@@ -38,6 +38,29 @@ function notFound(): AppError {
   return new AppError('ERP-CORE-0004', 'Resource not found');
 }
 
+/** What a failed count says: the depreciation's use could not be counted, so nothing is deleted. */
+const NOT_COUNTED = 'its use could not be counted';
+
+/** The groups that may hold a depreciation, in the order a refusal names them: one and many. */
+const GROUP_WORDS = [
+  ['models', 'asset model', 'asset models'],
+  ['assets', 'asset', 'assets'],
+] as const;
+
+/**
+ * The in-use refusal, written for a reader: "used by 2 asset models and 1 asset", naming only the
+ * non-zero groups, in `GROUP_WORDS` order; `null` when nothing uses the depreciation.
+ */
+function inUse(usage: FixedEquipmentDepreciationUsage): AppError | null {
+  const parts = GROUP_WORDS.filter(([group]) => usage[group] > 0).map(
+    ([group, one, many]) => `${String(usage[group])} ${usage[group] === 1 ? one : many}`,
+  );
+  const last = parts.pop();
+  if (last === undefined) return null;
+  const list = parts.length === 0 ? last : `${parts.join(', ')} and ${last}`;
+  return new AppError('ERP-FIXEDEQUIPMENTDEPRECIATIONS-0001', `used by ${list}`);
+}
+
 /**
  * The permission gate is the controller's (`PermissionGuard`); the row scope travels with the read
  * and is never re-decided here: the repository narrows `own` to the rows the member created.
@@ -107,8 +130,12 @@ export class FixedEquipmentDepreciationsService {
   }
 
   /**
-   * 404 for a missing id; 409 `ERP-FIXEDEQUIPMENTDEPRECIATIONS-0001` while an asset model or an asset uses it
-   * (the detail names both counts); 409 `ERP-FIXEDEQUIPMENTDEPRECIATIONS-0002` when its use could not be counted.
+   * 404 for a missing id, which is never counted; 409 `ERP-FIXEDEQUIPMENTDEPRECIATIONS-0001` while an
+   * asset model or an asset uses it, the detail naming the non-zero groups ("used by 2 asset models
+   * and 1 asset"), and nothing is deleted; 409 `ERP-FIXEDEQUIPMENTDEPRECIATIONS-0002` when its use
+   * could not be counted. A row gone between the count and the delete is the same 404. One
+   * `FixedEquipmentDepreciationsDeletedV1` after the delete, then the log line. The check-then-delete
+   * window is accepted: Perfex's own delete had no check at all.
    */
   async remove(params: unknown): Promise<void> {
     const { id } = this.validator.parseParams(params);
@@ -118,14 +145,10 @@ export class FixedEquipmentDepreciationsService {
     try {
       usage = await this.repository.usage(id);
     } catch {
-      throw new AppError('ERP-FIXEDEQUIPMENTDEPRECIATIONS-0002', 'its use could not be counted');
+      throw new AppError('ERP-FIXEDEQUIPMENTDEPRECIATIONS-0002', NOT_COUNTED);
     }
-    if (usage.models > 0 || usage.assets > 0) {
-      throw new AppError(
-        'ERP-FIXEDEQUIPMENTDEPRECIATIONS-0001',
-        `Depreciation is still in use. Usage counts: models=${String(usage.models)}, assets=${String(usage.assets)}`,
-      );
-    }
+    const refusal = inUse(usage);
+    if (refusal !== null) throw refusal;
 
     const at = this.now().toISOString();
     if (!(await this.repository.remove(id))) throw notFound();

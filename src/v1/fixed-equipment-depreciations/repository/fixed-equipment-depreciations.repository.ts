@@ -167,7 +167,10 @@ export class FixedEquipmentDepreciationsRepository {
     return row === null ? null : rowSchema.parse(row);
   }
 
-  /** `date_creator` is the database's default; `creator_id` is the member who created it. */
+  /**
+   * `creator_id` is the member who created it. `date_creator` is sent by Prisma, the api's own time
+   * in UTC (its `@default(now())`); Perfex's insert takes the database's clock instead.
+   */
   async create(input: NewFixedEquipmentDepreciation): Promise<FixedEquipmentDepreciation> {
     const row = await this.prisma.client.tblfe_depreciations.create({
       data: { name: input.name, term: input.term, creator_id: input.creatorId },

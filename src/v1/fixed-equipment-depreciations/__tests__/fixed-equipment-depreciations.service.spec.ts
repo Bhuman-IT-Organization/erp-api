@@ -238,16 +238,16 @@ describe('remove', () => {
   });
 
   it.each([
-    ['an asset model', { models: 1, assets: 0 }],
-    ['an asset', { models: 0, assets: 2 }],
-    ['both', { models: 3, assets: 4 }],
+    ['an asset model', { models: 1, assets: 0 }, 'used by 1 asset model'],
+    ['assets', { models: 0, assets: 2 }, 'used by 2 assets'],
+    ['both', { models: 3, assets: 1 }, 'used by 3 asset models and 1 asset'],
   ])(
-    'refuses with 409 ERP-FIXEDEQUIPMENTDEPRECIATIONS-0001 while %s uses it, naming both counts; nothing is deleted or published',
-    async (_label, usage) => {
+    'refuses with 409 ERP-FIXEDEQUIPMENTDEPRECIATIONS-0001 while %s uses it, naming only the non-zero groups; nothing is deleted or published',
+    async (_label, usage, message) => {
       repository.usage.mockResolvedValue(usage);
       await expect(service.remove({ id: 5 })).rejects.toMatchObject({
         code: 'ERP-FIXEDEQUIPMENTDEPRECIATIONS-0001',
-        message: `Depreciation is still in use. Usage counts: models=${String(usage.models)}, assets=${String(usage.assets)}`,
+        message,
       });
       expect(repository.remove).not.toHaveBeenCalled();
       expect(transport.publish).not.toHaveBeenCalled();
@@ -291,6 +291,7 @@ describe('exportCsv', () => {
     repository.list.mockResolvedValue(EMPTY_PAGE);
     await service.exportCsv({}, 'own', 3);
     expect(repository.count).toHaveBeenCalledWith(expect.anything(), 'own', 3);
+    expect(repository.list).toHaveBeenCalledWith(expect.anything(), 'own', 3);
   });
 });
 

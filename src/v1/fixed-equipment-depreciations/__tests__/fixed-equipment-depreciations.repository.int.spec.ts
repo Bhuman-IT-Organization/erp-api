@@ -222,7 +222,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
         expect(await repository.usage(c.id)).toEqual({ models: 1, assets: 1 });
         await expect(service.remove({ id: c.id })).rejects.toMatchObject({
           code: 'ERP-FIXEDEQUIPMENTDEPRECIATIONS-0001',
-          message: 'Depreciation is still in use. Usage counts: models=1, assets=1',
+          message: 'used by 1 asset model and 1 asset',
         });
         expect(await repository.findById(c.id, 'all', 0)).toEqual(c);
       } finally {
@@ -239,6 +239,39 @@ describe.skipIf(!process.env.DATABASE_URL)(
       expect(
         await client.tblfe_depreciations.count({ where: { name: { startsWith: MARKER } } }),
       ).toBe(0);
+      expect(
+        await perfex.tblfe_models.count({ where: { model_name: { startsWith: MARKER } } }),
+      ).toBe(0);
+      expect(
+        await perfex.tblfe_assets.count({ where: { assets_name: { startsWith: MARKER } } }),
+      ).toBe(0);
+    });
+
+    it('an old Perfex row whose term is 12.5, 0 or negative is read as stored', async () => {
+      for (const term of [12.5, 0, -6]) {
+        const old = await repository.create({
+          name: `${MARKER}-old-${String(term)}`,
+          term,
+          creatorId: OWNER,
+        });
+        expect((await repository.findById(old.id, 'all', 0))?.term).toBe(term);
+        expect(await service.get({ id: old.id }, 'all', 0)).toMatchObject({
+          id: String(old.id),
+          term,
+        });
+      }
+    });
+
+    it('renaming such a row with its stored term is refused with 400 ERP-VALIDATION-0001, and the row is unchanged', async () => {
+      const old = await repository.create({
+        name: `${MARKER}-old-rename`,
+        term: 12.5,
+        creatorId: OWNER,
+      });
+      await expect(
+        service.update({ id: old.id }, { name: `${MARKER}-renamed`, term: 12.5 }),
+      ).rejects.toMatchObject({ code: 'ERP-VALIDATION-0001' });
+      expect(await repository.findById(old.id, 'all', 0)).toEqual(old);
     });
   },
 );
