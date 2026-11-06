@@ -699,8 +699,8 @@
     "table": "tblactivity_log"
   },
   {
-    "decided_by": "migration lead",
-    "decided_on": "2026-11-02",
+    "decided_by": null,
+    "decided_on": null,
     "evidence": {
       "ddl": [],
       "forms": [
@@ -712,12 +712,11 @@
         "perfex-core"
       ],
       "writers": [
-        "node",
         "perfex-core"
       ]
     },
-    "evidence_changed": true,
-    "note": "Announcements wave: written by the Setup screen, which v1/announcements owns (/api/v1/announcements POST/PATCH/DELETE); Perfex's Announcements_model add/update/delete writes are refused at Nginx and its screens read the list. Perfex keeps reading it (dashboard, staff portal).",
+    "evidence_changed": false,
+    "note": "Announcements wave: written by the Setup screen, which v1/announcements owns (/api/v1/announcements POST/PATCH/DELETE); Perfex's Announcements_model add/update/delete writes are refused at Nginx and its screens read the list. Perfex keeps reading it (dashboard, client portal).",
     "owner": "node",
     "owner_confidence": "write-single",
     "table": "tblannouncements"

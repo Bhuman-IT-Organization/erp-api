@@ -28,14 +28,14 @@ describe('toResponse', () => {
       id: '7',
       name: 'Holiday',
       message: 'Closed on Friday',
-      dateadded: '2026-02-10T14:30:00.000Z',
-      showtousers: 1,
-      showtostaff: 0,
-      showname: 1,
+      dateAdded: '2026-02-10T14:30:00.000Z',
+      showToUsers: true,
+      showToStaff: false,
+      showName: true,
     });
   });
 
-  it('keeps a missing message as null', () => {
+  it('keeps a stored NULL message as null', () => {
     expect(toResponse(NO_MESSAGE).message).toBeNull();
   });
 
@@ -54,7 +54,8 @@ describe('the export rows', () => {
     });
   });
 
-  it('has one cell definition per export column', () => {
+  it('has one cell definition per export column and marks the date as dateTime', () => {
+    expect(ANNOUNCEMENTS_EXPORT_CELLS.dateadded.kind).toBe('dateTime');
     expect(Object.keys(ANNOUNCEMENTS_EXPORT_CELLS)).toEqual([...ANNOUNCEMENTS_EXPORT_COLUMNS]);
   });
 });

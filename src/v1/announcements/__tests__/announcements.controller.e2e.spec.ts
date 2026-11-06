@@ -55,17 +55,17 @@ const ADMIN_ONLY = 'announcements are managed by administrators only';
 const BODY = {
   name: 'Fuel prices',
   message: 'Updated',
-  showtousers: true,
-  showtostaff: false,
-  showname: true,
+  showToUsers: true,
+  showToStaff: false,
+  showName: true,
 };
 /** Seed row 1 exactly as seeded, so a PATCH of it leaves the shared data as it found it. */
 const SEED_1_BODY = {
   name: 'Head Office',
   message: 'Open on Sunday',
-  showtousers: true,
-  showtostaff: true,
-  showname: false,
+  showToUsers: true,
+  showToStaff: true,
+  showName: false,
 };
 
 type Method = 'GET' | 'POST' | 'PATCH' | 'DELETE';
@@ -213,16 +213,16 @@ describe('AnnouncementsController (Fastify inject, no network)', () => {
           id: '3',
           name: 'Holiday',
           message: 'Closed on Friday',
-          dateadded: '2026-02-10T14:30:00.000Z',
-          showtousers: 1,
-          showtostaff: 0,
-          showname: 0,
+          dateAdded: '2026-02-10T14:30:00.000Z',
+          showToUsers: true,
+          showToStaff: false,
+          showName: false,
         },
       ]);
       expect(res.payload).not.toContain('userid');
     });
 
-    it('a row with no message answers message null', async () => {
+    it('a legacy row with NULL message answers message null', async () => {
       const res = await send('GET', record(2), TEST_BEARERS.admin);
       expect(announcementsResponseSchema.parse(JSON.parse(res.payload)).message).toBeNull();
     });
@@ -279,10 +279,10 @@ describe('AnnouncementsController (Fastify inject, no network)', () => {
         id: dto.id,
         name: 'Written',
         message: 'Updated',
-        dateadded: CREATED_AT,
-        showtousers: 1,
-        showtostaff: 0,
-        showname: 1,
+        dateAdded: CREATED_AT,
+        showToUsers: true,
+        showToStaff: false,
+        showName: true,
       });
       expect(await ctx.repo.findById(Number(dto.id))).toMatchObject({
         name: 'Written',
@@ -296,18 +296,18 @@ describe('AnnouncementsController (Fastify inject, no network)', () => {
       const updated = await send('PATCH', record(dto.id), TEST_BEARERS.admin, {
         name: 'Rewritten',
         message: '',
-        showtousers: false,
-        showtostaff: true,
-        showname: false,
+        showToUsers: false,
+        showToStaff: true,
+        showName: false,
       });
       expect(updated.statusCode).toBe(HTTP.ok);
       expect(JSON.parse(updated.payload)).toEqual({
         ...dto,
         name: 'Rewritten',
         message: '',
-        showtousers: 0,
-        showtostaff: 1,
-        showname: 0,
+        showToUsers: false,
+        showToStaff: true,
+        showName: false,
       });
       expect(ctx.events.drain().map((event) => event.constructor)).toEqual([
         AnnouncementsCreatedV1,
@@ -320,7 +320,7 @@ describe('AnnouncementsController (Fastify inject, no network)', () => {
       ]);
     });
 
-    it('POST without a message stores it as null', async () => {
+    it('POST without a message stores it as an empty string', async () => {
       const withoutMessage = Object.fromEntries(
         Object.entries(BODY).filter(([key]) => key !== 'message'),
       );
@@ -338,7 +338,7 @@ describe('AnnouncementsController (Fastify inject, no network)', () => {
         const read = await send('GET', record(id), TEST_BEARERS.admin);
         expect(announcementsResponseSchema.parse(JSON.parse(read.payload))).toMatchObject({
           name,
-          dateadded: CREATED_AT,
+          dateAdded: CREATED_AT,
         });
       },
     );
@@ -364,7 +364,7 @@ describe('AnnouncementsController (Fastify inject, no network)', () => {
 
     it('POST with no name, a blank name or a missing switch is 400', async () => {
       const withoutSwitch = Object.fromEntries(
-        Object.entries(BODY).filter(([key]) => key !== 'showname'),
+        Object.entries(BODY).filter(([key]) => key !== 'showName'),
       );
       for (const payload of [{ ...BODY, name: '' }, { ...BODY, name: '   ' }, withoutSwitch]) {
         const res = await send('POST', LIST, TEST_BEARERS.admin, payload);
@@ -374,10 +374,18 @@ describe('AnnouncementsController (Fastify inject, no network)', () => {
       expect(ctx.events.count).toBe(0);
     });
 
-    it('PATCH {} is 400; PATCH with an extra key is 400 and the row is unchanged', async () => {
+    it('PATCH {} or a missing message is 400; an extra key is 400 and the row is unchanged', async () => {
       const empty = await send('PATCH', record(1), TEST_BEARERS.admin, {});
       expect(empty.statusCode).toBe(HTTP.bad);
       expect(JSON.stringify(problem(empty).issues)).toContain('name');
+      const missingMessage = await send('PATCH', record(1), TEST_BEARERS.admin, {
+        name: 'Head Office',
+        showToUsers: true,
+        showToStaff: true,
+        showName: false,
+      });
+      expect(missingMessage.statusCode).toBe(HTTP.bad);
+      expect(JSON.stringify(problem(missingMessage).issues)).toContain('message');
       const before = await ctx.repo.findById(3);
       const sneaky = await send('PATCH', record(3), TEST_BEARERS.admin, {
         ...BODY,
@@ -393,12 +401,20 @@ describe('AnnouncementsController (Fastify inject, no network)', () => {
       const res = await send('PATCH', record(id), TEST_BEARERS.admin, {
         name: 'Renamed',
         message: 'New text',
-        showtousers: true,
-        showtostaff: true,
-        showname: true,
+        showToUsers: true,
+        showToStaff: true,
+        showName: true,
       });
       expect(res.statusCode).toBe(HTTP.ok);
-      expect(announcementsResponseSchema.parse(JSON.parse(res.payload)).dateadded).toBe(CREATED_AT);
+      const response = announcementsResponseSchema.parse(JSON.parse(res.payload));
+      expect(response.dateAdded).toBe(CREATED_AT);
+      expect(response).not.toHaveProperty('dateadded');
+      expect(response).not.toHaveProperty('showtousers');
+      expect(JSON.parse(res.payload)).toMatchObject({
+        showToUsers: true,
+        showToStaff: true,
+        showName: true,
+      });
       expect(await ctx.repo.findById(Number(id))).toEqual({
         ...before,
         name: 'Renamed',
@@ -490,7 +506,7 @@ describe('AnnouncementsController (Fastify inject, no network)', () => {
       expect(res.headers['content-disposition']).toBeUndefined();
       const body = JSON.parse(res.payload) as { headers: string[]; rows: string[][] };
       expect(body.headers).toEqual(['id', 'name', 'dateadded']);
-      expect(body.rows).toEqual([['2', 'Warehouse', '2026-01-20T09:00:00.000Z']]);
+      expect(body.rows).toEqual([['2', 'Warehouse', '2026-01-20 09:00:00']]);
     });
 
     it.each(FORMATS)(

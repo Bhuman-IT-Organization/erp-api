@@ -3,7 +3,7 @@
  *
  * Owner of the table it writes (ADR-0029; `ownership.json`):
  *   `tblannouncements`  node: `name`, `message`, `showtousers`, `showtostaff`, `showname`,
- *                       `dateadded`; `announcementid` is assigned by the database.
+ *                       `dateadded`, `userid` (the actor's name); `announcementid` is assigned by the database.
  * `tbldismissed_announcements` is owned by perfex-core: Node never reads or writes it.
  *
  * Every row is re-parsed through its zod schema, never trusted from the generic (BE-11).
@@ -112,21 +112,13 @@ function cursorWhere(
   if (sortField !== 'dateadded') return keysetWhere(sortField, 'announcementid', cursor, order);
   // `keysetWhere` rides KeyValue cursors, and a Date is none of its kinds, so the date side of the
   // predicate is written here: the same `{ OR: [...] }`, the millis back as a Date, the id breaking
-  // ties — exactly what `keysetWhere` writes for any other column.
+  // ties — exactly what `keysetWhere` writes for any other column. The validator checks the millis.
   const [value, id] = cursor.key;
-  if (typeof value !== 'number') return refuseDateCursor();
   const op = (order === 'asc') === (cursor.direction === 'after') ? 'gt' : 'lt';
-  const date = new Date(value);
+  const date = new Date(value as number);
   return {
     OR: [{ dateadded: { [op]: date } }, { dateadded: date, announcementid: { [op]: id } }],
   };
-}
-
-/** A `dateadded` cursor whose value is not epoch millis: refused, never compared as a Date. */
-function refuseDateCursor(): never {
-  throw new AppError('ERP-VALIDATION-0001', 'Query is invalid', {
-    issues: [{ path: ['cursor'], message: 'cursor is not a cursor of this list' }],
-  });
 }
 
 /** A `before` cursor reads the rows just before it in the reversed order, then reverses them back. */

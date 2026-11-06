@@ -4,8 +4,8 @@
  * replacing it with an HTTP or queue adapter is what makes extraction to a service atomic.
  *
  * Read only: no method writes, and none asserts the administrator flag, because a module-to-module
- * read has no actor. A later portal or dashboard wave reads it: `listAll` for the announcements a
- * signed-in member or contact sees, `findByIds` for the names other records point at.
+ * read has no actor. A later portal or dashboard wave reads it: `listAll` returns every announcement
+ * without filtering by member or contact; `findByIds` returns names other records point at.
  */
 import { Injectable } from '@nestjs/common';
 import type { Announcement } from '../model/announcements.model.js';

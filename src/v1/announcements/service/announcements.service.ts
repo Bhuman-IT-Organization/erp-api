@@ -26,9 +26,10 @@ import {
   ANNOUNCEMENTS_EXPORT_COLUMNS,
   ANNOUNCEMENTS_EXPORT_FILE_STEM,
 } from '../announcements.routes.js';
-import type {
-  AnnouncementsListResponseDto,
-  AnnouncementsResponseDto,
+import {
+  ANNOUNCEMENTS_USERID_MAX,
+  type AnnouncementsListResponseDto,
+  type AnnouncementsResponseDto,
 } from '../dto/announcements.dto.js';
 import {
   AnnouncementsCreatedV1,
@@ -109,7 +110,7 @@ export class AnnouncementsService {
     });
   }
 
-  /** `GET /api/v1/announcements/:id`: one announcement; a missing id is `ERP-CORE-0004`. */
+  /** `GET /api/v1/announcements/:id`: one announcement with wire-named fields; missing id is `ERP-CORE-0004`. */
   async get(actor: AuthenticatedUser, params: unknown): Promise<AnnouncementsResponseDto> {
     this.assertAdministrator(actor, ADMIN_ONLY);
     const { id } = this.validator.parseParams(params);
@@ -123,14 +124,14 @@ export class AnnouncementsService {
     this.assertAdministrator(actor, ADMIN_ONLY);
     const input = this.validator.parseCreateBody(body);
     const names = await this.transport.nameOf(actor.staffId);
-    const userid = names.get(actor.staffId) ?? '';
+    const userid = (names.get(actor.staffId) ?? '').slice(0, ANNOUNCEMENTS_USERID_MAX);
     const row = await this.repository.create(
       {
         name: input.name,
         message: input.message ?? '',
-        showtousers: input.showtousers ? 1 : 0,
-        showtostaff: input.showtostaff ? 1 : 0,
-        showname: input.showname ? 1 : 0,
+        showtousers: input.showToUsers ? 1 : 0,
+        showtostaff: input.showToStaff ? 1 : 0,
+        showname: input.showName ? 1 : 0,
       },
       this.now(),
       userid,
@@ -142,7 +143,7 @@ export class AnnouncementsService {
     return this.transformer.toResponse(row);
   }
 
-  /** `PATCH /api/v1/announcements/:id`: the five fields, never the date; a missing id is `ERP-CORE-0004`. */
+  /** `PATCH /api/v1/announcements/:id`: the five fields, never the date; message is required. */
   async update(
     actor: AuthenticatedUser,
     params: unknown,
@@ -153,10 +154,10 @@ export class AnnouncementsService {
     const input = this.validator.parseUpdateBody(body);
     const updated = await this.repository.update(id, {
       name: input.name,
-      message: input.message ?? '',
-      showtousers: input.showtousers ? 1 : 0,
-      showtostaff: input.showtostaff ? 1 : 0,
-      showname: input.showname ? 1 : 0,
+      message: input.message,
+      showtousers: input.showToUsers ? 1 : 0,
+      showtostaff: input.showToStaff ? 1 : 0,
+      showname: input.showName ? 1 : 0,
     });
     if (updated === null) throw notFound();
     await this.transport.publish(new AnnouncementsUpdatedV1({ id, at: this.now().toISOString() }));

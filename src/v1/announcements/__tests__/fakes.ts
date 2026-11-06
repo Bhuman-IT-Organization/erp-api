@@ -64,6 +64,7 @@ function keyOf(row: AnnouncementRow, sortField: AnnouncementsSortField): Key {
 export class InMemoryAnnouncementsRepository implements AnnouncementsRepositoryPort {
   private readonly rows = new Map<number, AnnouncementRow>();
   private lastId = 0;
+  lastUserid: string | undefined;
 
   /** Puts rows in exactly as given (ids included). */
   seed(rows: readonly AnnouncementRow[]): void {
@@ -112,14 +113,15 @@ export class InMemoryAnnouncementsRepository implements AnnouncementsRepositoryP
     return Promise.resolve(this.rows.get(id) ?? null);
   }
 
-  create(input: NewAnnouncement, dateadded: Date): Promise<AnnouncementRow> {
+  create(input: NewAnnouncement, dateadded: Date, userid: string): Promise<AnnouncementRow> {
     this.lastId += 1;
+    this.lastUserid = userid;
     const row: AnnouncementRow = { id: this.lastId, dateadded, ...input };
     this.rows.set(row.id, row);
     return Promise.resolve(row);
   }
 
-  /** The four saved fields; the date stays as it was. */
+  /** The five saved fields; the date stays as it was. */
   update(id: number, patch: AnnouncementPatch): Promise<AnnouncementRow | null> {
     const row = this.rows.get(id);
     if (row === undefined) return Promise.resolve(null);

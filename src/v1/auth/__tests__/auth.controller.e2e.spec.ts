@@ -66,6 +66,12 @@ function problem(res: LightMyRequestResponse): Problem {
   return JSON.parse(res.payload) as Problem;
 }
 
+/**
+ * This test timed out under load (not on an assertion), so it gets longer than the 5 s default.
+ * TEST-06: a slow test gets its own timeout and a reason, never a global one.
+ */
+const SLOW_TEST_TIMEOUT_MS = 30_000;
+
 describe('auth controller (in-process)', () => {
   let ctx: AuthTestApp;
 
@@ -325,65 +331,69 @@ describe('auth controller (in-process)', () => {
     expect(problem(garbage).code).toBe('ERP-AUTH-0002');
   });
 
-  it('POST refresh that ends the session (0002/0003) clears erp_refresh and erp_session_present with their own Path and SameSite; 0008 and 5xx clear neither', async () => {
-    // ADR-0037 (WR-09): a refused refresh must not leave the presence flag behind, or proxy.ts keeps
-    // admitting a member whose session is gone. Each clearing line carries the attributes the cookie
-    // was set with, or the browser would not match it.
-    function expectCleared(res: LightMyRequestResponse): void {
-      const refreshLine = cookie(res, REFRESH_COOKIE);
-      expect(refreshLine?.value).toBe('');
-      expect(refreshLine?.path).toBe('/api/v1/auth/refresh');
-      expect(refreshLine?.sameSite).toBe('Strict');
-      expect(refreshLine?.httpOnly).toBe(true);
-      expect(
-        refreshLine?.maxAge === 0 ||
-          (refreshLine?.expires !== undefined && refreshLine.expires < new Date()),
-      ).toBe(true);
-      const presentLine = cookie(res, SESSION_PRESENT_COOKIE);
-      expect(presentLine?.value).toBe('');
-      expect(presentLine?.path).toBe(SESSION_PRESENT_COOKIE_PATH);
-      expect(presentLine?.sameSite).toBe('Lax');
-      expect(presentLine?.httpOnly).toBe(true);
-      expect(
-        presentLine?.maxAge === 0 ||
-          (presentLine?.expires !== undefined && presentLine.expires < new Date()),
-      ).toBe(true);
-    }
-    function expectUntouched(res: LightMyRequestResponse): void {
-      expect(cookie(res, REFRESH_COOKIE)).toBeUndefined();
-      expect(cookie(res, SESSION_PRESENT_COOKIE)).toBeUndefined();
-    }
+  it(
+    'POST refresh that ends the session (0002/0003) clears erp_refresh and erp_session_present with their own Path and SameSite; 0008 and 5xx clear neither',
+    async () => {
+      // ADR-0037 (WR-09): a refused refresh must not leave the presence flag behind, or proxy.ts keeps
+      // admitting a member whose session is gone. Each clearing line carries the attributes the cookie
+      // was set with, or the browser would not match it.
+      function expectCleared(res: LightMyRequestResponse): void {
+        const refreshLine = cookie(res, REFRESH_COOKIE);
+        expect(refreshLine?.value).toBe('');
+        expect(refreshLine?.path).toBe('/api/v1/auth/refresh');
+        expect(refreshLine?.sameSite).toBe('Strict');
+        expect(refreshLine?.httpOnly).toBe(true);
+        expect(
+          refreshLine?.maxAge === 0 ||
+            (refreshLine?.expires !== undefined && refreshLine.expires < new Date()),
+        ).toBe(true);
+        const presentLine = cookie(res, SESSION_PRESENT_COOKIE);
+        expect(presentLine?.value).toBe('');
+        expect(presentLine?.path).toBe(SESSION_PRESENT_COOKIE_PATH);
+        expect(presentLine?.sameSite).toBe('Lax');
+        expect(presentLine?.httpOnly).toBe(true);
+        expect(
+          presentLine?.maxAge === 0 ||
+            (presentLine?.expires !== undefined && presentLine.expires < new Date()),
+        ).toBe(true);
+      }
+      function expectUntouched(res: LightMyRequestResponse): void {
+        expect(cookie(res, REFRESH_COOKIE)).toBeUndefined();
+        expect(cookie(res, SESSION_PRESENT_COOKIE)).toBeUndefined();
+      }
 
-    // Reuse: rotate once, then replay the old cookie → 0003, both cleared.
-    const reused = await login(SEED_EMAILS.active, SEED_PASSWORDS.active);
-    expect((await refresh(reused)).statusCode).toBe(200);
-    const replay = await refresh(reused);
-    expect(replay.statusCode).toBe(401);
-    expect(problem(replay).code).toBe('ERP-AUTH-0003');
-    expectCleared(replay);
+      // Reuse: rotate once, then replay the old cookie → 0003, both cleared.
+      const reused = await login(SEED_EMAILS.active, SEED_PASSWORDS.active);
+      expect((await refresh(reused)).statusCode).toBe(200);
+      const replay = await refresh(reused);
+      expect(replay.statusCode).toBe(401);
+      expect(problem(replay).code).toBe('ERP-AUTH-0003');
+      expectCleared(replay);
 
-    // A dead cookie → 0002, both cleared.
-    const deadCookie = await login(SEED_EMAILS.active, SEED_PASSWORDS.active);
-    const garbage = await refresh(deadCookie, { refresh: 'garbage' });
-    expect(garbage.statusCode).toBe(401);
-    expect(problem(garbage).code).toBe('ERP-AUTH-0002');
-    expectCleared(garbage);
+      // A dead cookie → 0002, both cleared.
+      const deadCookie = await login(SEED_EMAILS.active, SEED_PASSWORDS.active);
+      const garbage = await refresh(deadCookie, { refresh: 'garbage' });
+      expect(garbage.statusCode).toBe(401);
+      expect(problem(garbage).code).toBe('ERP-AUTH-0002');
+      expectCleared(garbage);
 
-    // CSRF refusal → 0008 clears neither: a cross-site POST cannot sign anyone out.
-    const forged = await ctx.app.inject({ method: 'POST', url: REFRESH });
-    expect(forged.statusCode).toBe(403);
-    expect(problem(forged).code).toBe('ERP-AUTH-0008');
-    expectUntouched(forged);
+      // CSRF refusal → 0008 clears neither: a cross-site POST cannot sign anyone out.
+      const forged = await ctx.app.inject({ method: 'POST', url: REFRESH });
+      expect(forged.statusCode).toBe(403);
+      expect(problem(forged).code).toBe('ERP-AUTH-0008');
+      expectUntouched(forged);
 
-    // An outage is not a sign-out: a store failure → 500 clears neither.
-    const outage = await login(SEED_EMAILS.active, SEED_PASSWORDS.active);
-    const spy = vi.spyOn(ctx.store, 'getSession').mockRejectedValueOnce(new Error('store down'));
-    const down = await refresh(outage);
-    spy.mockRestore();
-    expect(down.statusCode).toBe(500);
-    expect(problem(down).code).toBe('ERP-INTERNAL-0001');
-    expectUntouched(down);
-  });
+      // An outage is not a sign-out: a store failure → 500 clears neither.
+      const outage = await login(SEED_EMAILS.active, SEED_PASSWORDS.active);
+      const spy = vi.spyOn(ctx.store, 'getSession').mockRejectedValueOnce(new Error('store down'));
+      const down = await refresh(outage);
+      spy.mockRestore();
+      expect(down.statusCode).toBe(500);
+      expect(problem(down).code).toBe('ERP-INTERNAL-0001');
+      expectUntouched(down);
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 
   it('POST logout with bearer + CSRF → 204, erp_refresh and erp_session_present cleared, token and session dead', async () => {
     const session = await login(SEED_EMAILS.active, SEED_PASSWORDS.active);

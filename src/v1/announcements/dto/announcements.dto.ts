@@ -7,13 +7,13 @@
  *
  * The id is a STRING on the wire: the web treats it as opaque. The table's key is an integer, so
  * `shared/http/keyset.ts`'s `[value, id]` cursor applies; the transformer writes `String(row.id)`
- * and the date as its ISO string.
+ * and maps the stored date to camelCase `dateAdded` as an ISO string.
  *
  * Perfex's business outcomes are kept: the name is required, trimmed, 1 to
- * `ANNOUNCEMENTS_NAME_MAX` characters; the message is optional and trimmed, at most
- * `ANNOUNCEMENTS_MESSAGE_MAX` characters (an empty string remains empty, as Perfex stores it);
- * the three visibility switches are booleans on the wire, stored as Perfex's 0/1. The bodies are
- * strict: only these five fields are saved, so any other key is a 400.
+ * `ANNOUNCEMENTS_NAME_MAX` characters; the message is optional on create, required on update, and
+ * trimmed to at most `ANNOUNCEMENTS_MESSAGE_MAX` characters. Fastify's 1 MiB body limit applies first;
+ * Zod counts characters, not bytes. The visibility switches are booleans on the wire, stored as
+ * Perfex's 0/1. The bodies are strict: only the five accepted fields are allowed.
  */
 import { z } from 'zod';
 import {
@@ -33,7 +33,12 @@ import { LIST_QUERY_LIMITS } from '../../../shared/http/pagination.js';
 
 /** The longest name a body may carry: Perfex's `VARCHAR(191)` column. */
 export const ANNOUNCEMENTS_NAME_MAX = 191;
-/** The maximum bytes Perfex's MEDIUMTEXT column can store. */
+/** The longest `userid`: Perfex's `VARCHAR(100)` column; the actor's full name is cut to it. */
+export const ANNOUNCEMENTS_USERID_MAX = 100;
+/**
+ * The most message characters Zod accepts: MEDIUMTEXT holds 16,777,215 bytes. Zod counts characters,
+ * not bytes, and Fastify's 1 MiB body limit applies first, so in practice the body limit is the ceiling.
+ */
 export const ANNOUNCEMENTS_MESSAGE_MAX = 16_777_215;
 /** The longest `?q=`; a longer one is a 400 on `q`. */
 export const ANNOUNCEMENTS_SEARCH_MAX = 100;
@@ -84,24 +89,26 @@ export const createAnnouncementsBodySchema = z.strictObject({
   name: z.string().trim().min(1).max(ANNOUNCEMENTS_NAME_MAX),
   /** Optional: an empty (or whitespace) message remains an empty string, as Perfex stores it. */
   message: z.string().trim().max(ANNOUNCEMENTS_MESSAGE_MAX).optional(),
-  showtousers: switchSchema,
-  showtostaff: switchSchema,
-  showname: switchSchema,
+  showToUsers: switchSchema,
+  showToStaff: switchSchema,
+  showName: switchSchema,
 });
 
-/** `PATCH :id`: the same body; `{}` is a 400 on `['name']`. */
-export const updateAnnouncementsBodySchema = createAnnouncementsBodySchema;
+/** `PATCH :id`: same fields as create, but a message is required; `{}` is a 400. */
+export const updateAnnouncementsBodySchema = createAnnouncementsBodySchema.extend({
+  message: z.string().trim().max(ANNOUNCEMENTS_MESSAGE_MAX),
+});
 
-/** One announcement: the id as a string, the stored name, the message (null when none), the date as ISO text and the switches as stored. */
+/** One announcement: string id, stored name and nullable message, ISO dateAdded, and boolean switches. */
 export const announcementsResponseSchema = z
   .object({
     id: z.string(),
     name: z.string(),
     message: z.string().nullable(),
-    dateadded: z.string(),
-    showtousers: z.number().int(),
-    showtostaff: z.number().int(),
-    showname: z.number().int(),
+    dateAdded: z.iso.datetime(),
+    showToUsers: z.boolean(),
+    showToStaff: z.boolean(),
+    showName: z.boolean(),
   })
   .readonly();
 

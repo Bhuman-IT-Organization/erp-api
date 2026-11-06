@@ -46,7 +46,7 @@ describe('AnnouncementsFacade', () => {
       Array.from({ length: ANNOUNCEMENTS_FACADE_MAX_ROWS }, (_, i) => ({
         id: 100 + i,
         name: `Bulk ${String(i)}`,
-        message: null,
+        message: '',
         dateadded: new Date(Date.UTC(2026, 2, 1)),
         showtousers: 0,
         showtostaff: 0,

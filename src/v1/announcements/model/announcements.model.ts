@@ -1,8 +1,11 @@
 /**
  * Domain entity types of the module; nothing here is a DTO. The entity is one `tblannouncements`
  * row in its STORED form: `announcementid` (`INT`, assigned by the database), `name`
- * (`VARCHAR(191)`), `message` (`MEDIUMTEXT`, may be NULL), `dateadded` (`DATETIME`) and the three
- * visibility switches Perfex writes as 0/1 (`showtousers`, `showtostaff`, `showname`).
+ * (`VARCHAR(191)`), `message` (`MEDIUMTEXT`), `dateadded` (`DATETIME`) and the three
+ * visibility switches Perfex writes as 0/1 (`showtousers`, `showtostaff`, `showname`). The message
+ * can be NULL in a legacy stored row, though Node writes empty text when omitted on create.
+ * `userid` (`VARCHAR(100)`, the actor's name) is written on create and never read back, so the
+ * entity does not carry it.
  *
  * `tbldismissed_announcements` is owned by perfex-core (ADR-0029): it links a staff member to an
  * announcement they dismissed, and Node never reads or writes it — a read would have to pick a
@@ -22,10 +25,10 @@ export interface AnnouncementRow {
   readonly showname: number;
 }
 
-/** What `create` stores: the trimmed name, the trimmed message (or null) and the switches. */
+/** What `create` stores: the trimmed name, the trimmed message (empty when omitted, never null) and the switches. */
 export interface NewAnnouncement {
   readonly name: string;
-  readonly message: string | null;
+  readonly message: string;
   readonly showtousers: number;
   readonly showtostaff: number;
   readonly showname: number;
@@ -34,7 +37,7 @@ export interface NewAnnouncement {
 /** What `update` stores: the same fields a create stores, in Perfex's order (name, message, switches). */
 export interface AnnouncementPatch {
   readonly name: string;
-  readonly message: string | null;
+  readonly message: string;
   readonly showtousers: number;
   readonly showtostaff: number;
   readonly showname: number;

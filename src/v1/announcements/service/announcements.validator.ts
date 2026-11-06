@@ -88,7 +88,12 @@ export class AnnouncementsValidator {
       refuse('Query is invalid', ['sort'], 'the list sorts on one field at a time');
     const sort = first ?? DEFAULT_SORT;
     const cursor = decodeCursor(query.cursor, sort.field);
-    if (cursor !== null && typeof cursor.key[0] !== SORT_KINDS[sort.field]) {
+    if (
+      cursor !== null &&
+      (typeof cursor.key[0] !== SORT_KINDS[sort.field] ||
+        (sort.field === 'dateadded' &&
+          !Number.isFinite(new Date(cursor.key[0] as number).getTime())))
+    ) {
       refuse('Query is invalid', ['cursor'], 'cursor is not a cursor of this list');
     }
     return {
@@ -114,12 +119,12 @@ export class AnnouncementsValidator {
     return parse(announcementsParamsSchema, input, 'Path parameter is invalid');
   }
 
-  /** `POST`: strict, the four saved fields; trimmed name 1 to 191, trimmed message at most the maximum. */
+  /** `POST`: strict, the name, optional message and three boolean switches. */
   parseCreateBody(input: unknown): CreateAnnouncementsBody {
     return parse(createAnnouncementsBodySchema, input, 'Request body is invalid');
   }
 
-  /** `PATCH :id`: the same body; `{}` is a 400 on `['name']`. */
+  /** `PATCH :id`: strict, name, message and all three boolean switches are required. */
   parseUpdateBody(input: unknown): UpdateAnnouncementsBody {
     return parse(updateAnnouncementsBodySchema, input, 'Request body is invalid');
   }

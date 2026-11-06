@@ -91,7 +91,7 @@ describe('AnnouncementsRepository: findById, create, update, remove', () => {
     const { repository, delegate } = stub({ update: vi.fn().mockResolvedValue(raw(2)) });
     const row = await repository.update(2, {
       name: 'N',
-      message: null,
+      message: '',
       showtousers: 0,
       showtostaff: 1,
       showname: 0,
@@ -100,13 +100,13 @@ describe('AnnouncementsRepository: findById, create, update, remove', () => {
     expect(delegate.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { announcementid: 2 },
-        data: { name: 'N', message: null, showtousers: 0, showtostaff: 1, showname: 0 },
+        data: { name: 'N', message: '', showtousers: 0, showtostaff: 1, showname: 0 },
       }),
     );
   });
 
   it('update answers null on Prisma P2025 and rethrows anything else', async () => {
-    const patch = { name: 'N', message: null, showtousers: 0, showtostaff: 0, showname: 0 };
+    const patch = { name: 'N', message: '', showtousers: 0, showtostaff: 0, showname: 0 };
     const missing = stub({
       update: vi.fn().mockRejectedValue(Object.assign(new Error('nf'), { code: 'P2025' })),
     });
@@ -227,17 +227,6 @@ describe('AnnouncementsRepository: list', () => {
         },
       }),
     );
-  });
-
-  it('a dateadded cursor whose value is not a number is refused with a 400', async () => {
-    const { repository } = stub();
-    await expect(
-      repository.list(
-        request({
-          cursor: { sort: 'dateadded', key: ['x', 1], direction: 'after' },
-        } as unknown as Partial<AnnouncementsListRequest>),
-      ),
-    ).rejects.toMatchObject({ code: 'ERP-VALIDATION-0001' });
   });
 
   it('a before cursor reads reversed and answers in order', async () => {

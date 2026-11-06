@@ -19,9 +19,9 @@ const STAFF = { isAdmin: false, staffId: 2 } as unknown as AuthenticatedUser;
 const BODY = {
   name: 'Fuel prices',
   message: 'Updated',
-  showtousers: true,
-  showtostaff: false,
-  showname: true,
+  showToUsers: true,
+  showToStaff: false,
+  showName: true,
 };
 
 function build() {
@@ -110,10 +110,10 @@ describe('AnnouncementsService: reads', () => {
       id: '1',
       name: 'Head Office',
       message: 'Open on Sunday',
-      dateadded: '2026-01-05T09:00:00.000Z',
-      showtousers: 1,
-      showtostaff: 1,
-      showname: 0,
+      dateAdded: '2026-01-05T09:00:00.000Z',
+      showToUsers: true,
+      showToStaff: true,
+      showName: false,
     });
     expect(await codeOf(service.get(ADMIN, { id: '404' }))).toBe('ERP-CORE-0004');
     expect(await codeOf(service.get(ADMIN, { id: 'abc' }))).toBe('ERP-VALIDATION-0001');
@@ -128,12 +128,13 @@ describe('AnnouncementsService: create', () => {
       id: '4',
       name: 'Fuel prices',
       message: 'Updated',
-      dateadded: NOW.toISOString(),
-      showtousers: 1,
-      showtostaff: 0,
-      showname: 1,
+      dateAdded: NOW.toISOString(),
+      showToUsers: true,
+      showToStaff: false,
+      showName: true,
     });
     expect(await repo.findById(4)).not.toBeNull();
+    expect(repo.lastUserid).toBe('Admin Staff');
     expect(namesOf).toHaveBeenCalledWith([1]);
     expect(publish).toHaveBeenCalledTimes(1);
     expect(publish.mock.calls[0]?.[0]).toBeInstanceOf(AnnouncementsCreatedV1);
@@ -148,6 +149,13 @@ describe('AnnouncementsService: create', () => {
     expect((await service.create(ADMIN, withoutMessage)).message).toBe('');
     expect((await service.create(ADMIN, { ...BODY, message: '' })).message).toBe('');
     expect((await service.create(ADMIN, { ...BODY, message: '   ' })).message).toBe('');
+  });
+
+  it('truncates a long identity name to the userid VARCHAR(100) limit', async () => {
+    const { service, namesOf, repo } = build();
+    namesOf.mockResolvedValue(new Map([[1, 'x'.repeat(101)]]));
+    await service.create(ADMIN, BODY);
+    expect(repo.lastUserid).toBe('x'.repeat(100));
   });
 
   it('accepts a name another announcement holds (Perfex has no uniqueness check)', async () => {
@@ -174,10 +182,10 @@ describe('AnnouncementsService: update', () => {
       id: '2',
       name: 'Fuel prices',
       message: 'Updated',
-      dateadded: '2026-01-20T09:00:00.000Z',
-      showtousers: 1,
-      showtostaff: 0,
-      showname: 1,
+      dateAdded: '2026-01-20T09:00:00.000Z',
+      showToUsers: true,
+      showToStaff: false,
+      showName: true,
     });
     expect(publish).toHaveBeenCalledTimes(1);
     expect(publish.mock.calls[0]?.[0]).toBeInstanceOf(AnnouncementsUpdatedV1);
@@ -199,6 +207,12 @@ describe('AnnouncementsService: update', () => {
   it('an invalid body or id is a 400', async () => {
     const { service } = build();
     expect(await codeOf(service.update(ADMIN, { id: '1' }, {}))).toBe('ERP-VALIDATION-0001');
+    const withoutMessage = Object.fromEntries(
+      Object.entries(BODY).filter(([key]) => key !== 'message'),
+    );
+    expect(await codeOf(service.update(ADMIN, { id: '1' }, withoutMessage))).toBe(
+      'ERP-VALIDATION-0001',
+    );
     expect(await codeOf(service.update(ADMIN, { id: '0' }, BODY))).toBe('ERP-VALIDATION-0001');
   });
 });

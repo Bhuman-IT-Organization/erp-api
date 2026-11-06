@@ -1,4 +1,4 @@
-﻿/**
+/**
  * AnnouncementsRepository against the local mirror (DATABASE_URL from ../erp-infra/env/local/api.host.env).
  *
  * `tblannouncements` is node-owned, so the ownership guard admits the writes this spec makes through
@@ -64,7 +64,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
     beforeAll(async () => {
       await cleanup();
       c = await repository.create(
-        { name: `${MARKER}-c`, message: null, showtousers: 0, showtostaff: 0, showname: 0 },
+        { name: `${MARKER}-c`, message: '', showtousers: 0, showtostaff: 0, showname: 0 },
         DATE_C,
         'IntSpec Repository',
       );
@@ -85,7 +85,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
         'IntSpec Repository',
       );
       const ghost = await repository.create(
-        { name: `${MARKER}-ghost`, message: null, showtousers: 0, showtostaff: 0, showname: 0 },
+        { name: `${MARKER}-ghost`, message: '', showtousers: 0, showtostaff: 0, showname: 0 },
         DATE_C,
         'IntSpec Repository',
       );
@@ -109,7 +109,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
         showtostaff: 0,
         showname: 1,
       });
-      expect(await repository.findById(c.id)).toMatchObject({ message: null, showname: 0 });
+      expect(await repository.findById(c.id)).toMatchObject({ message: '', showname: 0 });
       expect(await repository.findById(missingId)).toBeNull();
     });
 
@@ -127,10 +127,25 @@ describe.skipIf(!process.env.DATABASE_URL)(
       expect(userSchema.parse(rows)[0].u).toBe('IntSpec Repository');
     });
 
+    it('stores a message longer than 65,535 characters in full', async () => {
+      const message = 'x'.repeat(65_536);
+      const row = await repository.create(
+        { name: `${MARKER}-long-message`, message, showtousers: 0, showtostaff: 0, showname: 0 },
+        DATE_C,
+        'IntSpec Repository',
+      );
+      try {
+        expect((await repository.findById(row.id))?.message).toBe(message);
+      } finally {
+        // The paging tests below count every marker row, so this one must not outlive its test.
+        await repository.remove(row.id);
+      }
+    });
+
     it('update changes the five fields and never the date; a missing id is null', async () => {
       const updated = await repository.update(b.id, {
         name: `${MARKER}-b2`,
-        message: null,
+        message: '',
         showtousers: 1,
         showtostaff: 1,
         showname: 1,
@@ -138,7 +153,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
       expect(updated).toEqual({
         id: b.id,
         name: `${MARKER}-b2`,
-        message: null,
+        message: '',
         dateadded: DATE_B,
         showtousers: 1,
         showtostaff: 1,
@@ -148,7 +163,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
       expect(
         await repository.update(missingId, {
           name: `${MARKER}-nobody`,
-          message: null,
+          message: '',
           showtousers: 0,
           showtostaff: 0,
           showname: 0,
@@ -218,9 +233,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
 
     it('q as an id matches the id; an all-digit q beyond INT is no id but still runs', async () => {
       expect(ids(await repository.list(request({ search: String(c.id) })))).toContain(c.id);
-      await expect(repository.count(request({ search: '2147483647' }))).resolves.toBeTypeOf(
-        'number',
-      );
+      await expect(repository.count(request({ search: '2147483647' }))).resolves.toBe(0);
       await expect(repository.count(request({ search: '4294967295' }))).resolves.toBe(0);
     });
 

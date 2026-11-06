@@ -283,6 +283,12 @@ const tableNames = (body: string[]): string[] =>
 const eventNames = (source: string): string[] =>
   [...source.matchAll(/static readonly NAME = '([^']+)'/g)].map((m) => m[1] ?? '');
 
+/**
+ * These tests read every module source file, so they can take longer than the 5 s default on a busy machine.
+ * TEST-06: a slow test gets its own timeout and a reason, never a global one.
+ */
+const SLOW_TEST_TIMEOUT_MS = 30_000;
+
 describe('src/v1 module shape', () => {
   it(`has at least ${String(MIN_MODULES)} modules beside __tests__`, () => {
     expect(MODULES.length, `modules found: ${MODULES.join(', ')}`).toBeGreaterThanOrEqual(
@@ -335,47 +341,59 @@ describe('src/v1 module shape', () => {
     }
   });
 
-  it(`lets only v1/${IDENTITY_MODULE} name ${IDENTITY_TABLES.join(' and ')} (ADR-0034 decision 1)`, () => {
-    const offences: string[] = [];
-    for (const { module, file, source } of clauseSources()) {
-      if (module === IDENTITY_MODULE) continue;
-      const code = stripComments(source);
-      for (const table of IDENTITY_TABLES) {
-        if (new RegExp(String.raw`\b${table}\b`).test(code)) {
+  it(
+    `lets only v1/${IDENTITY_MODULE} name ${IDENTITY_TABLES.join(' and ')} (ADR-0034 decision 1)`,
+    () => {
+      const offences: string[] = [];
+      for (const { module, file, source } of clauseSources()) {
+        if (module === IDENTITY_MODULE) continue;
+        const code = stripComments(source);
+        for (const table of IDENTITY_TABLES) {
+          if (new RegExp(String.raw`\b${table}\b`).test(code)) {
+            offences.push(
+              `${file} names \`${table}\`; ADR-0034 decision 1 makes v1/${IDENTITY_MODULE} its only writer — ask identity.facade or subscribe to its event (BE-03)`,
+            );
+          }
+        }
+      }
+      expect(offences, offences.join('\n')).toEqual([]);
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    `lets only ${STAFF_TABLE_ALLOWLIST.join(' and ')} name ${SHARED_STAFF_TABLE} (ADR-0034 decision 1, BE-04 column scope)`,
+    () => {
+      const offences: string[] = [];
+      for (const { module, file, source } of clauseSources()) {
+        if (STAFF_TABLE_ALLOWLIST.includes(module)) continue;
+        if (new RegExp(String.raw`\b${SHARED_STAFF_TABLE}\b`).test(stripComments(source))) {
           offences.push(
-            `${file} names \`${table}\`; ADR-0034 decision 1 makes v1/${IDENTITY_MODULE} its only writer — ask identity.facade or subscribe to its event (BE-03)`,
+            `${file} names \`${SHARED_STAFF_TABLE}\`; only ${STAFF_TABLE_ALLOWLIST.join(' and ')} may (ADR-0034 decision 1; auth's allowance is the three login columns of src/v1/auth/README.md § Owned tables)`,
           );
         }
       }
-    }
-    expect(offences, offences.join('\n')).toEqual([]);
-  });
+      expect(offences, offences.join('\n')).toEqual([]);
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 
-  it(`lets only ${STAFF_TABLE_ALLOWLIST.join(' and ')} name ${SHARED_STAFF_TABLE} (ADR-0034 decision 1, BE-04 column scope)`, () => {
-    const offences: string[] = [];
-    for (const { module, file, source } of clauseSources()) {
-      if (STAFF_TABLE_ALLOWLIST.includes(module)) continue;
-      if (new RegExp(String.raw`\b${SHARED_STAFF_TABLE}\b`).test(stripComments(source))) {
-        offences.push(
-          `${file} names \`${SHARED_STAFF_TABLE}\`; only ${STAFF_TABLE_ALLOWLIST.join(' and ')} may (ADR-0034 decision 1; auth's allowance is the three login columns of src/v1/auth/README.md § Owned tables)`,
-        );
+  it(
+    `lets no module but v1/${IDENTITY_MODULE} import ${IDENTITY_REPOSITORY_IMPORT} (ADR-0034 decision 1)`,
+    () => {
+      const offences: string[] = [];
+      for (const { module, file, source } of clauseSources()) {
+        if (module === IDENTITY_MODULE) continue;
+        if (stripComments(source).includes(IDENTITY_REPOSITORY_IMPORT)) {
+          offences.push(
+            `${file} imports \`${IDENTITY_REPOSITORY_IMPORT}\`; reach v1/${IDENTITY_MODULE} through its index.ts (the facade) only — ADR-0034 decision 1, BE-03`,
+          );
+        }
       }
-    }
-    expect(offences, offences.join('\n')).toEqual([]);
-  });
-
-  it(`lets no module but v1/${IDENTITY_MODULE} import ${IDENTITY_REPOSITORY_IMPORT} (ADR-0034 decision 1)`, () => {
-    const offences: string[] = [];
-    for (const { module, file, source } of clauseSources()) {
-      if (module === IDENTITY_MODULE) continue;
-      if (stripComments(source).includes(IDENTITY_REPOSITORY_IMPORT)) {
-        offences.push(
-          `${file} imports \`${IDENTITY_REPOSITORY_IMPORT}\`; reach v1/${IDENTITY_MODULE} through its index.ts (the facade) only — ADR-0034 decision 1, BE-03`,
-        );
-      }
-    }
-    expect(offences, offences.join('\n')).toEqual([]);
-  });
+      expect(offences, offences.join('\n')).toEqual([]);
+    },
+    SLOW_TEST_TIMEOUT_MS,
+  );
 });
 
 describe('topLevelProblems (optionalTop, facade-only)', () => {

@@ -16,9 +16,9 @@ const validator = new AnnouncementsValidator();
 const BODY = {
   name: 'Fuel prices',
   message: 'Updated',
-  showtousers: true,
-  showtostaff: false,
-  showname: true,
+  showToUsers: true,
+  showToStaff: false,
+  showName: true,
 };
 
 function refused(run: () => unknown): AppError {
@@ -60,9 +60,9 @@ describe('AnnouncementsValidator: the list query', () => {
     expect(() => validator.parseListQuery({ sort: 'name,dateadded' })).toThrow(AppError);
   });
 
-  it('q is trimmed to null when empty and bounded at the maximum', () => {
+  it('q is null when empty and bounded at the maximum (without trimming)', () => {
     expect(validator.parseListQuery({ q: '' }).search).toBeNull();
-    expect(validator.parseListQuery({ q: 'fuel' }).search).toBe('fuel');
+    expect(validator.parseListQuery({ q: ' fuel ' }).search).toBe(' fuel ');
     expect(
       validator.parseListQuery({ q: 'a'.repeat(ANNOUNCEMENTS_SEARCH_MAX) }).search,
     ).toHaveLength(ANNOUNCEMENTS_SEARCH_MAX);
@@ -80,6 +80,11 @@ describe('AnnouncementsValidator: the list query', () => {
   it('refuses a cursor made for another sort', () => {
     const cursor = encodeCursor('dateadded', [5, 5], 'after');
     expect(() => validator.parseListQuery({ sort: 'name', cursor })).toThrow(AppError);
+  });
+
+  it('refuses a date cursor whose millis cannot make a valid Date', () => {
+    const cursor = encodeCursor('dateadded', [1e20, 5], 'after');
+    expect(() => validator.parseListQuery({ sort: 'dateadded', cursor })).toThrow(AppError);
   });
 
   it('the export list drops the cursor and reads the largest page', () => {
@@ -106,11 +111,12 @@ describe('AnnouncementsValidator: the body', () => {
     ).toEqual(BODY);
   });
 
-  it('the message is optional', () => {
+  it('the message is optional on create but required on update', () => {
     const withoutMessage = Object.fromEntries(
       Object.entries(BODY).filter(([key]) => key !== 'message'),
     );
     expect(validator.parseCreateBody(withoutMessage).message).toBeUndefined();
+    expect(() => validator.parseUpdateBody(withoutMessage)).toThrow(AppError);
   });
 
   it('accepts the longest name and message, refuses one more', () => {
@@ -140,14 +146,14 @@ describe('AnnouncementsValidator: the body', () => {
     expect(() => validator.parseCreateBody({ ...BODY, name: '' })).toThrow(AppError);
     expect(() => validator.parseCreateBody({ ...BODY, name: '   ' })).toThrow(AppError);
     const withoutSwitch = Object.fromEntries(
-      Object.entries(BODY).filter(([key]) => key !== 'showname'),
+      Object.entries(BODY).filter(([key]) => key !== 'showName'),
     );
     expect(() => validator.parseCreateBody(withoutSwitch)).toThrow(AppError);
-    expect(() => validator.parseCreateBody({ ...BODY, showtousers: 1 })).toThrow(AppError);
+    expect(() => validator.parseCreateBody({ ...BODY, showToUsers: 1 })).toThrow(AppError);
   });
 
   it.each(['id', 'userid', 'dateadded', 'announcementid'])(
-    'refuses a body carrying %s (strict: only the four saved fields)',
+    'refuses a body carrying %s (strict: only the five saved fields)',
     (key) => {
       expect(refused(() => validator.parseCreateBody({ ...BODY, [key]: 1 })).code).toBe(
         'ERP-VALIDATION-0001',

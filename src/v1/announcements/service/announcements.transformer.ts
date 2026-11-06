@@ -22,10 +22,10 @@ export function toResponse(row: AnnouncementRow): AnnouncementsResponseDto {
     id: String(row.id),
     name: row.name,
     message: row.message,
-    dateadded: row.dateadded.toISOString(),
-    showtousers: row.showtousers,
-    showtostaff: row.showtostaff,
-    showname: row.showname,
+    dateAdded: row.dateadded.toISOString(),
+    showToUsers: row.showtousers !== 0,
+    showToStaff: row.showtostaff !== 0,
+    showName: row.showname !== 0,
   });
 }
 
@@ -43,7 +43,7 @@ export interface AnnouncementExportRow {
 export const ANNOUNCEMENTS_EXPORT_CELLS = {
   id: { value: (row) => row.id },
   name: { value: (row) => row.name },
-  dateadded: { value: (row) => row.dateadded },
+  dateadded: { value: (row) => row.dateadded, kind: 'dateTime' },
 } as const satisfies Record<
   (typeof ANNOUNCEMENTS_EXPORT_COLUMNS)[number],
   ExportCell<AnnouncementExportRow>
@@ -75,7 +75,7 @@ export class AnnouncementsTransformer {
   }
 
   /**
-   * The list envelope: each row, the four page fields copied one by one, and `exportLimit` and
+   * The list envelope: each row, the four paging fields copied one by one, and `exportLimit` and
    * `printLimit` from their one definition.
    *
    * @complexity O(n) over the page's rows

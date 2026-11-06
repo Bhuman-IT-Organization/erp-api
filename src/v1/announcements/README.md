@@ -2,27 +2,28 @@
 
 ## Purpose
 
-Announcements is the Perfex `Setup > Utilities > Announcements` screen, migrated: the list at
+Announcements is the Perfex `Utilities > Announcements` screen, migrated: the list at
 `/setup/announcements`, the create form at `/setup/announcements/new` and the edit form at
 `/setup/announcements/:id`, backed by Perfex's own `tblannouncements` table through
 `src/v1/announcements`.
 
 The Node screens and API handlers are administrators-only. Perfex's `Announcements.php::index()`
 has no admin check; only its menu item, the form and delete are admin-only. The three routes
-are `ADMIN_GATE` in `src/config/route-gates.ts` and its mirror in `@erp/contracts`, the menu item
-reads the same gate through `navGateOf`, and the screens sit behind
+are marked `'admin'` in `@erp/contracts`' `ROUTE_GATES`; the menu item reads the same gate through
+`navGateOf`, and the screens sit behind
 `withAuth(withPermission(...))`: a non-administrator sees the kit's "no access" state once `/me`
 has answered, and the screen asks the api for nothing. The page gate is presentation only: the api
 refuses every handler to anyone but an administrator with 403 `ERP-AUTH-0005` regardless.
 
 ## Owned tables
 
-| Table              | Columns used                                                                                         | Notes                                                                                                                |
-| ------------------ | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `tblannouncements` | `announcementid`, `name`, `message`, `dateadded`, `showtousers`, `showtostaff`, `showname`, `userid` | The three switches travel as Perfex's 0/1 integers; `userid` stores the actor's full name, resolved through Identity |
+| Table              | Columns used                                                                                         | Notes                                                                                                                 |
+| ------------------ | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `tblannouncements` | `announcementid`, `name`, `message`, `dateadded`, `showtousers`, `showtostaff`, `showname`, `userid` | Switches are booleans on the wire and 0/1 in Perfex; `userid` stores the actor's full name, resolved through Identity |
 
 `tbldismissed_announcements` stays owned by perfex-core (ADR-0029); Node does not otherwise read or
-write it. Perfex's delete also removes the matching dismissal rows; the Node delete does not yet.
+write it. **Difference.** Perfex's delete also removes the matching dismissal rows; Node's delete does
+not. _Why:_ Node's announcement repository deliberately owns and deletes only `tblannouncements`.
 
 ## Facade surface
 
@@ -101,29 +102,28 @@ None.
 Flow parity (FE-18, D-29): someone who used the Perfex screen does the same job in the same order,
 with the same business outcome.
 
-| Perfex announcements screen (`admin/announcements.php`)                   | Node step                                                                                          |
-| ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| the list: Name, Date Added; search; paging                                | the same list and pager; name/id search (not date); export also includes ID                        |
-| Add Announcement opens the create form (name required, message, switches) | `/setup/announcements/new`: same fields > Create > save returns to the list, not the view page     |
-| Edit prefills the same fields; Save updates                               | `/:id` prefilled > Save > saved and returned to the list, not the view page                        |
-| Delete asks in the browser then removes                                   | Difference: Node has no View or Dismiss; both remain on Perfex. Delete > confirmation sends DELETE |
-| Export buttons over the table                                             | the kit's Export menu: CSV, Excel, PDF or Print of Id, Name, Date Added                            |
+| Perfex announcements screen (`admin/announcements`, `controllers/admin/Announcements.php`) | Node step                                                                                                      |
+| ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| the list: Name, Date Added; search; paging                                                 | the same list and pager; **Difference.** search is by name or id, not date, and the export also includes ID    |
+| Add Announcement opens the create form (name required, message, switches)                  | `/setup/announcements/new`: same fields > Create > save returns to the list; **Difference.** not the view page |
+| Edit prefills the same fields; Save updates                                                | `/:id` prefilled > Save > saved and returned to the list; **Difference.** not the view page                    |
+| Delete asks in the browser then removes                                                    | Confirmation sends DELETE; **Difference.** dismissal rows are not removed                                      |
+| Export buttons over the table                                                              | the kit's Export menu: CSV, Excel, PDF or Print of Id, Name, Date Added                                        |
+
+### Differences
+
+- Non-admin staff who enter `/admin/announcements` do not get the Node list; the dashboard tab still works for them. **Difference.** _Why:_ the migrated management screen is administrator-only, while Perfex's `index()` has no admin check.
+- Perfex's delete also removes the matching dismissal rows (`Announcements_model.php:152-154`), but Node's delete does not. **Difference.** _Why:_ `tbldismissed_announcements` remains owned by perfex-core.
+- The Node export includes an ID column; Perfex's visible list/export columns are Name and Date only. **Difference.** _Why:_ the shared export includes the record id so exported rows can be matched to records.
+- Search covers name and ID, not date. **Difference.** _Why:_ the Node list query supports name substring and numeric id matching only.
+- Saving returns to the Node list rather than Perfex's view page. **Difference.** _Why:_ the view page remains on Perfex, so the migrated flow uses the list as its landing page.
+- The message is trimmed before storage. **Difference.** _Why:_ the API's Zod body schema trims the message.
+- Perfex's activity-log line is replaced by the domain event and service log line (D-18). **Difference.** _Why:_ Node publishes the module event and logs the write rather than creating a Perfex activity-log row.
 
 ### Dropped on purpose
 
-### Differences, intentionally retained on Perfex
-
-- Non-admin staff who enter `/admin/announcements` do not get the Node list; the dashboard tab still
-  works for them. Perfex's `index()` has no admin check, while the migrated setup page is gated.
-- Node has no View or Dismiss actions; those remain on Perfex because dashboard dismissal state stays
-  owned by the legacy module.
-- The Node export includes an ID column; Perfex's visible list/export columns are Name and Date only.
-- Search covers name and ID, not date, matching the fields supported by the Node query.
-- Saving returns to the Node list rather than Perfex's view page; the migrated flow uses the list as
-  its landing page.
-- Perfex's activity-log line is replaced by the domain event and service log line (D-18).
-- The editor is a plain multiline text field (`message`), rendered as text, not markup; the rich-text
-  editor stays on Perfex until a wave owns rich text. Perfex uses TinyMCE.
+- View and Dismiss actions remain on Perfex. _Why:_ dashboard dismissal state is owned by perfex-core and only Perfex implements per-user dismissal.
+- Perfex's TinyMCE editor remains on Perfex; Node uses a plain text field. _Why:_ this wave stores and renders the message as text, not markup.
 
 ## How to run its tests
 

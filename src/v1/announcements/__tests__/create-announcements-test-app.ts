@@ -1,13 +1,11 @@
 /**
  * The module inside a real Nest + Fastify application, without a network or a database: the
- * repository is `InMemoryAnnouncementsRepository` (`fakes.ts`) seeded with `SEED_ANNOUNCEMENTS` (its
- * usage answer settable), `SettingsModule` is replaced whole by `stubSettingsModule` with a
- * `FakeSettingsFacade` answering `default_timezone` (`Asia/Dubai`, settable), the access-token
- * verifier is a stub with three known bearers, the domain-event publisher is the recording one, the
- * logger records its `log` lines and the service's clock is fixed (`TEST_NOW`), so a spec can
- * assert the events, the log lines and D-31's `datecreated`. Everything else (the module wiring,
- * the guards, the request-id hook, the global prefix, the problem-details filter) is the production
- * code path, so `app.inject` proves the HTTP contract `main.ts` serves.
+ * repository is `InMemoryAnnouncementsRepository` (`fakes.ts`) seeded with `SEED_ANNOUNCEMENTS`,
+ * the access-token verifier is a stub with three known bearers, the domain-event publisher is the
+ * recording one, the logger records its `log` lines and the service's clock is fixed (`TEST_NOW`),
+ * so a spec can assert the events, the log lines and the stored date. Everything else (the module
+ * wiring, the guards, the request-id hook, the global prefix, the problem-details filter) is the
+ * production code path, so `app.inject` proves the HTTP contract `main.ts` serves.
  *
  * The bearers follow `v1/identity`'s test app: an administrator, a member holding EVERY code in the
  * `@erp/contracts` catalogue who is still not an administrator (the D-06 proof: no code opens this
@@ -32,8 +30,7 @@ import {
 import { registerRequestId } from '../../../shared/http/request-id.js';
 import { LoggerModule } from '../../../shared/logger/logger.module.js';
 import { LoggerService, type LogMeta } from '../../../shared/logger/logger.service.js';
-import { FakeSettingsFacade, stubSettingsModule } from '../../settings/__tests__/fakes.js';
-import { SettingsModule } from '../../settings/settings.module.js';
+
 import { IdentityModule } from '../../identity/identity.module.js';
 import { IdentityFacade } from '../../identity/index.js';
 import { AnnouncementsModule } from '../announcements.module.js';
@@ -58,11 +55,8 @@ export const TEST_STAFF = {
   noPermission: 3,
 } as const;
 
-/** The service's fixed clock: 2026-10-03 00:30:15 on Perfex's wall clock in `Asia/Dubai`. */
+/** The service's fixed clock for deterministic create and event assertions. */
 export const TEST_NOW = new Date('2026-10-02T20:30:15.250Z');
-
-/** The company zone the stub settings facade answers by default. */
-export const TEST_ZONE = 'Asia/Dubai';
 
 const FAR_FUTURE_EXPIRY_S = 4_102_444_800; // 2100-01-01T00:00:00Z
 
@@ -155,20 +149,13 @@ export class RecordingLogger extends LoggerService {
   }
 }
 
-/** A settings facade answering `default_timezone` with `zone` (no row when `null`). */
-export function settingsWithZone(zone: string | null = TEST_ZONE): FakeSettingsFacade {
-  return new FakeSettingsFacade(zone === null ? [] : [{ name: 'default_timezone', value: zone }]);
-}
-
 export interface AnnouncementsTestApp {
   readonly app: NestFastifyApplication;
   readonly moduleRef: TestingModule;
   /** Every route Fastify registered as `METHOD url` (HEAD twins included). */
   readonly routes: readonly string[];
-  /** The repository's fake, seeded with `SEED_ANNOUNCEMENTS` (ids 1 to 3), its usage settable. */
+  /** The repository's fake, seeded with `SEED_ANNOUNCEMENTS` (ids 1 to 3). */
   readonly repo: InMemoryAnnouncementsRepository;
-  /** The settings facade's fake: `options` answers `default_timezone`. */
-  readonly settings: FakeSettingsFacade;
   /** Every domain event the module published. */
   readonly events: RecordingDomainEventPublisher;
   /** Every `log` line the module wrote. */
@@ -178,7 +165,6 @@ export interface AnnouncementsTestApp {
 
 export async function createAnnouncementsTestApp(): Promise<AnnouncementsTestApp> {
   const repo = seededStore();
-  const settings = settingsWithZone();
   const events = new RecordingDomainEventPublisher();
   const logger = new RecordingLogger();
 
@@ -187,8 +173,6 @@ export async function createAnnouncementsTestApp(): Promise<AnnouncementsTestApp
   })
     .overrideModule(IdentityModule)
     .useModule(FakeIdentityModule)
-    .overrideModule(SettingsModule)
-    .useModule(stubSettingsModule(settings))
     .overrideProvider(AnnouncementsRepository)
     .useValue(asRepository(repo))
     .overrideProvider(DOMAIN_EVENT_PUBLISHER)
@@ -216,5 +200,5 @@ export async function createAnnouncementsTestApp(): Promise<AnnouncementsTestApp
   await app.init();
   await app.getHttpAdapter().getInstance().ready();
 
-  return { app, moduleRef, routes, repo, settings, events, logger, close: () => app.close() };
+  return { app, moduleRef, routes, repo, events, logger, close: () => app.close() };
 }
