@@ -494,6 +494,7 @@ describe('the committed register, today', () => {
     // only read them.
     // Ticket Statuses claimed tbltickets_status for v1/ticket-statuses.
     // Customer Groups claimed tblcustomers_groups for v1/customer-groups; tblcustomer_groups stays Perfex's.
+    // Fixed Equipment Depreciation claimed tblfe_depreciations for v1/fixed-equipment-depreciations.
     // Update this expectation in the same PR that changes either register.
     // Contract Types claimed tblcontracts_types for v1/contract-types.
     const nodeOwned = [...map.entries()]
@@ -506,6 +507,7 @@ describe('the committed register, today', () => {
       'tblcurrencies',
       'tblcustomers_groups',
       'tblexpenses_categories',
+      'tblfe_depreciations',
       'tblidentity_audit',
       'tblleads_sources',
       'tblmail_sent_emails',

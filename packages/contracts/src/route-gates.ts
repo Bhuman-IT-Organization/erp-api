@@ -36,6 +36,7 @@
  * its screen, as `/setup/expense-categories*` did in plan 04.1-03).
  */
 import { PERMISSIONS, type PermissionCode } from './permissions.catalogue.js';
+import { FIXED_EQUIPMENT_SETTINGS_CODES } from './fixed-equipment-settings.js';
 
 /**
  * The administrator flag as a gate value. It is deliberately not a permission code: ADR-0034
@@ -135,6 +136,18 @@ export const ROUTE_GATES: Readonly<Record<string, RouteGate>> = Object.freeze({
   '/setup/ticket-priorities': ADMIN_GATE,
   '/setup/ticket-priorities/new': ADMIN_GATE,
   '/setup/ticket-priorities/:id': ADMIN_GATE,
+  '/setup/fixed-equipment-depreciations': [
+    ...FIXED_EQUIPMENT_SETTINGS_CODES.depreciation.read.all,
+    ...FIXED_EQUIPMENT_SETTINGS_CODES.depreciation.read.own,
+  ],
+  '/setup/fixed-equipment-depreciations/new': [
+    ...FIXED_EQUIPMENT_SETTINGS_CODES.depreciation.read.all,
+    ...FIXED_EQUIPMENT_SETTINGS_CODES.depreciation.read.own,
+  ],
+  '/setup/fixed-equipment-depreciations/:id': [
+    ...FIXED_EQUIPMENT_SETTINGS_CODES.depreciation.read.all,
+    ...FIXED_EQUIPMENT_SETTINGS_CODES.depreciation.read.own,
+  ],
 });
 
 /** Every declared route path, sorted — the set both verifying tests enumerate. */
