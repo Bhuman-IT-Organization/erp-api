@@ -45,18 +45,16 @@ import { FIXED_EQUIPMENT_SETTINGS_CODES } from './fixed-equipment-settings.js';
  * protects.
  */
 export const ADMIN_GATE = 'admin';
-
 /**
- * What a route may be gated on: one clean permission code, an any-of list of codes, or the
- * administrator flag.
- *
- * `PermissionCode` widens to `string` (the catalogue's 507 leaves are `as const` values, not a
- * closed type), so the second constituent adds nothing the compiler can use — it is written anyway
- * because it is the whole point of the map: a reader must see that `'admin'` is an admitted value
- * and not a typo, and `isAdminGate` is the narrowing both repositories switch on.
+ * A gate that admits any authenticated staff member, including administrators.
+ * The API must still enforce ownership and resource-level authorization.
  */
-// eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents -- `'admin'` is documentation the compiler cannot express while PermissionCode is `string`, and the array form is the any-of gate; see the docblock above.
-export type RouteGate = PermissionCode | readonly PermissionCode[] | typeof ADMIN_GATE;
+export const AUTHENTICATED_GATE = 'authenticated';
+/**
+ * What a route may be gated on: one permission code or an any-of list of permission codes.
+ * Built-in administrator and authenticated gates are represented by string values.
+ */
+export type RouteGate = PermissionCode | readonly PermissionCode[];
 
 /**
  * Route → gate, frozen. `/setup/staff*` is the member half (plan 03.1-07, gated on the view code the
@@ -133,6 +131,9 @@ export const ROUTE_GATES: Readonly<Record<string, RouteGate>> = Object.freeze({
   '/setup/customer-groups': ADMIN_GATE,
   '/setup/customer-groups/new': ADMIN_GATE,
   '/setup/customer-groups/:id': ADMIN_GATE,
+  '/setup/todo': AUTHENTICATED_GATE,
+  '/setup/todo/new': AUTHENTICATED_GATE,
+  '/setup/todo/:id': AUTHENTICATED_GATE,
   '/setup/ticket-priorities': ADMIN_GATE,
   '/setup/ticket-priorities/new': ADMIN_GATE,
   '/setup/ticket-priorities/:id': ADMIN_GATE,
@@ -156,6 +157,10 @@ export const GATED_ROUTES: readonly string[] = Object.keys(ROUTE_GATES).sort();
 /** True when the route is gated on the administrator flag rather than on a permission code. */
 export function isAdminGate(gate: RouteGate): gate is typeof ADMIN_GATE {
   return gate === ADMIN_GATE;
+}
+/** True when the route admits any authenticated staff member, including administrators. */
+export function isAuthenticatedGate(gate: RouteGate): gate is typeof AUTHENTICATED_GATE {
+  return gate === AUTHENTICATED_GATE;
 }
 
 /** True when the route admits a member holding any one of a list of codes (plan 04.2-02). */

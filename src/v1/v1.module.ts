@@ -17,6 +17,7 @@ import { SettingsModule } from './settings/settings.module.js';
 import { TaxesModule } from './taxes/taxes.module.js';
 import { ServicesModule } from './services/services.module.js';
 import { TicketStatusesModule } from './ticket-statuses/ticket-statuses.module.js';
+import { TodoModule } from './todo/todo.module.js';
 import { TicketPrioritiesModule } from './ticket-priorities/ticket-priorities.module.js';
 import { FixedEquipmentDepreciationsModule } from './fixed-equipment-depreciations/fixed-equipment-depreciations.module.js';
 
@@ -41,6 +42,7 @@ import { FixedEquipmentDepreciationsModule } from './fixed-equipment-depreciatio
     LeadSourcesModule,
     TicketStatusesModule,
     CustomerGroupsModule,
+    TodoModule,
     TicketPrioritiesModule,
     FixedEquipmentDepreciationsModule,
   ],
