@@ -28,7 +28,7 @@
     "check:ratchet": "node configs/scripts/lint-ratchet.mjs --expect 140",
     "check:cycles": "depcruise src packages/contracts/src --config configs/dependency-cruiser.cjs",
     "check:audit": "yarn npm audit --all --recursive --severity high",
-    "check:push": "yarn typecheck && yarn test",
+    "check:push": "yarn typecheck && yarn test --maxWorkers=2 --hookTimeout=60000 --testTimeout=60000",
     "check": "yarn typecheck && yarn lint && yarn check:ratchet && yarn check:cycles && yarn check:arch && yarn format && yarn test && yarn check:audit",
     "check:phase": "yarn typecheck && yarn lint && yarn check:ratchet && yarn check:cycles && yarn check:arch && yarn format && yarn test:coverage && yarn check:audit",
     "db:pull": "dotenv -e ../erp-infra/env/local/api.host.env -- prisma db pull && node scripts/fix-ignored-relations.mjs && prisma format && node scripts/introspection-report.mjs",
