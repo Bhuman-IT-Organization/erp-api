@@ -65,6 +65,11 @@ export const ERROR_CODES = {
   'ERP-CONTRACTTYPES-0001': { status: 409, title: 'The contract type is still in use' },
   // v1/cost-centers (plan 04.1-18): 0001 refuses a delete while any referencing column still names the cost center (D-07, D-28).
   'ERP-COSTCENTERS-0001': { status: 409, title: 'The cost center is still in use' },
+  // v1/knowledge-base-groups: 0001 refuses a delete while the group has articles (D-07, D-28).
+  'ERP-KNOWLEDGEBASEGROUPS-0001': {
+    status: 409,
+    title: 'The knowledge base group has articles and cannot be deleted',
+  },
   // v1/services: 0001 refuses a delete while any ticket still uses the service.
   'ERP-SERVICES-0001': { status: 409, title: 'The service is still in use' },
   // v1/ticket-statuses (plan 06): 0001 is a referenced status, 0002 is a built-in status.

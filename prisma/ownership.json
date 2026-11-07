@@ -5227,8 +5227,8 @@
       ]
     },
     "evidence_changed": false,
-    "note": "",
-    "owner": "perfex-core",
+    "note": "Written by v1/knowledge-base-groups. Perfex still writes it through knowledge_base/group, update_groups_order and change_group_color.",
+    "owner": "node",
     "owner_confidence": "write-single",
     "table": "tblknowledge_base_groups"
   },

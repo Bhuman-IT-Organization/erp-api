@@ -497,6 +497,7 @@ describe('the committed register, today', () => {
     // Fixed Equipment Depreciation claimed tblfe_depreciations for v1/fixed-equipment-depreciations.
     // Update this expectation in the same PR that changes either register.
     // Contract Types claimed tblcontracts_types for v1/contract-types.
+    // knowledge base groups claimed tblknowledge_base_groups for v1/knowledge-base-groups.
     const nodeOwned = [...map.entries()]
       .filter(([, o]) => o === 'node')
       .map(([t]) => t)
@@ -509,6 +510,7 @@ describe('the committed register, today', () => {
       'tblexpenses_categories',
       'tblfe_depreciations',
       'tblidentity_audit',
+      'tblknowledge_base_groups',
       'tblleads_sources',
       'tblmail_sent_emails',
       'tblmail_template_versions',
@@ -539,7 +541,7 @@ describe('the committed register, today', () => {
     }
   });
 
-  it('allows a tblstaff updateMany (node) and rejects a tblknowledge_base_groups update (perfex-core)', () => {
+  it('allows a tblstaff updateMany (node) and rejects a tbltodos update (perfex-core)', () => {
     const tables = loadModelTableMap();
     expect(
       decide({
@@ -553,14 +555,14 @@ describe('the committed register, today', () => {
     ).toEqual({ allowed: true });
     expect(
       decide({
-        model: 'tblknowledge_base_groups',
+        model: 'tbltodos',
         operation: 'update',
-        args: { where: { groupid: 1 }, data: { name: 'x' } },
+        args: { where: { todoid: 1 }, data: { description: 'x' } },
         ownership: map,
         modelToTable: tables,
         relations: noRelations,
       }),
-    ).toEqual({ allowed: false, table: 'tblknowledge_base_groups', owner: 'perfex-core' });
+    ).toEqual({ allowed: false, table: 'tbltodos', owner: 'perfex-core' });
   });
 
   const rawOnRegister = (args: unknown) =>

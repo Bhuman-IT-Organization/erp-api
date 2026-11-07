@@ -10,6 +10,7 @@ import { DepartmentsModule } from './departments/departments.module.js';
 import { ExampleItemModule } from './example-item/example-item.module.js';
 import { ExpenseCategoriesModule } from './expense-categories/expense-categories.module.js';
 import { IdentityModule } from './identity/identity.module.js';
+import { KnowledgeBaseGroupsModule } from './knowledge-base-groups/knowledge-base-groups.module.js';
 import { MailModule } from './mail/mail.module.js';
 import { PaymentModesModule } from './payment-modes/payment-modes.module.js';
 import { LeadSourcesModule } from './lead-sources/lead-sources.module.js';
@@ -32,6 +33,7 @@ import { FixedEquipmentDepreciationsModule } from './fixed-equipment-depreciatio
     MailModule,
     TaxesModule,
     CostCentersModule,
+    KnowledgeBaseGroupsModule,
     ContractTypesModule,
     PaymentModesModule,
     CurrenciesModule,

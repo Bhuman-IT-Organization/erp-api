@@ -9,8 +9,9 @@ import { PrismaService } from '../prisma.service.js';
 // tblstaff became node-owned in Phase 1.3 (ADR-0030), so the rejection fixtures live on another
 // table. Plan 03.1-05 (P5) moved them again: that plan flips the three RBAC tables to `node`, and a
 // write verb aimed at a table that is about to become writable would execute. Plan 04.1-32 moved them
-// a third time: it flips tbldepartments to `node` (W2A-06, column-scoped), so the fixture table is
-// now tblknowledge_base_groups (perfex-core, write-single, read only by Perfex core, named by no
+// a third time: it flips tbldepartments to `node` (W2A-06, column-scoped). Plan 04.1-33 moved them
+// a fourth time: knowledge-base groups became node-owned, so the fixture table is
+// now tbltodos (perfex-core, write-single, read only by Perfex core, named by no
 // planned phase; D-10).
 // Never put a write verb against a node-owned table in this spec: it would execute. The check below
 // refuses to load this file once the register stops giving the fixture table to perfex-core, so no
@@ -18,7 +19,7 @@ import { PrismaService } from '../prisma.service.js';
 // Measured by plan 01.2-03 against the local legacy stack (SELECT COUNT(*) FROM tblstaff).
 const EXPECTED_STAFF_ROWS = 33;
 
-const FIXTURE_TABLE = 'tblknowledge_base_groups';
+const FIXTURE_TABLE = 'tbltodos';
 const FIXTURE_OWNER = loadOwnership().get(FIXTURE_TABLE);
 if (FIXTURE_OWNER !== 'perfex-core') {
   throw new Error(
@@ -56,23 +57,22 @@ describe.skipIf(!process.env.DATABASE_URL)('ownership guard against the local mi
   });
 
   const writes: Record<string, () => Promise<unknown>> = {
-    create: () => client.tblknowledge_base_groups.create({ data: {} as never }),
-    createMany: () => client.tblknowledge_base_groups.createMany({ data: [] as never }),
-    update: () => client.tblknowledge_base_groups.update({ where: { groupid: 1 }, data: {} }),
-    updateMany: () =>
-      client.tblknowledge_base_groups.updateMany({ where: { groupid: 1 }, data: {} }),
+    create: () => client.tbltodos.create({ data: {} as never }),
+    createMany: () => client.tbltodos.createMany({ data: [] as never }),
+    update: () => client.tbltodos.update({ where: { todoid: 1 }, data: {} }),
+    updateMany: () => client.tbltodos.updateMany({ where: { todoid: 1 }, data: {} }),
     upsert: () =>
-      client.tblknowledge_base_groups.upsert({
-        where: { groupid: 1 },
+      client.tbltodos.upsert({
+        where: { todoid: 1 },
         create: {} as never,
         update: {},
       }),
-    delete: () => client.tblknowledge_base_groups.delete({ where: { groupid: 1 } }),
-    deleteMany: () => client.tblknowledge_base_groups.deleteMany({ where: { groupid: 1 } }),
+    delete: () => client.tbltodos.delete({ where: { todoid: 1 } }),
+    deleteMany: () => client.tbltodos.deleteMany({ where: { todoid: 1 } }),
   };
 
   it.each(Object.keys(writes))(
-    '%s on tblknowledge_base_groups rejects with OwnershipViolationError',
+    '%s on tbltodos rejects with OwnershipViolationError',
     async (op) => {
       await expect(writes[op]?.()).rejects.toBeInstanceOf(OwnershipViolationError);
     },
@@ -95,21 +95,19 @@ describe.skipIf(!process.env.DATABASE_URL)('ownership guard against the local mi
   });
 
   it('$executeRawUnsafe to a perfex-core table rejects and leaves the table unchanged', async () => {
-    const before = await client.tblknowledge_base_groups.count();
+    const before = await client.tbltodos.count();
     await expect(
-      client.$executeRawUnsafe('UPDATE tblknowledge_base_groups SET name = name'),
+      client.$executeRawUnsafe('UPDATE tbltodos SET description = description'),
     ).rejects.toBeInstanceOf(OwnershipViolationError);
     await expect(
-      client.$executeRawUnsafe('DELETE FROM tblknowledge_base_groups WHERE groupid = -1'),
+      client.$executeRawUnsafe('DELETE FROM tbltodos WHERE todoid = -1'),
     ).rejects.toBeInstanceOf(OwnershipViolationError);
-    expect(await client.tblknowledge_base_groups.count()).toBe(before);
+    expect(await client.tbltodos.count()).toBe(before);
   });
 
   it('$executeRawUnsafe with a statement the parser cannot read stays refused', async () => {
     await expect(
-      client.$executeRawUnsafe(
-        'UPDATE tblstaff SET last_ip = last_ip; DELETE FROM tblknowledge_base_groups',
-      ),
+      client.$executeRawUnsafe('UPDATE tblstaff SET last_ip = last_ip; DELETE FROM tbltodos'),
     ).rejects.toBeInstanceOf(OwnershipViolationError);
     await expect(client.$executeRawUnsafe('TRUNCATE TABLE tblstaff')).rejects.toBeInstanceOf(
       OwnershipViolationError,
@@ -117,14 +115,14 @@ describe.skipIf(!process.env.DATABASE_URL)('ownership guard against the local mi
   });
 
   it('$queryRawUnsafe with a non-SELECT rejects', async () => {
-    await expect(
-      client.$queryRawUnsafe('DELETE FROM tblknowledge_base_groups WHERE 1 = 0'),
-    ).rejects.toBeInstanceOf(OwnershipViolationError);
+    await expect(client.$queryRawUnsafe('DELETE FROM tbltodos WHERE 1 = 0')).rejects.toBeInstanceOf(
+      OwnershipViolationError,
+    );
   });
 
   it.each([
-    'EXPLAIN ANALYZE DELETE t FROM tblknowledge_base_groups t WHERE 1 = 0',
-    'WITH x AS (SELECT 1) DELETE FROM tblknowledge_base_groups WHERE 1 = 0',
+    'EXPLAIN ANALYZE DELETE t FROM tbltodos t WHERE 1 = 0',
+    'WITH x AS (SELECT 1) DELETE FROM tbltodos WHERE 1 = 0',
   ])(
     '$queryRawUnsafe(%j) rejects (WR-01: read-prefixed writes execute on MySQL 8)',
     async (sql) => {
