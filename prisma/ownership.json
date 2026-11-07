@@ -2246,8 +2246,8 @@
       ]
     },
     "evidence_changed": false,
-    "note": "",
-    "owner": "fixed_equipment",
+    "note": "Fixed Equipment Depreciation claimed tblfe_depreciations for v1/fixed-equipment-depreciations. Perfex's screen is closed at Nginx.",
+    "owner": "node",
     "owner_confidence": "ddl-single",
     "table": "tblfe_depreciations"
   },
