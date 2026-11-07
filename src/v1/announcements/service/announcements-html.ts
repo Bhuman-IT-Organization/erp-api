@@ -21,7 +21,7 @@ function escapeAndJoinLine(line: string): string {
 }
 
 export function textToHtml(text: string | undefined | null): string {
-  if (!text) return '';
+  if (!text || text.trim() === '') return '';
   const normalized = text.replace(/\r\n/g, '\n');
   const blocks = normalized.split(/\n\s*\n/);
   return blocks
@@ -33,10 +33,7 @@ export function textToHtml(text: string | undefined | null): string {
     .join('');
 }
 
-export function htmlToText(html: string | undefined | null): {
-  text: string;
-  hasOtherFormatting: boolean;
-} {
+export function htmlToText(html: string | undefined | null): { text: string; hasOtherFormatting: boolean } {
   if (!html) return { text: '', hasOtherFormatting: false };
   const tagRegex = /<\/?[a-z0-9-]+(\s+[^>]*)?\/?>/gi;
   let match: RegExpExecArray | null;
