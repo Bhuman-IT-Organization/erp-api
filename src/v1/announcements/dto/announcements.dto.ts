@@ -7,13 +7,16 @@
  *
  * The id is a STRING on the wire: the web treats it as opaque. The table's key is an integer, so
  * `shared/http/keyset.ts`'s `[value, id]` cursor applies; the transformer writes `String(row.id)`
- * and maps the stored date to camelCase `dateAdded` as an ISO string.
+ * and maps the stored date to camelCase `dateAdded` as an ISO instant (the column holds the company
+ * zone's wall clock, `announcements-zone.ts`).
  *
  * Perfex's business outcomes are kept: the name is required, trimmed, 1 to
- * `ANNOUNCEMENTS_NAME_MAX` characters; the message is optional on create, required on update, and
- * trimmed to at most `ANNOUNCEMENTS_MESSAGE_MAX` characters. Fastify's 1 MiB body limit applies first;
- * Zod counts characters, not bytes. The visibility switches are booleans on the wire, stored as
- * Perfex's 0/1. The bodies are strict: only the five accepted fields are allowed.
+ * `ANNOUNCEMENTS_NAME_MAX` characters; the message is optional on create and on update (an omitted
+ * message on update leaves the stored one untouched), plain text on the wire, trimmed. The column
+ * holds HTML (`announcements-html.ts`), so the real cap is on the stored HTML in bytes and the
+ * service answers 400 on `message` when it is longer; the character cap here is only the first,
+ * cheaper gate. The visibility switches are booleans on the wire, stored as Perfex's 0/1. The
+ * bodies are strict: only the five accepted fields are allowed.
  */
 import { z } from 'zod';
 import {
@@ -36,8 +39,9 @@ export const ANNOUNCEMENTS_NAME_MAX = 191;
 /** The longest `userid`: Perfex's `VARCHAR(100)` column; the actor's full name is cut to it. */
 export const ANNOUNCEMENTS_USERID_MAX = 100;
 /**
- * The most message characters Zod accepts: MEDIUMTEXT holds 16,777,215 bytes. Zod counts characters,
- * not bytes, and Fastify's 1 MiB body limit applies first, so in practice the body limit is the ceiling.
+ * The most typed characters Zod accepts: MEDIUMTEXT holds 16,777,215 bytes and the stored HTML is
+ * never shorter than the typed text, so a longer text can never fit. The exact cap is on the HTML
+ * (`exceedsMessageLimit`); Fastify's 1 MiB body limit applies before both.
  */
 export const ANNOUNCEMENTS_MESSAGE_MAX = 16_777_215;
 /** The longest `?q=`; a longer one is a 400 on `q`. */
@@ -94,12 +98,13 @@ export const createAnnouncementsBodySchema = z.strictObject({
   showName: switchSchema,
 });
 
-/** `PATCH :id`: same fields as create, but a message is required; `{}` is a 400. */
-export const updateAnnouncementsBodySchema = createAnnouncementsBodySchema.extend({
-  message: z.string().trim().max(ANNOUNCEMENTS_MESSAGE_MAX),
-});
+/**
+ * `PATCH :id`: the same strict body, and `message` is optional: a body without it leaves the stored
+ * message byte for byte as it was (Perfex's editor may have stored bold or links in it).
+ */
+export const updateAnnouncementsBodySchema = createAnnouncementsBodySchema;
 
-/** One announcement: string id, stored name and nullable message, ISO dateAdded, and boolean switches. */
+/** One announcement: the message as plain text, whether stored formatting was dropped, ISO dateAdded. */
 export const announcementsResponseSchema = z
   .object({
     id: z.string(),
@@ -109,6 +114,7 @@ export const announcementsResponseSchema = z
     showToUsers: z.boolean(),
     showToStaff: z.boolean(),
     showName: z.boolean(),
+    hasOtherFormatting: z.boolean(),
   })
   .readonly();
 

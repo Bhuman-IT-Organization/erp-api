@@ -24,7 +24,7 @@ const NO_MESSAGE: AnnouncementRow = { ...ROW, id: 8, message: null };
 
 describe('toResponse', () => {
   it('writes String(id), the stored fields and the date as ISO text', () => {
-    expect(toResponse(ROW)).toEqual({
+    expect(toResponse(ROW, 'UTC')).toEqual({
       id: '7',
       name: 'Holiday',
       message: 'Closed on Friday',
@@ -32,26 +32,50 @@ describe('toResponse', () => {
       showToUsers: true,
       showToStaff: false,
       showName: true,
+      hasOtherFormatting: false,
     });
   });
 
-  it('keeps a stored NULL message as null', () => {
-    expect(toResponse(NO_MESSAGE).message).toBeNull();
+  it('keeps a stored NULL message as null and reports it is unformatted', () => {
+    expect(toResponse(NO_MESSAGE, 'UTC')).toMatchObject({
+      message: null,
+      hasOtherFormatting: false,
+    });
+  });
+
+  it('answers the stored HTML as plain text', () => {
+    expect(
+      toResponse({ ...ROW, message: '<p>one<br>a &lt; b</p><p>two</p>' }, 'UTC'),
+    ).toMatchObject({ message: 'one\na < b\n\ntwo', hasOtherFormatting: false });
+  });
+
+  it('removes the rich text Perfex stored and says so', () => {
+    expect(
+      toResponse({ ...ROW, message: '<p>Closed <strong>Friday</strong></p>' }, 'UTC'),
+    ).toMatchObject({ message: 'Closed Friday', hasOtherFormatting: true });
+  });
+
+  it('reads the stored wall clock in the company zone and answers the instant', () => {
+    expect(toResponse(ROW, 'Asia/Kolkata').dateAdded).toBe('2026-02-10T09:00:00.000Z');
   });
 
   it('never carries a key the response schema does not name', () => {
-    const result = toResponse({ ...ROW, userid: '0' } as unknown as AnnouncementRow);
+    const result = toResponse({ ...ROW, userid: '0' } as unknown as AnnouncementRow, 'UTC');
     expect('userid' in result).toBe(false);
   });
 });
 
 describe('the export rows', () => {
   it('writes the id as text, the name and the date as ISO text; never the message', () => {
-    expect(toExportRow(ROW)).toEqual({
+    expect(toExportRow(ROW, 'UTC')).toEqual({
       id: '7',
       name: 'Holiday',
       dateadded: '2026-02-10T14:30:00.000Z',
     });
+  });
+
+  it('answers the instant of the stored wall clock in the company zone', () => {
+    expect(toExportRow(ROW, 'Asia/Kolkata').dateadded).toBe('2026-02-10T09:00:00.000Z');
   });
 
   it('has one cell definition per export column and marks the date as dateTime', () => {
@@ -71,11 +95,11 @@ describe('AnnouncementsTransformer', () => {
   const transformer = new AnnouncementsTransformer();
 
   it('toResponse is the same as the function', () => {
-    expect(transformer.toResponse(ROW)).toEqual(toResponse(ROW));
+    expect(transformer.toResponse(ROW, 'UTC')).toEqual(toResponse(ROW, 'UTC'));
   });
 
   it('builds the list envelope with the pager meta and the export limits', () => {
-    const response = transformer.toListResponse([ROW, NO_MESSAGE], {
+    const response = transformer.toListResponse([ROW, NO_MESSAGE], 'UTC', {
       nextCursor: null,
       prevCursor: null,
       total: 2,

@@ -34,13 +34,13 @@ export interface NewAnnouncement {
   readonly showname: number;
 }
 
-/** What `update` stores: the same fields a create stores, in Perfex's order (name, message, switches). */
+/** What `update` stores: only supplied fields; omitted message preserves its Perfex formatting. */
 export interface AnnouncementPatch {
-  readonly name: string;
-  readonly message: string;
-  readonly showtousers: number;
-  readonly showtostaff: number;
-  readonly showname: number;
+  readonly name?: string;
+  readonly message?: string;
+  readonly showtousers?: number;
+  readonly showtostaff?: number;
+  readonly showname?: number;
 }
 
 /** The facade's public shape. */

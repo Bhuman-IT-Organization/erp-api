@@ -33,6 +33,8 @@ import { LoggerService, type LogMeta } from '../../../shared/logger/logger.servi
 
 import { IdentityModule } from '../../identity/identity.module.js';
 import { IdentityFacade } from '../../identity/index.js';
+import { SettingsFacade } from '../../settings/index.js';
+import { SettingsModule } from '../../settings/settings.module.js';
 import { AnnouncementsModule } from '../announcements.module.js';
 import { AnnouncementsRepository } from '../repository/announcements.repository.js';
 import { AnnouncementsService } from '../service/announcements.service.js';
@@ -122,6 +124,13 @@ class StubVerifierModule {}
 })
 class FakeIdentityModule {}
 
+/** Perfex's `default_timezone` answers no row, so the zone is UTC and the dates read as stored; the real SettingsModule needs a database. */
+@Module({
+  providers: [{ provide: SettingsFacade, useValue: { getOption: () => Promise.resolve(null) } }],
+  exports: [SettingsFacade],
+})
+class FakeSettingsModule {}
+
 /** One `log` call the service made: the message and its meta. */
 export interface LoggedLine {
   readonly message: string;
@@ -173,6 +182,8 @@ export async function createAnnouncementsTestApp(): Promise<AnnouncementsTestApp
   })
     .overrideModule(IdentityModule)
     .useModule(FakeIdentityModule)
+    .overrideModule(SettingsModule)
+    .useModule(FakeSettingsModule)
     .overrideProvider(AnnouncementsRepository)
     .useValue(asRepository(repo))
     .overrideProvider(DOMAIN_EVENT_PUBLISHER)

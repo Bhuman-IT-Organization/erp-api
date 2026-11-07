@@ -235,11 +235,11 @@ export class AnnouncementsRepository {
       const row = await this.prisma.client.tblannouncements.update({
         where: { announcementid: id },
         data: {
-          name: patch.name,
-          message: patch.message,
-          showtousers: patch.showtousers,
-          showtostaff: patch.showtostaff,
-          showname: patch.showname,
+          ...(patch.name === undefined ? {} : { name: patch.name }),
+          ...(patch.message === undefined ? {} : { message: patch.message }),
+          ...(patch.showtousers === undefined ? {} : { showtousers: patch.showtousers }),
+          ...(patch.showtostaff === undefined ? {} : { showtostaff: patch.showtostaff }),
+          ...(patch.showname === undefined ? {} : { showname: patch.showname }),
         },
         select: COLUMNS,
       });

@@ -111,12 +111,12 @@ describe('AnnouncementsValidator: the body', () => {
     ).toEqual(BODY);
   });
 
-  it('the message is optional on create but required on update', () => {
+  it('message is optional on create and update so formatted text can be preserved', () => {
     const withoutMessage = Object.fromEntries(
       Object.entries(BODY).filter(([key]) => key !== 'message'),
     );
     expect(validator.parseCreateBody(withoutMessage).message).toBeUndefined();
-    expect(() => validator.parseUpdateBody(withoutMessage)).toThrow(AppError);
+    expect(validator.parseUpdateBody(withoutMessage).message).toBeUndefined();
   });
 
   it('accepts the longest name and message, refuses one more', () => {

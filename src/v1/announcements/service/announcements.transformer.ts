@@ -2,6 +2,10 @@
  * Transformer: entity to response DTO and the export rows. Every DTO is built field by field and
  * then parsed through its zod response schema, which strips any key the schema does not name. The
  * controller never imports this file (BE-08).
+ *
+ * The stored message is HTML (`announcements-html.ts`): the wire answers it as plain text with
+ * `hasOtherFormatting`. The stored `dateadded` is the company zone's wall clock
+ * (`announcements-zone.ts`): the wire answers the instant it names.
  */
 import { Injectable } from '@nestjs/common';
 import { EXPORT_MAX_ROWS } from '../../../shared/http/csv.js';
@@ -15,21 +19,25 @@ import {
   type AnnouncementsResponseDto,
 } from '../dto/announcements.dto.js';
 import type { Announcement, AnnouncementRow } from '../model/announcements.model.js';
+import { htmlToText } from './announcements-html.js';
+import { instantOf } from './announcements-zone.js';
 
-/** One announcement on the wire: the id as text, the stored fields, the date as ISO text. */
-export function toResponse(row: AnnouncementRow): AnnouncementsResponseDto {
+/** One announcement on the wire: the id as text, the message as text, the date as the ISO instant in `zone`. */
+export function toResponse(row: AnnouncementRow, zone: string): AnnouncementsResponseDto {
+  const message = row.message === null ? null : htmlToText(row.message);
   return announcementsResponseSchema.parse({
     id: String(row.id),
     name: row.name,
-    message: row.message,
-    dateAdded: row.dateadded.toISOString(),
+    message: message === null ? null : message.text,
+    dateAdded: instantOf(row.dateadded, zone),
     showToUsers: row.showtousers !== 0,
     showToStaff: row.showtostaff !== 0,
     showName: row.showname !== 0,
+    hasOtherFormatting: message?.hasOtherFormatting ?? false,
   });
 }
 
-/** One exported row: the id as text, the name, and the date as its ISO text. */
+/** One exported row: the id as text, the name, and the date as its ISO instant. */
 export interface AnnouncementExportRow {
   readonly id: string;
   readonly name: string;
@@ -49,9 +57,9 @@ export const ANNOUNCEMENTS_EXPORT_CELLS = {
   ExportCell<AnnouncementExportRow>
 >;
 
-/** One exported row: the id as text, the name and the date as its ISO text. */
-export function toExportRow(row: AnnouncementRow): AnnouncementExportRow {
-  return { id: String(row.id), name: row.name, dateadded: row.dateadded.toISOString() };
+/** One exported row: the id as text, the name and the date as the ISO instant in `zone`. */
+export function toExportRow(row: AnnouncementRow, zone: string): AnnouncementExportRow {
+  return { id: String(row.id), name: row.name, dateadded: instantOf(row.dateadded, zone) };
 }
 
 /** The facade's shape: the stored fields, never the wire DTO. */
@@ -70,8 +78,8 @@ export function toAnnouncement(row: AnnouncementRow): Announcement {
 @Injectable()
 export class AnnouncementsTransformer {
   /** One record. */
-  toResponse(row: AnnouncementRow): AnnouncementsResponseDto {
-    return toResponse(row);
+  toResponse(row: AnnouncementRow, zone: string): AnnouncementsResponseDto {
+    return toResponse(row, zone);
   }
 
   /**
@@ -82,10 +90,11 @@ export class AnnouncementsTransformer {
    */
   toListResponse(
     rows: readonly AnnouncementRow[],
+    zone: string,
     meta: ListPageMeta,
   ): AnnouncementsListResponseDto {
     return announcementsListResponseSchema.parse({
-      data: rows.map((row) => this.toResponse(row)),
+      data: rows.map((row) => this.toResponse(row, zone)),
       meta: {
         nextCursor: meta.nextCursor,
         prevCursor: meta.prevCursor,

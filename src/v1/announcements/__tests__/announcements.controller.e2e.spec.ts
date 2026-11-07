@@ -217,6 +217,7 @@ describe('AnnouncementsController (Fastify inject, no network)', () => {
           showToUsers: true,
           showToStaff: false,
           showName: false,
+          hasOtherFormatting: false,
         },
       ]);
       expect(res.payload).not.toContain('userid');
@@ -283,10 +284,11 @@ describe('AnnouncementsController (Fastify inject, no network)', () => {
         showToUsers: true,
         showToStaff: false,
         showName: true,
+        hasOtherFormatting: false,
       });
       expect(await ctx.repo.findById(Number(dto.id))).toMatchObject({
         name: 'Written',
-        message: 'Updated',
+        message: '<p>Updated</p>',
         showtousers: 1,
         showtostaff: 0,
         showname: 1,
@@ -374,18 +376,11 @@ describe('AnnouncementsController (Fastify inject, no network)', () => {
       expect(ctx.events.count).toBe(0);
     });
 
-    it('PATCH {} or a missing message is 400; an extra key is 400 and the row is unchanged', async () => {
+    it('PATCH {} is 400; an extra key is 400 and the row is unchanged', async () => {
       const empty = await send('PATCH', record(1), TEST_BEARERS.admin, {});
       expect(empty.statusCode).toBe(HTTP.bad);
       expect(JSON.stringify(problem(empty).issues)).toContain('name');
-      const missingMessage = await send('PATCH', record(1), TEST_BEARERS.admin, {
-        name: 'Head Office',
-        showToUsers: true,
-        showToStaff: true,
-        showName: false,
-      });
-      expect(missingMessage.statusCode).toBe(HTTP.bad);
-      expect(JSON.stringify(problem(missingMessage).issues)).toContain('message');
+
       const before = await ctx.repo.findById(3);
       const sneaky = await send('PATCH', record(3), TEST_BEARERS.admin, {
         ...BODY,
@@ -393,6 +388,25 @@ describe('AnnouncementsController (Fastify inject, no network)', () => {
       });
       expect(sneaky.statusCode).toBe(HTTP.bad);
       expect(await ctx.repo.findById(3)).toEqual(before);
+    });
+
+    it('PATCH without a message leaves the stored message byte for byte (Perfex formatting survives)', async () => {
+      const id = await created('Keep my message');
+      const perfex = '<p>Open <strong>Sunday</strong> <a href="https://x.test">details</a></p>';
+      await ctx.repo.update(Number(id), { message: perfex });
+      const res = await send('PATCH', record(id), TEST_BEARERS.admin, {
+        name: 'Renamed only',
+        showToUsers: false,
+        showToStaff: true,
+        showName: true,
+      });
+      expect(res.statusCode).toBe(HTTP.ok);
+      expect((await ctx.repo.findById(Number(id)))?.message).toBe(perfex);
+      expect(announcementsResponseSchema.parse(JSON.parse(res.payload))).toMatchObject({
+        name: 'Renamed only',
+        message: 'Open Sunday details',
+        hasOtherFormatting: true,
+      });
     });
 
     it('PATCH changes the five saved fields and never the date', async () => {
@@ -418,7 +432,7 @@ describe('AnnouncementsController (Fastify inject, no network)', () => {
       expect(await ctx.repo.findById(Number(id))).toEqual({
         ...before,
         name: 'Renamed',
-        message: 'New text',
+        message: '<p>New text</p>',
         showtousers: 1,
         showtostaff: 1,
         showname: 1,

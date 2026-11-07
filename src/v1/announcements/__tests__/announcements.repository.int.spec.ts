@@ -171,6 +171,25 @@ describe.skipIf(!process.env.DATABASE_URL)(
       ).toBeNull();
     });
 
+    it('update without a message leaves the stored message byte for byte', async () => {
+      const before = await repository.findById(a.id);
+      const updated = await repository.update(a.id, {
+        name: `${MARKER}-a <b>`,
+        showtousers: 0,
+        showtostaff: 1,
+        showname: 0,
+      });
+      expect(updated).toEqual({ ...before, showtousers: 0, showtostaff: 1, showname: 0 });
+      expect((await repository.findById(a.id))?.message).toBe('Line 1\nLine <2> & "three"');
+      // put the switches back: the paging tests below read this row
+      await repository.update(a.id, {
+        name: `${MARKER}-a <b>`,
+        showtousers: 1,
+        showtostaff: 0,
+        showname: 1,
+      });
+    });
+
     it('three marker names page with limit 1 both ways under q, by name', async () => {
       const first = await repository.list(request({ limit: 1 }));
       expect(ids(first)).toEqual([a.id]);
