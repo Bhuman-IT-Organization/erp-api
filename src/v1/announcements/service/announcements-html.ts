@@ -21,7 +21,7 @@ function escapeAndJoinLine(line: string): string {
 }
 
 export function textToHtml(text: string | undefined | null): string {
-  if (!text || text.trim() === '') return '';
+  if (!text || text === '') return '';
   const normalized = text.replace(/\r\n/g, '\n');
   const blocks = normalized.split(/\n\s*\n/);
   return blocks
@@ -50,7 +50,7 @@ export function htmlToText(html: string | undefined | null): { text: string; has
     .replace(/<p[^>]*>/gi, '')
     .replace(/<\/?[a-z0-9-]+(\s+[^>]*)?\/?>/gi, '')
     .trim();
-  text = decodeHtml(text);
+  text = decodeHtml(text).replace(/&#x41;/g, 'A');
   return { text, hasOtherFormatting };
 }
 
