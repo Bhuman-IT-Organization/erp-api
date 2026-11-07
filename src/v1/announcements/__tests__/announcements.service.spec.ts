@@ -127,7 +127,9 @@ describe('AnnouncementsService: reads', () => {
 
   it('answers a message Perfex stored as HTML as text, and says formatting was removed', async () => {
     const { service, repo } = build();
-    repo.seed([{ ...SEED_ANNOUNCEMENTS[0]!, id: 9, message: PERFEX_MESSAGE }]);
+    const seed = SEED_ANNOUNCEMENTS[0];
+    if (!seed) throw new Error('Expected a seeded announcement');
+    repo.seed([{ ...seed, id: 9, message: PERFEX_MESSAGE }]);
     expect(await service.get(ADMIN, { id: '9' })).toMatchObject({
       message: 'Open Sunday details',
       hasOtherFormatting: true,
@@ -187,7 +189,7 @@ describe('AnnouncementsService: create', () => {
     const message = '&'.repeat(3_400_000);
     await expect(service.create(ADMIN, { ...BODY, message })).rejects.toMatchObject({
       code: 'ERP-VALIDATION-0001',
-      issues: [{ path: ['message'] }],
+      extras: { issues: [{ path: ['message'] }] },
     });
     expect(await repo.findById(4)).toBeNull();
     expect(publish).not.toHaveBeenCalled();
@@ -271,7 +273,9 @@ describe('AnnouncementsService: update', () => {
 
   it('a PATCH with only the name and the switches leaves the stored message byte for byte', async () => {
     const { service, repo } = build();
-    repo.seed([{ ...SEED_ANNOUNCEMENTS[0]!, id: 9, message: PERFEX_MESSAGE }]);
+    const seed = SEED_ANNOUNCEMENTS[0];
+    if (!seed) throw new Error('Expected a seeded announcement');
+    repo.seed([{ ...seed, id: 9, message: PERFEX_MESSAGE }]);
     const updated = await service.update(
       ADMIN,
       { id: '9' },
@@ -303,7 +307,7 @@ describe('AnnouncementsService: update', () => {
     const message = '&'.repeat(3_400_000);
     await expect(service.update(ADMIN, { id: '1' }, { ...BODY, message })).rejects.toMatchObject({
       code: 'ERP-VALIDATION-0001',
-      issues: [{ path: ['message'] }],
+      extras: { issues: [{ path: ['message'] }] },
     });
     expect((await repo.findById(1))?.message).toBe('Open on Sunday');
     expect(publish).not.toHaveBeenCalled();

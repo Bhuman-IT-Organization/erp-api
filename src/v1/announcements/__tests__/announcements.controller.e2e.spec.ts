@@ -46,7 +46,7 @@ const HTTP = {
   notFound: 404,
 };
 /** The service's fixed clock, as `dateadded` answers it. */
-const CREATED_AT = TEST_NOW.toISOString();
+const CREATED_AT = new Date(Math.floor(TEST_NOW.getTime() / 1000) * 1000).toISOString();
 /** Every row: the fake's own match with no search, for a count. */
 const ALL = { search: null, sortField: 'name', order: 'asc', cursor: null, limit: 1 } as const;
 const ADMIN_ONLY = 'announcements are managed by administrators only';

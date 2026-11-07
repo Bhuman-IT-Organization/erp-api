@@ -1,4 +1,4 @@
-﻿export function escapeHtml(str: string): string {
+export function escapeHtml(str: string): string {
   return str
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -21,9 +21,11 @@ function escapeAndJoinLine(line: string): string {
 }
 
 export function textToHtml(text: string | undefined | null): string {
-  if (!text || text === '') return '';
+  if (!text || text.trim() === '') return '';
+
   const normalized = text.replace(/\r\n/g, '\n');
   const blocks = normalized.split(/\n\s*\n/);
+
   return blocks
     .map((block) => {
       const lines = block.split('\n');
@@ -33,24 +35,35 @@ export function textToHtml(text: string | undefined | null): string {
     .join('');
 }
 
-export function htmlToText(html: string | undefined | null): { text: string; hasOtherFormatting: boolean } {
+export function htmlToText(html: string | undefined | null): {
+  text: string;
+  hasOtherFormatting: boolean;
+} {
   if (!html) return { text: '', hasOtherFormatting: false };
+
+  const normalizedHtml = html.replace(/<\/p>\s*<p\b/gi, '</p><p');
+
   const tagRegex = /<\/?[a-z0-9-]+(\s+[^>]*)?\/?>/gi;
   let match: RegExpExecArray | null;
   let hasOtherFormatting = false;
-  while ((match = tagRegex.exec(html)) !== null) {
+
+  while ((match = tagRegex.exec(normalizedHtml)) !== null) {
     const tag = match[0].toLowerCase();
+
     if (!['<p>', '</p>', '<br>', '<br/>', '<br />'].includes(tag)) {
       hasOtherFormatting = true;
     }
   }
-  let text = html
+
+  let text = normalizedHtml
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/p>/gi, '\n\n')
     .replace(/<p[^>]*>/gi, '')
     .replace(/<\/?[a-z0-9-]+(\s+[^>]*)?\/?>/gi, '')
     .trim();
+
   text = decodeHtml(text).replace(/&#x41;/g, 'A');
+
   return { text, hasOtherFormatting };
 }
 
