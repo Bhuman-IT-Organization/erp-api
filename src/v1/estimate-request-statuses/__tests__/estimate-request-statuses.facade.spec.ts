@@ -23,11 +23,11 @@ describe('EstimateRequestStatusesFacade', () => {
     expect(facade.describe()).toEqual({ module: 'estimate-request-statuses', version: 1 });
   });
 
-  it('returns all statuses with estimate-request counts in name order', async () => {
+  it('returns all statuses with estimate-request counts in status order', async () => {
     expect((await facade.listAll()).map(({ id, name }) => [id, name])).toEqual([
-      [3, 'Closed'],
       [1, 'Open'],
       [2, 'Ready'],
+      [3, 'Closed'],
     ]);
   });
 

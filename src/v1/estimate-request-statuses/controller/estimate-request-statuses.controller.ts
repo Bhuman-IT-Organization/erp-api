@@ -132,6 +132,7 @@ export class EstimateRequestStatusesController {
       'ERP-CORE-0004',
       'ERP-ESTIMATEREQUESTSTATUSES-0001',
       'ERP-ESTIMATEREQUESTSTATUSES-0002',
+      'ERP-ESTIMATEREQUESTSTATUSES-0003',
     ],
   })
   remove(@CurrentUser() user: AuthenticatedUser, @Param() params: unknown): Promise<void> {

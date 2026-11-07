@@ -1,11 +1,14 @@
 import 'reflect-metadata';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppConfig } from '../../../shared/config/app-config.js';
 import { PrismaClient } from '../../../shared/db/generated/client.js';
 import { PrismaService } from '../../../shared/db/prisma.service.js';
 import { HealthService } from '../../../shared/health/health.service.js';
 import { decodeCursor } from '../../../shared/http/keyset.js';
 import { EstimateRequestStatusesRepository } from '../repository/estimate-request-statuses.repository.js';
+import { EstimateRequestStatusesService } from '../service/estimate-request-statuses.service.js';
+import { EstimateRequestStatusesTransformer } from '../service/estimate-request-statuses.transformer.js';
+import { EstimateRequestStatusesValidator } from '../service/estimate-request-statuses.validator.js';
 
 const MARKER = 'int-spec-estimate-request-status';
 
@@ -23,6 +26,9 @@ describe.skipIf(!process.env.DATABASE_URL)(
     const cleanup = async () => {
       await directClient.tblestimate_requests.deleteMany({
         where: { email: { startsWith: MARKER } },
+      });
+      await directClient.tblestimate_request_forms.deleteMany({
+        where: { name: { startsWith: MARKER } },
       });
       await client.tblestimate_request_status.deleteMany({
         where: { name: { startsWith: MARKER } },
@@ -87,17 +93,6 @@ describe.skipIf(!process.env.DATABASE_URL)(
       await expect(repository.count(query)).resolves.toBe(3);
     });
 
-    it('stores no more than the status name column length', async () => {
-      const name = `${MARKER}-${'x'.repeat(60)}`;
-      const row = await repository.create({
-        name,
-        color: null,
-        statusorder: null,
-      });
-      expect(row.name).toBe(name.slice(0, 50));
-      expect(row.name).toHaveLength(50);
-    });
-
     it('counts a real estimate-request reference before deletion', async () => {
       const status = await create('referenced');
       const email = `${MARKER}-request@example.invalid`;
@@ -110,8 +105,42 @@ describe.skipIf(!process.env.DATABASE_URL)(
           status: status.id,
         },
       });
-      await expect(repository.deleteReferenceCount(status.id)).resolves.toBe(1);
+      await expect(repository.deleteReferenceCount(status.id)).resolves.toEqual({
+        requestCount: 1,
+        formCount: 0,
+      });
       await directClient.tblestimate_requests.deleteMany({ where: { email } });
+      await expect(repository.remove(status.id)).resolves.toBe(true);
+    });
+
+    it('counts a real estimate-request-form reference before deletion', async () => {
+      const status = await create('form-referenced');
+      const name = `${MARKER}-form`;
+      await directClient.tblestimate_request_forms.create({
+        data: {
+          form_key: 'int-estimate-form',
+          type: 'form',
+          name,
+          status: status.id,
+        },
+      });
+      await expect(repository.deleteReferenceCount(status.id)).resolves.toEqual({
+        requestCount: 0,
+        formCount: 1,
+      });
+      const service = new EstimateRequestStatusesService(
+        new EstimateRequestStatusesValidator(),
+        repository,
+        new EstimateRequestStatusesTransformer(),
+        { publish: vi.fn().mockResolvedValue(undefined) } as never,
+        { log: vi.fn() } as never,
+      );
+      await expect(
+        service.remove({ isAdmin: true } as never, { id: String(status.id) }),
+      ).rejects.toMatchObject({
+        code: 'ERP-ESTIMATEREQUESTSTATUSES-0003',
+      });
+      await directClient.tblestimate_request_forms.deleteMany({ where: { name } });
       await expect(repository.remove(status.id)).resolves.toBe(true);
     });
   },

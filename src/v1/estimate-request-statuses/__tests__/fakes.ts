@@ -37,6 +37,7 @@ function keyOf(row: EstimateRequestStatusRow, field: EstimateRequestStatusSortFi
 export class InMemoryEstimateRequestStatusesRepository implements EstimateRequestStatusesRepositoryPort {
   readonly rows = new Map(SEED_STATUSES.map((row) => [row.id, row]));
   readonly referenceCounts = new Map<number, number>();
+  readonly formReferenceCounts = new Map<number, number>();
   referenceCountError: Error | null = null;
   private lastId = Math.max(...this.rows.keys());
 
@@ -44,6 +45,7 @@ export class InMemoryEstimateRequestStatusesRepository implements EstimateReques
     this.rows.clear();
     for (const row of SEED_STATUSES) this.rows.set(row.id, row);
     this.referenceCounts.clear();
+    this.formReferenceCounts.clear();
     this.referenceCountError = null;
     this.lastId = Math.max(...this.rows.keys());
   }
@@ -124,9 +126,15 @@ export class InMemoryEstimateRequestStatusesRepository implements EstimateReques
     return Promise.resolve(updated);
   }
 
-  deleteReferenceCount(id: number): Promise<number> {
+  deleteReferenceCount(id: number): Promise<{
+    readonly requestCount: number;
+    readonly formCount: number;
+  }> {
     if (this.referenceCountError !== null) return Promise.reject(this.referenceCountError);
-    return Promise.resolve(this.referenceCounts.get(id) ?? 0);
+    return Promise.resolve({
+      requestCount: this.referenceCounts.get(id) ?? 0,
+      formCount: this.formReferenceCounts.get(id) ?? 0,
+    });
   }
 
   remove(id: number): Promise<boolean> {
@@ -134,8 +142,10 @@ export class InMemoryEstimateRequestStatusesRepository implements EstimateReques
   }
 
   listAll(): Promise<readonly EstimateRequestStatusRow[]> {
-    const rows = [...this.rows.values()].sort((a, b) =>
-      compareKeys(keyOf(a, 'name'), keyOf(b, 'name'), 'asc'),
+    const rows = [...this.rows.values()].sort(
+      (a, b) =>
+        (a.statusorder ?? Number.MAX_SAFE_INTEGER) - (b.statusorder ?? Number.MAX_SAFE_INTEGER) ||
+        a.id - b.id,
     );
     if (rows.length > ESTIMATE_REQUEST_STATUSES_FACADE_MAX_ROWS) {
       return Promise.reject(

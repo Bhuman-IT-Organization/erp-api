@@ -38,6 +38,13 @@ function inUse(): AppError {
   );
 }
 
+function usedByForm(): AppError {
+  return new AppError(
+    'ERP-ESTIMATEREQUESTSTATUSES-0003',
+    'estimate request status is used by an estimate request form',
+  );
+}
+
 function useCouldNotBeCounted(): AppError {
   return new AppError('ERP-ESTIMATEREQUESTSTATUSES-0001', 'its use could not be counted');
 }
@@ -136,13 +143,14 @@ export class EstimateRequestStatusesService {
     const row = await this.repository.findById(id);
     if (row === null) throw notFound();
 
-    let references: number;
+    let references: { readonly requestCount: number; readonly formCount: number };
     try {
       references = await this.repository.deleteReferenceCount(id);
     } catch {
       throw useCouldNotBeCounted();
     }
-    if (references > 0) throw inUse();
+    if (references.requestCount > 0) throw inUse();
+    if (references.formCount > 0) throw usedByForm();
     if (row.flag !== null && row.flag !== '') throw builtIn();
 
     if (!(await this.repository.remove(id))) throw notFound();

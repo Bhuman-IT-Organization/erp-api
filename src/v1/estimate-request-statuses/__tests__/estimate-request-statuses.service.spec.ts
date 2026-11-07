@@ -49,7 +49,7 @@ function build(overrides: Partial<EstimateRequestStatusesRepository> = {}) {
     findById: vi.fn().mockResolvedValue(ROW),
     create: vi.fn().mockResolvedValue(ROW),
     update: vi.fn().mockResolvedValue(ROW),
-    deleteReferenceCount: vi.fn().mockResolvedValue(0),
+    deleteReferenceCount: vi.fn().mockResolvedValue({ requestCount: 0, formCount: 0 }),
     remove: vi.fn().mockResolvedValue(true),
     listAll: vi.fn().mockResolvedValue([ROW]),
   };
@@ -171,7 +171,7 @@ describe('EstimateRequestStatusesService', () => {
   it('returns the reference error before checking a flagged status', async () => {
     const flagged = { ...ROW, flag: 'default' };
     const findById = vi.fn().mockResolvedValue(flagged);
-    const deleteReferenceCount = vi.fn().mockResolvedValue(2);
+    const deleteReferenceCount = vi.fn().mockResolvedValue({ requestCount: 2, formCount: 0 });
     const remove = vi.fn();
     const { service } = build({ findById, deleteReferenceCount, remove });
     const error = await failure(service.remove(ADMIN, { id: '3' }));
@@ -184,7 +184,7 @@ describe('EstimateRequestStatusesService', () => {
     const remove = vi.fn();
     const { service } = build({
       findById: vi.fn().mockResolvedValue({ ...ROW, flag: 'default' }),
-      deleteReferenceCount: vi.fn().mockResolvedValue(0),
+      deleteReferenceCount: vi.fn().mockResolvedValue({ requestCount: 0, formCount: 0 }),
       remove,
     });
     const error = await failure(service.remove(ADMIN, { id: '3' }));
@@ -202,10 +202,22 @@ describe('EstimateRequestStatusesService', () => {
   });
 
   it('distinguishes a failed count from a positive reference count', async () => {
-    const { service } = build({ deleteReferenceCount: vi.fn().mockResolvedValue(1) });
+    const { service } = build({
+      deleteReferenceCount: vi.fn().mockResolvedValue({ requestCount: 1, formCount: 0 }),
+    });
     const error = await failure(service.remove(ADMIN, { id: '3' }));
     expect(error.code).toBe('ERP-ESTIMATEREQUESTSTATUSES-0001');
     expect(error.message).toBe('estimate request status is still referenced');
+  });
+
+  it('refuses a status used by an estimate request form', async () => {
+    const { service, methods } = build({
+      deleteReferenceCount: vi.fn().mockResolvedValue({ requestCount: 0, formCount: 1 }),
+    });
+    const error = await failure(service.remove(ADMIN, { id: '3' }));
+    expect(error.code).toBe('ERP-ESTIMATEREQUESTSTATUSES-0003');
+    expect(error.message).toBe('estimate request status is used by an estimate request form');
+    expect(methods.remove).not.toHaveBeenCalled();
   });
 
   it('deletes an unreferenced, unflagged row', async () => {

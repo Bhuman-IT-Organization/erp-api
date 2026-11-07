@@ -255,6 +255,17 @@ describe('EstimateRequestStatusesController (Fastify inject, production guards)'
       expect(problem(res).detail).toBe('estimate request status is still referenced');
     });
 
+    it('returns 409 when a status is used by an estimate request form', async () => {
+      const id = await created();
+      ctx.repo.formReferenceCounts.set(Number(id), 1);
+      const res = await send('DELETE', record(id), TEST_BEARERS.admin);
+      expect(res.statusCode).toBe(HTTP.conflict);
+      expect(problem(res).code).toBe('ERP-ESTIMATEREQUESTSTATUSES-0003');
+      expect(problem(res).detail).toBe(
+        'estimate request status is used by an estimate request form',
+      );
+    });
+
     it('returns 409 for a built-in status after checking references', async () => {
       const res = await send('DELETE', record(3), TEST_BEARERS.admin);
       expect(res.statusCode).toBe(HTTP.conflict);

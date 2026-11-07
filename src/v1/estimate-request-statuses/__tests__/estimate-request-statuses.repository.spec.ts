@@ -188,14 +188,20 @@ describe('EstimateRequestStatusesRepository', () => {
         [{ n: 2n }],
       ],
     });
-    await expect(repository.deleteReferenceCount(12)).resolves.toBe(3);
+    await expect(repository.deleteReferenceCount(12)).resolves.toEqual({
+      requestCount: 1,
+      formCount: 2,
+    });
     expect($queryRaw).toHaveBeenCalledTimes(3);
     expect(String($queryRaw.mock.calls[0]?.[0])).toContain('information_schema.COLUMNS');
   });
 
   it('skips reference columns not present in the current schema', async () => {
     const { repository, $queryRaw } = stub({ rawAnswers: [[]] });
-    await expect(repository.deleteReferenceCount(12)).resolves.toBe(0);
+    await expect(repository.deleteReferenceCount(12)).resolves.toEqual({
+      requestCount: 0,
+      formCount: 0,
+    });
     expect($queryRaw).toHaveBeenCalledOnce();
   });
 
@@ -203,7 +209,7 @@ describe('EstimateRequestStatusesRepository', () => {
     const small = stub({ rows: [RAW_ROW] });
     await expect(small.repository.listAll()).resolves.toEqual([ROW]);
     expect(small.findMany).toHaveBeenCalledWith({
-      orderBy: [{ name: 'asc' }, { id: 'asc' }],
+      orderBy: [{ statusorder: 'asc' }, { id: 'asc' }],
       take: ESTIMATE_REQUEST_STATUSES_FACADE_MAX_ROWS + 1,
       select: COLUMNS,
     });

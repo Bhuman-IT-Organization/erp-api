@@ -31,14 +31,14 @@ Every endpoint requires authentication and the administrator flag. The controlle
 `JwtAuthGuard` and `PermissionGuard`; the service checks `isAdmin` before parsing or data access.
 The three setup screen routes are `ADMIN_GATE`s in `@erp/contracts`.
 
-| Method   | Path                                                     | Success                     | Behavior                                                                             |
-| -------- | -------------------------------------------------------- | --------------------------- | ------------------------------------------------------------------------------------ |
-| `GET`    | `/api/v1/estimate-request-statuses?limit&cursor&q&sort`  | `200 { data, meta }`        | Keyset list; default sort is `name` ascending, with `id` ascending as a tie-breaker. |
-| `GET`    | `/api/v1/estimate-request-statuses/export?format&q&sort` | `200` export                | CSV, XLSX, PDF, or print rows; columns are `id`, `name`, and `total_request`.        |
-| `GET`    | `/api/v1/estimate-request-statuses/:id`                  | `200 EstimateRequestStatus` | Read one status; missing ids return `ERP-CORE-0004`.                                 |
-| `POST`   | `/api/v1/estimate-request-statuses`                      | `201 EstimateRequestStatus` | Create from `name`, `color`, and `statusorder`.                                      |
-| `PATCH`  | `/api/v1/estimate-request-statuses/:id`                  | `200 EstimateRequestStatus` | Update supplied writable fields.                                                     |
-| `DELETE` | `/api/v1/estimate-request-statuses/:id`                  | `204`                       | Refuse referenced statuses with `-0001`, then refuse flagged statuses with `-0002`.  |
+| Method   | Path                                                     | Success                     | Behavior                                                                                                                    |
+| -------- | -------------------------------------------------------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `GET`    | `/api/v1/estimate-request-statuses?limit&cursor&q&sort`  | `200 { data, meta }`        | Keyset list; default sort is `name` ascending, with `id` ascending as a tie-breaker.                                        |
+| `GET`    | `/api/v1/estimate-request-statuses/export?format&q&sort` | `200` export                | CSV, XLSX, PDF, or print rows; columns are `id`, `name`, and `total_request`.                                               |
+| `GET`    | `/api/v1/estimate-request-statuses/:id`                  | `200 EstimateRequestStatus` | Read one status; missing ids return `ERP-CORE-0004`.                                                                        |
+| `POST`   | `/api/v1/estimate-request-statuses`                      | `201 EstimateRequestStatus` | Create from `name`, `color`, and `statusorder`.                                                                             |
+| `PATCH`  | `/api/v1/estimate-request-statuses/:id`                  | `200 EstimateRequestStatus` | Update supplied writable fields.                                                                                            |
+| `DELETE` | `/api/v1/estimate-request-statuses/:id`                  | `204`                       | Refuse request-referenced statuses with `-0001`, form-referenced statuses with `-0003`, then flagged statuses with `-0002`. |
 
 Responses preserve the web contract: `id` is a string and each record contains `name`, `color`,
 `statusorder`, `flag`, and `total_request`. Request bodies are strict; `flag`, `id`, and all other
@@ -49,8 +49,9 @@ stored as `#757575`.
 
 Delete checks both reference columns discovered in `information_schema.COLUMNS`. **Difference:**
 Perfex checks only `tblestimate_requests.status`; this API also checks `tblestimate_request_forms.status`.
-The reference check runs before the built-in `flag` check, so a referenced flagged status returns
-`ERP-ESTIMATEREQUESTSTATUSES-0001`.
+The request reference check runs before the form reference check, and both run before the built-in
+`flag` check. A request-referenced flagged status returns `ERP-ESTIMATEREQUESTSTATUSES-0001`; a
+form-referenced status returns `ERP-ESTIMATEREQUESTSTATUSES-0003`.
 
 ## Legacy parity
 

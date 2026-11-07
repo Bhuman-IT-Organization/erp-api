@@ -74,7 +74,7 @@ export const ERROR_CODES = {
     status: 409,
     title: 'The ticket status is the default reply status',
   },
-  // v1/estimate-request-statuses: 0001 refuses referenced rows, 0002 protects built-in rows.
+  // v1/estimate-request-statuses: 0001 refuses requests, 0002 protects built-in rows, 0003 refuses forms.
   'ERP-ESTIMATEREQUESTSTATUSES-0001': {
     status: 409,
     title: 'The estimate request status is still referenced',
@@ -82,6 +82,10 @@ export const ERROR_CODES = {
   'ERP-ESTIMATEREQUESTSTATUSES-0002': {
     status: 409,
     title: 'The built-in estimate request status cannot be deleted',
+  },
+  'ERP-ESTIMATEREQUESTSTATUSES-0003': {
+    status: 409,
+    title: 'The estimate request status is used by an estimate request form',
   },
   // v1/payment-modes (plan 04.1-23): 0001 refuses a delete while a transactional column still names the mode (D-33), 0002 the credit expense mode (D-37).
   'ERP-PAYMENTMODES-0001': { status: 409, title: 'The payment mode is still in use' },

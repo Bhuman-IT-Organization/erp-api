@@ -200,7 +200,10 @@ export class EstimateRequestStatusesRepository {
     }
   }
 
-  async deleteReferenceCount(id: number): Promise<number> {
+  async deleteReferenceCount(id: number): Promise<{
+    readonly requestCount: number;
+    readonly formCount: number;
+  }> {
     const tables = ESTIMATE_REQUEST_STATUS_REFERENCES.map(({ table }) => table);
     const columns = ESTIMATE_REQUEST_STATUS_REFERENCES.map(({ column }) => column);
     const present = presentColumnsSchema.parse(
@@ -212,10 +215,14 @@ export class EstimateRequestStatusesRepository {
       existing.has(`${table}.${column}`.toLowerCase()),
     );
     const counts = await Promise.all(reads.map(({ count }) => count(this.prisma.client, id)));
-    return counts.reduce<number>((total, result) => {
+    const values = counts.map((result) => {
       const [row] = countRowsSchema.parse(result);
-      return total + Number(row?.n ?? 0);
-    }, 0);
+      return Number(row?.n ?? 0);
+    });
+    return {
+      requestCount: values[reads.findIndex(({ table }) => table === 'tblestimate_requests')] ?? 0,
+      formCount: values[reads.findIndex(({ table }) => table === 'tblestimate_request_forms')] ?? 0,
+    };
   }
 
   async remove(id: number): Promise<boolean> {
@@ -228,7 +235,7 @@ export class EstimateRequestStatusesRepository {
   async listAll(): Promise<readonly EstimateRequestStatusRow[]> {
     const rows = rowsSchema.parse(
       await this.prisma.client.tblestimate_request_status.findMany({
-        orderBy: [{ name: 'asc' }, { id: 'asc' }],
+        orderBy: [{ statusorder: 'asc' }, { id: 'asc' }],
         take: ESTIMATE_REQUEST_STATUSES_FACADE_MAX_ROWS + 1,
         select: COLUMNS,
       }),
