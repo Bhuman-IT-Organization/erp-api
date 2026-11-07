@@ -9,6 +9,7 @@ import { CustomerGroupsModule } from './customer-groups/customer-groups.module.j
 import { DepartmentsModule } from './departments/departments.module.js';
 import { ExampleItemModule } from './example-item/example-item.module.js';
 import { ExpenseCategoriesModule } from './expense-categories/expense-categories.module.js';
+import { EstimateRequestStatusesModule } from './estimate-request-statuses/estimate-request-statuses.module.js';
 import { IdentityModule } from './identity/identity.module.js';
 import { MailModule } from './mail/mail.module.js';
 import { PaymentModesModule } from './payment-modes/payment-modes.module.js';
@@ -33,6 +34,7 @@ import { FixedEquipmentDepreciationsModule } from './fixed-equipment-depreciatio
     TaxesModule,
     CostCentersModule,
     ContractTypesModule,
+    EstimateRequestStatusesModule,
     PaymentModesModule,
     CurrenciesModule,
     DepartmentsModule,

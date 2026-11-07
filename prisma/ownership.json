@@ -1649,8 +1649,8 @@
       ]
     },
     "evidence_changed": false,
-    "note": "",
-    "owner": "perfex-core",
+    "note": "Written by v1/estimate-request-statuses; Perfex's status add, edit and delete are closed at Nginx.",
+    "owner": "node",
     "owner_confidence": "ddl-single",
     "table": "tblestimate_request_status"
   },

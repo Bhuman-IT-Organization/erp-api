@@ -497,6 +497,7 @@ describe('the committed register, today', () => {
     // Fixed Equipment Depreciation claimed tblfe_depreciations for v1/fixed-equipment-depreciations.
     // Update this expectation in the same PR that changes either register.
     // Contract Types claimed tblcontracts_types for v1/contract-types.
+    // Estimate Request Statuses writes tblestimate_request_status; Perfex's status add, edit and delete are closed at Nginx.
     const nodeOwned = [...map.entries()]
       .filter(([, o]) => o === 'node')
       .map(([t]) => t)
@@ -506,6 +507,7 @@ describe('the committed register, today', () => {
       'tblcost_centers',
       'tblcurrencies',
       'tblcustomers_groups',
+      'tblestimate_request_status',
       'tblexpenses_categories',
       'tblfe_depreciations',
       'tblidentity_audit',
