@@ -92,12 +92,6 @@ const EXPORT_SUCCESS = {
   headers: ['Cache-Control', 'Content-Disposition', REQUEST_ID_HEADER].sort(),
 };
 
-/**
- * These tests start a Nest app, hash with bcrypt or scan the whole source tree, so they can pass
- * the 5 s default on a busy machine. TEST-06: a slow test gets its own timeout and a reason.
- */
-const SLOW_TEST_TIMEOUT_MS = 30_000;
-
 describe('every registered route is in the OpenAPI document (BE-23)', () => {
   let ctx: AuthTestApp;
   let served: OpenApiDocument;
@@ -120,148 +114,120 @@ describe('every registered route is in the OpenAPI document (BE-23)', () => {
     const res = await ctx.app.inject({ method: 'GET', url: OPENAPI_URL });
     expect(res.statusCode).toBe(HTTP_OK);
     served = JSON.parse(res.payload) as OpenApiDocument;
-  }, SLOW_TEST_TIMEOUT_MS);
+  });
 
   afterAll(async () => {
     await ctx.close();
   });
 
-  it(
-    'serves a 3.1 document that equals buildOpenApiDocument(app) byte for byte, twice',
-    () => {
-      expect(served.openapi).toBe(OPENAPI_VERSION);
-      const first = JSON.stringify(buildOpenApiDocument(ctx.app));
-      expect(first).toBe(JSON.stringify(buildOpenApiDocument(ctx.app)));
-      expect(first).toBe(JSON.stringify(served));
-    },
-    SLOW_TEST_TIMEOUT_MS,
-  );
+  it('serves a 3.1 document that equals buildOpenApiDocument(app) byte for byte, twice', () => {
+    expect(served.openapi).toBe(OPENAPI_VERSION);
+    const first = JSON.stringify(buildOpenApiDocument(ctx.app));
+    expect(first).toBe(JSON.stringify(buildOpenApiDocument(ctx.app)));
+    expect(first).toBe(JSON.stringify(served));
+  });
 
-  it(
-    'every non-HEAD route under /api/v1/ or in UNPREFIXED_ROUTES has an operation (docs routes excluded)',
-    () => {
-      const unprefixed = new Set(UNPREFIXED_ROUTES.map((route) => `/${route}`));
-      const routes = ctx.routeTable.filter((r) => r.method !== 'HEAD' && !isDocsRoute(r.url));
-      expect(routes.length).toBeGreaterThanOrEqual(10);
-      const undocumented = routes
-        .filter((r) => r.url.startsWith(`/${API_PREFIX}/`) || unprefixed.has(r.url))
-        .filter((r) => {
-          // SwaggerModule emits a bare operation for every Nest route; only @ApiZod gives it a summary.
-          const item = served.paths[toOpenApiPath(r.url)] as Record<string, Operation> | undefined;
-          return typeof item?.[r.method.toLowerCase()]?.summary !== 'string';
-        })
-        .map((r) => `${r.method} ${r.url}`);
-      expect(
-        undocumented,
-        `undocumented routes — add @ApiZod({ … }) to the handler: ${undocumented.join(', ')}`,
-      ).toEqual([]);
-      // Every documented path is a registered route, too (the document never claims a route that does not exist).
-      const registered = new Set(
-        routes.map((r) => `${r.method.toLowerCase()} ${toOpenApiPath(r.url)}`),
-      );
-      for (const [path, item] of Object.entries(served.paths)) {
-        for (const method of Object.keys(item)) {
-          expect(
-            registered.has(`${method} ${path}`),
-            `${method} ${path} is documented but not registered`,
-          ).toBe(true);
+  it('every non-HEAD route under /api/v1/ or in UNPREFIXED_ROUTES has an operation (docs routes excluded)', () => {
+    const unprefixed = new Set(UNPREFIXED_ROUTES.map((route) => `/${route}`));
+    const routes = ctx.routeTable.filter((r) => r.method !== 'HEAD' && !isDocsRoute(r.url));
+    expect(routes.length).toBeGreaterThanOrEqual(10);
+    const undocumented = routes
+      .filter((r) => r.url.startsWith(`/${API_PREFIX}/`) || unprefixed.has(r.url))
+      .filter((r) => {
+        // SwaggerModule emits a bare operation for every Nest route; only @ApiZod gives it a summary.
+        const item = served.paths[toOpenApiPath(r.url)] as Record<string, Operation> | undefined;
+        return typeof item?.[r.method.toLowerCase()]?.summary !== 'string';
+      })
+      .map((r) => `${r.method} ${r.url}`);
+    expect(
+      undocumented,
+      `undocumented routes — add @ApiZod({ … }) to the handler: ${undocumented.join(', ')}`,
+    ).toEqual([]);
+    // Every documented path is a registered route, too (the document never claims a route that does not exist).
+    const registered = new Set(
+      routes.map((r) => `${r.method.toLowerCase()} ${toOpenApiPath(r.url)}`),
+    );
+    for (const [path, item] of Object.entries(served.paths)) {
+      for (const method of Object.keys(item)) {
+        expect(
+          registered.has(`${method} ${path}`),
+          `${method} ${path} is documented but not registered`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it("every operation has a 2xx response with an application/json schema (or an explicit 204 without a body, or the export kind's text/csv string) and x-request-id on every response", () => {
+    for (const [path, item] of Object.entries(served.paths)) {
+      for (const [method, operation] of Object.entries(item as Record<string, Operation>)) {
+        const where = `${method.toUpperCase()} ${path}`;
+        const statuses = Object.keys(operation.responses).map(Number);
+        const success = statuses.filter((s) => s >= HTTP_OK && s < HTTP_FIRST_REDIRECT);
+        expect(success, `${where}: no 2xx response — @ApiZod responses`).not.toEqual([]);
+        for (const status of success) {
+          const entry = operation.responses[String(status)];
+          // A `produces: 'export'` handler (every list export) documents its CSV as a string beside the print rows schema, as the identity block reads it.
+          const schema =
+            entry?.content?.['application/json']?.schema ?? entry?.content?.['text/csv']?.schema;
+          if (status === 204)
+            expect(entry?.content, `${where}: 204 carries no body`).toBeUndefined();
+          else
+            expect(
+              schema,
+              `${where}: ${String(status)} has no application/json schema`,
+            ).toBeDefined();
+        }
+        for (const [status, entry] of Object.entries(operation.responses)) {
+          expect(entry.headers, `${where}: ${status} lacks ${REQUEST_ID_HEADER}`).toHaveProperty(
+            REQUEST_ID_HEADER,
+          );
         }
       }
-    },
-    SLOW_TEST_TIMEOUT_MS,
-  );
+    }
+  });
 
-  it(
-    "every operation has a 2xx response with an application/json schema (or an explicit 204 without a body, or the export kind's text/csv string) and x-request-id on every response",
-    () => {
-      for (const [path, item] of Object.entries(served.paths)) {
-        for (const [method, operation] of Object.entries(item as Record<string, Operation>)) {
-          const where = `${method.toUpperCase()} ${path}`;
-          const statuses = Object.keys(operation.responses).map(Number);
-          const success = statuses.filter((s) => s >= HTTP_OK && s < HTTP_FIRST_REDIRECT);
-          expect(success, `${where}: no 2xx response — @ApiZod responses`).not.toEqual([]);
-          for (const status of success) {
-            const entry = operation.responses[String(status)];
-            // A `produces: 'export'` handler (every list export) documents its CSV as a string beside the print rows schema, as the identity block reads it.
-            const schema =
-              entry?.content?.['application/json']?.schema ?? entry?.content?.['text/csv']?.schema;
-            if (status === 204)
-              expect(entry?.content, `${where}: 204 carries no body`).toBeUndefined();
-            else
-              expect(
-                schema,
-                `${where}: ${String(status)} has no application/json schema`,
-              ).toBeDefined();
-          }
-          for (const [status, entry] of Object.entries(operation.responses)) {
-            expect(entry.headers, `${where}: ${status} lacks ${REQUEST_ID_HEADER}`).toHaveProperty(
-              REQUEST_ID_HEADER,
-            );
-          }
-        }
-      }
-    },
-    SLOW_TEST_TIMEOUT_MS,
-  );
+  it('the expense categories export documents its 200 as CSV, xlsx, PDF and print rows (plan 04.1.1-02)', () => {
+    const path = '/api/v1/expense-categories/export';
+    expect(exportSuccessOf(served, path), path).toEqual(EXPORT_SUCCESS);
+  });
 
-  it(
-    'the expense categories export documents its 200 as CSV, xlsx, PDF and print rows (plan 04.1.1-02)',
-    () => {
-      const path = '/api/v1/expense-categories/export';
-      expect(exportSuccessOf(served, path), path).toEqual(EXPORT_SUCCESS);
-    },
-    SLOW_TEST_TIMEOUT_MS,
-  );
+  it('the generated example-item export documents its 200 as CSV, xlsx, PDF and print rows (plan 04.1.1-02)', () => {
+    const path = '/api/v1/example-item/export';
+    expect(exportSuccessOf(served, path), path).toEqual(EXPORT_SUCCESS);
+  });
 
-  it(
-    'the generated example-item export documents its 200 as CSV, xlsx, PDF and print rows (plan 04.1.1-02)',
-    () => {
-      const path = '/api/v1/example-item/export';
-      expect(exportSuccessOf(served, path), path).toEqual(EXPORT_SUCCESS);
-    },
-    SLOW_TEST_TIMEOUT_MS,
-  );
-
-  it(
-    'every problem+json response enumerates codes that exist in ERROR_CODES',
-    () => {
-      let problems = 0;
-      for (const [path, item] of Object.entries(served.paths)) {
-        for (const [method, operation] of Object.entries(item as Record<string, Operation>)) {
-          for (const [status, entry] of Object.entries(operation.responses)) {
-            const schema = entry.content?.[PROBLEM_CONTENT_TYPE]?.schema;
-            if (schema === undefined) continue;
-            problems += 1;
-            const codes = schema.allOf?.[1]?.properties?.code?.enum ?? [];
-            expect(codes.length, `${method} ${path} ${status}: empty code enum`).toBeGreaterThan(0);
-            for (const code of codes) {
-              const known = typeof code === 'string' && code in ERROR_CODES;
-              expect(known, `${method} ${path} ${status}: unknown code ${String(code)}`).toBe(true);
-              if (!known) continue;
-              expect(ERROR_CODES[code as keyof typeof ERROR_CODES].status).toBe(Number(status));
-            }
+  it('every problem+json response enumerates codes that exist in ERROR_CODES', () => {
+    let problems = 0;
+    for (const [path, item] of Object.entries(served.paths)) {
+      for (const [method, operation] of Object.entries(item as Record<string, Operation>)) {
+        for (const [status, entry] of Object.entries(operation.responses)) {
+          const schema = entry.content?.[PROBLEM_CONTENT_TYPE]?.schema;
+          if (schema === undefined) continue;
+          problems += 1;
+          const codes = schema.allOf?.[1]?.properties?.code?.enum ?? [];
+          expect(codes.length, `${method} ${path} ${status}: empty code enum`).toBeGreaterThan(0);
+          for (const code of codes) {
+            const known = typeof code === 'string' && code in ERROR_CODES;
+            expect(known, `${method} ${path} ${status}: unknown code ${String(code)}`).toBe(true);
+            if (!known) continue;
+            expect(ERROR_CODES[code as keyof typeof ERROR_CODES].status).toBe(Number(status));
           }
         }
       }
-      expect(problems).toBeGreaterThan(5);
-    },
-    SLOW_TEST_TIMEOUT_MS,
-  );
+    }
+    expect(problems).toBeGreaterThan(5);
+  });
 
-  it(
-    'the UI answers at /api/v1/docs and neither docs path is in UNPREFIXED_ROUTES',
-    async () => {
-      const ui = await ctx.app.inject({ method: 'GET', url: DOCS_URL });
-      expect(ui.statusCode).toBe(HTTP_OK);
-      expect(ui.headers['content-type']).toContain('text/html');
-      expect(ctx.routes).toContain(OPENAPI_URL);
-      expect(ctx.routes).toContain(DOCS_URL);
-      expect([...UNPREFIXED_ROUTES].some((r) => r.includes('docs') || r.includes('openapi'))).toBe(
-        false,
-      );
-    },
-    SLOW_TEST_TIMEOUT_MS,
-  );
+  it('the UI answers at /api/v1/docs and neither docs path is in UNPREFIXED_ROUTES', async () => {
+    const ui = await ctx.app.inject({ method: 'GET', url: DOCS_URL });
+    expect(ui.statusCode).toBe(HTTP_OK);
+    expect(ui.headers['content-type']).toContain('text/html');
+    expect(ctx.routes).toContain(OPENAPI_URL);
+    expect(ctx.routes).toContain(DOCS_URL);
+    expect([...UNPREFIXED_ROUTES].some((r) => r.includes('docs') || r.includes('openapi'))).toBe(
+      false,
+    );
+  });
 });
 
 /**
@@ -277,69 +243,57 @@ describe('every v1/identity route is in the OpenAPI document (BE-23)', () => {
   beforeAll(async () => {
     ctx = await createIdentityTestApp();
     document = buildOpenApiDocument(ctx.app);
-  }, SLOW_TEST_TIMEOUT_MS);
+  });
 
   afterAll(async () => {
     await ctx.close();
   });
 
-  it(
-    'every identity route has an operation with a summary, and every documented path is registered',
-    () => {
-      const urls = [...new Set(ctx.routes)].filter((url) =>
-        url.startsWith(`/${API_PREFIX}/identity`),
-      );
-      expect(urls.length).toBeGreaterThanOrEqual(10);
-      const documented = new Set(Object.keys(document.paths));
-      const missing = urls.filter((url) => !documented.has(toOpenApiPath(url)));
-      expect(missing, `undocumented identity routes: ${missing.join(', ')}`).toEqual([]);
-      for (const [path, item] of Object.entries(document.paths)) {
-        expect(urls.map(toOpenApiPath), `${path} is documented but not registered`).toContain(path);
-        for (const [method, operation] of Object.entries(item as Record<string, Operation>)) {
-          expect(typeof operation.summary, `${method} ${path} has no summary`).toBe('string');
+  it('every identity route has an operation with a summary, and every documented path is registered', () => {
+    const urls = [...new Set(ctx.routes)].filter((url) =>
+      url.startsWith(`/${API_PREFIX}/identity`),
+    );
+    expect(urls.length).toBeGreaterThanOrEqual(10);
+    const documented = new Set(Object.keys(document.paths));
+    const missing = urls.filter((url) => !documented.has(toOpenApiPath(url)));
+    expect(missing, `undocumented identity routes: ${missing.join(', ')}`).toEqual([]);
+    for (const [path, item] of Object.entries(document.paths)) {
+      expect(urls.map(toOpenApiPath), `${path} is documented but not registered`).toContain(path);
+      for (const [method, operation] of Object.entries(item as Record<string, Operation>)) {
+        expect(typeof operation.summary, `${method} ${path} has no summary`).toBe('string');
+      }
+    }
+  });
+
+  it("every identity operation has a 2xx with a JSON schema, an explicit 204, or the export kind's text/csv string; x-request-id everywhere", () => {
+    for (const [path, item] of Object.entries(document.paths)) {
+      for (const [method, operation] of Object.entries(item as Record<string, Operation>)) {
+        const where = `${method.toUpperCase()} ${path}`;
+        const success = Object.keys(operation.responses)
+          .map(Number)
+          .filter((s) => s >= HTTP_OK && s < HTTP_FIRST_REDIRECT);
+        expect(success, `${where}: no 2xx response`).not.toEqual([]);
+        for (const status of success) {
+          const content = operation.responses[String(status)]?.content;
+          if (status === 204) expect(content, `${where}: 204 carries no body`).toBeUndefined();
+          else
+            expect(
+              content?.['application/json']?.schema ?? content?.['text/csv']?.schema,
+              `${where}: ${String(status)} has no schema`,
+            ).toBeDefined();
+        }
+        for (const [status, entry] of Object.entries(operation.responses)) {
+          expect(entry.headers, `${where}: ${status} lacks ${REQUEST_ID_HEADER}`).toHaveProperty(
+            REQUEST_ID_HEADER,
+          );
         }
       }
-    },
-    SLOW_TEST_TIMEOUT_MS,
-  );
+    }
+  });
 
-  it(
-    "every identity operation has a 2xx with a JSON schema, an explicit 204, or the export kind's text/csv string; x-request-id everywhere",
-    () => {
-      for (const [path, item] of Object.entries(document.paths)) {
-        for (const [method, operation] of Object.entries(item as Record<string, Operation>)) {
-          const where = `${method.toUpperCase()} ${path}`;
-          const success = Object.keys(operation.responses)
-            .map(Number)
-            .filter((s) => s >= HTTP_OK && s < HTTP_FIRST_REDIRECT);
-          expect(success, `${where}: no 2xx response`).not.toEqual([]);
-          for (const status of success) {
-            const content = operation.responses[String(status)]?.content;
-            if (status === 204) expect(content, `${where}: 204 carries no body`).toBeUndefined();
-            else
-              expect(
-                content?.['application/json']?.schema ?? content?.['text/csv']?.schema,
-                `${where}: ${String(status)} has no schema`,
-              ).toBeDefined();
-          }
-          for (const [status, entry] of Object.entries(operation.responses)) {
-            expect(entry.headers, `${where}: ${status} lacks ${REQUEST_ID_HEADER}`).toHaveProperty(
-              REQUEST_ID_HEADER,
-            );
-          }
-        }
-      }
-    },
-    SLOW_TEST_TIMEOUT_MS,
-  );
-
-  it(
-    'the two exports document their 200 as CSV, xlsx, PDF and print rows (plan 04.1.1-02)',
-    () => {
-      for (const path of ['/api/v1/identity/members/export', '/api/v1/identity/roles/export']) {
-        expect(exportSuccessOf(document, path), path).toEqual(EXPORT_SUCCESS);
-      }
-    },
-    SLOW_TEST_TIMEOUT_MS,
-  );
+  it('the two exports document their 200 as CSV, xlsx, PDF and print rows (plan 04.1.1-02)', () => {
+    for (const path of ['/api/v1/identity/members/export', '/api/v1/identity/roles/export']) {
+      expect(exportSuccessOf(document, path), path).toEqual(EXPORT_SUCCESS);
+    }
+  });
 });

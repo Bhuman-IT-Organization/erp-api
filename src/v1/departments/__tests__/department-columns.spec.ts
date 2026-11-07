@@ -294,168 +294,138 @@ function onPlanted(rule: (root: string) => string[], files: Readonly<Record<stri
   }
 }
 
-/**
- * These tests scan every file under src/, so they can take longer than the 5 s default on a busy machine.
- * TEST-06: a slow test gets its own timeout and a reason, never a global one.
- */
-const SLOW_TEST_TIMEOUT_MS = 30_000;
-
 describe('D-48, the credential guard over src/', () => {
-  it(
-    'D-48: DEPARTMENT_COLUMNS is exactly the six read columns',
-    () => {
-      expect(Object.keys(DEPARTMENT_COLUMNS).sort()).toEqual(READ_COLUMNS);
-      expect(new Set(Object.values(DEPARTMENT_COLUMNS))).toEqual(new Set([true]));
-      expect(columnsOffences(SRC)).toEqual([]);
-    },
-    SLOW_TEST_TIMEOUT_MS,
-  );
+  it('D-48: DEPARTMENT_COLUMNS is exactly the six read columns', () => {
+    expect(Object.keys(DEPARTMENT_COLUMNS).sort()).toEqual(READ_COLUMNS);
+    expect(new Set(Object.values(DEPARTMENT_COLUMNS))).toEqual(new Set([true]));
+    expect(columnsOffences(SRC)).toEqual([]);
+  });
 
-  it(
-    'D-48: every tbldepartments call that returns rows selects DEPARTMENT_COLUMNS',
-    () => {
-      const offences = selectOffences(SRC);
-      expect(offences, offences.join('\n')).toEqual([]);
-      const reached = sourcesUnder(SRC).flatMap(accessesIn);
-      expect(reached.filter((access) => access.file === REPOSITORY).length).toBeGreaterThan(5);
-    },
-    SLOW_TEST_TIMEOUT_MS,
-  );
+  it('D-48: every tbldepartments call that returns rows selects DEPARTMENT_COLUMNS', () => {
+    const offences = selectOffences(SRC);
+    expect(offences, offences.join('\n')).toEqual([]);
+    const reached = sourcesUnder(SRC).flatMap(accessesIn);
+    expect(reached.filter((access) => access.file === REPOSITORY).length).toBeGreaterThan(5);
+  });
 
-  it(
-    'nothing in src/ writes tbldepartments (Perfex owns it; Node only reads it)',
-    () => {
-      const offences = writeOffences(SRC);
-      expect(offences, offences.join('\n')).toEqual([]);
-    },
-    SLOW_TEST_TIMEOUT_MS,
-  );
+  it('nothing in src/ writes tbldepartments (Perfex owns it; Node only reads it)', () => {
+    const offences = writeOffences(SRC);
+    expect(offences, offences.join('\n')).toEqual([]);
+  });
 
-  it(
-    'D-48: no file names a mailbox column',
-    () => {
-      const offences = mailboxOffences(SRC);
-      expect(offences, offences.join('\n')).toEqual([]);
-    },
-    SLOW_TEST_TIMEOUT_MS,
-  );
+  it('D-48: no file names a mailbox column', () => {
+    const offences = mailboxOffences(SRC);
+    expect(offences, offences.join('\n')).toEqual([]);
+  });
 
-  it(
-    'D-48: only the departments repository names tbldepartments',
-    () => {
-      const offences = ownerOffences(SRC);
-      expect(offences, offences.join('\n')).toEqual([]);
-    },
-    SLOW_TEST_TIMEOUT_MS,
-  );
+  it('D-48: only the departments repository names tbldepartments', () => {
+    const offences = ownerOffences(SRC);
+    expect(offences, offences.join('\n')).toEqual([]);
+  });
 
-  it(
-    'D-48: the guard fails on a planted violation',
-    () => {
-      expect(onPlanted(selectOffences, {})).toEqual([]);
-      expect(onPlanted(ownerOffences, {})).toEqual([]);
-      expect(onPlanted(mailboxOffences, {})).toEqual([]);
-      expect(onPlanted(columnsOffences, {})).toEqual([]);
-      expect(onPlanted(writeOffences, {})).toEqual([]);
+  it('D-48: the guard fails on a planted violation', () => {
+    expect(onPlanted(selectOffences, {})).toEqual([]);
+    expect(onPlanted(ownerOffences, {})).toEqual([]);
+    expect(onPlanted(mailboxOffences, {})).toEqual([]);
+    expect(onPlanted(columnsOffences, {})).toEqual([]);
+    expect(onPlanted(writeOffences, {})).toEqual([]);
 
-      const planted: readonly [string, (root: string) => string[], Record<string, string>][] = [
-        [
-          'a findMany without the select',
-          selectOffences,
-          repositoryWith('void this.prisma.client.tbldepartments.findMany({ where: {} });'),
-        ],
-        [
-          'a transaction delegate without the select',
-          selectOffences,
-          repositoryWith('void tx.tbldepartments.findMany({ where: {} });'),
-        ],
-        [
-          'a destructured delegate',
-          selectOffences,
-          repositoryWith('const { tbldepartments } = this.prisma.client;'),
-        ],
-        [
-          'the bracket form without the select',
-          selectOffences,
-          repositoryWith("void this.prisma.client['tbldepartments'].findFirst({});"),
-        ],
-        [
-          'a select spreading the allow-list with more',
-          selectOffences,
-          repositoryWith(
-            'void this.prisma.client.tbldepartments.findFirst({ select: { ...DEPARTMENT_COLUMNS, host: true } });',
+    const planted: readonly [string, (root: string) => string[], Record<string, string>][] = [
+      [
+        'a findMany without the select',
+        selectOffences,
+        repositoryWith('void this.prisma.client.tbldepartments.findMany({ where: {} });'),
+      ],
+      [
+        'a transaction delegate without the select',
+        selectOffences,
+        repositoryWith('void tx.tbldepartments.findMany({ where: {} });'),
+      ],
+      [
+        'a destructured delegate',
+        selectOffences,
+        repositoryWith('const { tbldepartments } = this.prisma.client;'),
+      ],
+      [
+        'the bracket form without the select',
+        selectOffences,
+        repositoryWith("void this.prisma.client['tbldepartments'].findFirst({});"),
+      ],
+      [
+        'a select spreading the allow-list with more',
+        selectOffences,
+        repositoryWith(
+          'void this.prisma.client.tbldepartments.findFirst({ select: { ...DEPARTMENT_COLUMNS, host: true } });',
+        ),
+      ],
+      [
+        'a delete(',
+        writeOffences,
+        repositoryWith(
+          'void this.prisma.client.tbldepartments.delete({ where: { departmentid: 1 }, select: DEPARTMENT_COLUMNS });',
+        ),
+      ],
+      [
+        'a create',
+        writeOffences,
+        repositoryWith(
+          "void this.prisma.client.tbldepartments.create({ data: { name: 'x' }, select: DEPARTMENT_COLUMNS });",
+        ),
+      ],
+      [
+        'an update through a transaction delegate',
+        writeOffences,
+        repositoryWith(
+          "void tx.tbldepartments.update({ where: { departmentid: 1 }, data: { name: 'x' }, select: DEPARTMENT_COLUMNS });",
+        ),
+      ],
+      [
+        'a deleteMany (a count, still a write)',
+        writeOffences,
+        repositoryWith('void this.prisma.client.tbldepartments.deleteMany({ where: {} });'),
+      ],
+      [
+        'a raw UPDATE of tbldepartments in another module',
+        writeOffences,
+        {
+          'v1/taxes/repository/zz-probe.ts':
+            "void client.$executeRaw`UPDATE tbldepartments SET name = 'x' WHERE departmentid = 1`;\n",
+        },
+      ],
+      [
+        'a mailbox column in the module',
+        mailboxOffences,
+        { [`${MODULE}/service/zz-probe.ts`]: 'export const PROBE = { password: true };\n' },
+      ],
+      [
+        'a seventh column in the allow-list',
+        columnsOffences,
+        {
+          [REPOSITORY]: readFileSync(join(SRC, REPOSITORY), 'utf8').replace(
+            'parent_id: true,',
+            'parent_id: true,\n  password: true,',
           ),
-        ],
-        [
-          'a delete(',
-          writeOffences,
-          repositoryWith(
-            'void this.prisma.client.tbldepartments.delete({ where: { departmentid: 1 }, select: DEPARTMENT_COLUMNS });',
-          ),
-        ],
-        [
-          'a create',
-          writeOffences,
-          repositoryWith(
-            "void this.prisma.client.tbldepartments.create({ data: { name: 'x' }, select: DEPARTMENT_COLUMNS });",
-          ),
-        ],
-        [
-          'an update through a transaction delegate',
-          writeOffences,
-          repositoryWith(
-            "void tx.tbldepartments.update({ where: { departmentid: 1 }, data: { name: 'x' }, select: DEPARTMENT_COLUMNS });",
-          ),
-        ],
-        [
-          'a deleteMany (a count, still a write)',
-          writeOffences,
-          repositoryWith('void this.prisma.client.tbldepartments.deleteMany({ where: {} });'),
-        ],
-        [
-          'a raw UPDATE of tbldepartments in another module',
-          writeOffences,
-          {
-            'v1/taxes/repository/zz-probe.ts':
-              "void client.$executeRaw`UPDATE tbldepartments SET name = 'x' WHERE departmentid = 1`;\n",
-          },
-        ],
-        [
-          'a mailbox column in the module',
-          mailboxOffences,
-          { [`${MODULE}/service/zz-probe.ts`]: 'export const PROBE = { password: true };\n' },
-        ],
-        [
-          'a seventh column in the allow-list',
-          columnsOffences,
-          {
-            [REPOSITORY]: readFileSync(join(SRC, REPOSITORY), 'utf8').replace(
-              'parent_id: true,',
-              'parent_id: true,\n  password: true,',
-            ),
-          },
-        ],
-        [
-          'an identity file reading tbldepartments',
-          ownerOffences,
-          {
-            [identityFile('zz-probe.ts')]:
-              'void this.prisma.client.tbldepartments.findMany({ select: DEPARTMENT_COLUMNS });\n',
-          },
-        ],
-        [
-          'a raw statement selecting * from tbldepartments',
-          ownerOffences,
-          {
-            'v1/taxes/repository/zz-probe.ts':
-              'void client.$queryRaw`SELECT * FROM tbldepartments WHERE departmentid = 1`;\n',
-          },
-        ],
-      ];
-      for (const [label, rule, files] of planted) {
-        expect(onPlanted(rule, files), label).not.toEqual([]);
-      }
-    },
-    SLOW_TEST_TIMEOUT_MS,
-  );
+        },
+      ],
+      [
+        'an identity file reading tbldepartments',
+        ownerOffences,
+        {
+          [identityFile('zz-probe.ts')]:
+            'void this.prisma.client.tbldepartments.findMany({ select: DEPARTMENT_COLUMNS });\n',
+        },
+      ],
+      [
+        'a raw statement selecting * from tbldepartments',
+        ownerOffences,
+        {
+          'v1/taxes/repository/zz-probe.ts':
+            'void client.$queryRaw`SELECT * FROM tbldepartments WHERE departmentid = 1`;\n',
+        },
+      ],
+    ];
+    for (const [label, rule, files] of planted) {
+      expect(onPlanted(rule, files), label).not.toEqual([]);
+    }
+  });
 });

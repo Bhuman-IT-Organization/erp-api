@@ -14,12 +14,6 @@ function relabel(hash: string, label: '$2a$' | '$2y$' | '$2b$'): string {
   return label + hash.slice(4);
 }
 
-/**
- * These tests start a Nest app, hash with bcrypt or scan the whole source tree, so they can pass
- * the 5 s default on a busy machine. TEST-06: a slow test gets its own timeout and a reason.
- */
-const SLOW_TEST_TIMEOUT_MS = 30_000;
-
 describe('PasswordHasher', () => {
   const hasher = new PasswordHasher();
   let fixtures: Record<'$2a$08$' | '$2y$08$' | '$2y$10$' | '$2b$12$', string>;
@@ -31,7 +25,7 @@ describe('PasswordHasher', () => {
       $2y$10$: relabel(hashSync(PASSWORD, 10), '$2y$'), // the live rows after the 2026-08-07 reset
       $2b$12$: hashSync(PASSWORD, 12), // bcryptjs native
     };
-  }, SLOW_TEST_TIMEOUT_MS);
+  });
 
   it.each(['$2a$08$', '$2y$08$', '$2y$10$', '$2b$12$'] as const)(
     'verifies the right password and rejects a wrong one for a %s hash',
@@ -44,27 +38,19 @@ describe('PasswordHasher', () => {
     },
   );
 
-  it(
-    'hash() produces a 60-character $2y$12$ string that verify() accepts',
-    async () => {
-      const produced = await hasher.hash('x');
-      expect(produced.startsWith(PasswordHasher.TARGET_PREFIX)).toBe(true);
-      expect(produced.startsWith('$2y$12$')).toBe(true);
-      expect(produced).toHaveLength(60);
-      await expect(hasher.verify('x', produced)).resolves.toBe(true);
-      await expect(hasher.verify('y', produced)).resolves.toBe(false);
-    },
-    SLOW_TEST_TIMEOUT_MS,
-  );
+  it('hash() produces a 60-character $2y$12$ string that verify() accepts', async () => {
+    const produced = await hasher.hash('x');
+    expect(produced.startsWith(PasswordHasher.TARGET_PREFIX)).toBe(true);
+    expect(produced.startsWith('$2y$12$')).toBe(true);
+    expect(produced).toHaveLength(60);
+    await expect(hasher.verify('x', produced)).resolves.toBe(true);
+    await expect(hasher.verify('y', produced)).resolves.toBe(false);
+  });
 
-  it(
-    'two hashes of the same password differ (fresh salt each time)',
-    async () => {
-      const [a, b] = await Promise.all([hasher.hash('x'), hasher.hash('x')]);
-      expect(a).not.toBe(b);
-    },
-    SLOW_TEST_TIMEOUT_MS,
-  );
+  it('two hashes of the same password differ (fresh salt each time)', async () => {
+    const [a, b] = await Promise.all([hasher.hash('x'), hasher.hash('x')]);
+    expect(a).not.toBe(b);
+  });
 
   it.each(['$2a$08$', '$2y$08$', '$2y$10$', '$2b$12$'] as const)(
     'needsRehash is true for a %s hash',
@@ -73,13 +59,9 @@ describe('PasswordHasher', () => {
     },
   );
 
-  it(
-    'needsRehash is false for the $2y$12$ output',
-    async () => {
-      expect(hasher.needsRehash(await hasher.hash('x'))).toBe(false);
-    },
-    SLOW_TEST_TIMEOUT_MS,
-  );
+  it('needsRehash is false for the $2y$12$ output', async () => {
+    expect(hasher.needsRehash(await hasher.hash('x'))).toBe(false);
+  });
 
   it.each(['', 'not-a-hash', '$1$abc', '$2z$12$' + 'a'.repeat(53), '$P$Bportable'])(
     'verify() resolves false (never throws) for the unparsable stored value %j',

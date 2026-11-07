@@ -32,30 +32,20 @@ function sourceFiles(): string[] {
   return listed.split('\n').filter((file) => file !== '' && file !== SELF);
 }
 
-/**
- * This test walks the whole source tree, so it can take longer than the 5 s default on a busy machine.
- * TEST-06: a slow test gets its own timeout and a reason, never a global one.
- */
-const SLOW_TEST_TIMEOUT_MS = 30_000;
-
 describe('no vendor licence check (ADR-0042, T-4.2-14)', () => {
-  it(
-    'names no licence server, licence key, LB-* header or vendorLicence breaker anywhere',
-    () => {
-      const offending: string[] = [];
-      for (const file of sourceFiles()) {
-        let text: string;
-        try {
-          text = readFileSync(join(ROOT, file), 'utf8');
-        } catch {
-          continue; // listed by git but deleted in the working tree
-        }
-        text.split('\n').forEach((line, index) => {
-          if (LICENCE.test(line)) offending.push(`${file}:${String(index + 1)}`);
-        });
+  it('names no licence server, licence key, LB-* header or vendorLicence breaker anywhere', () => {
+    const offending: string[] = [];
+    for (const file of sourceFiles()) {
+      let text: string;
+      try {
+        text = readFileSync(join(ROOT, file), 'utf8');
+      } catch {
+        continue; // listed by git but deleted in the working tree
       }
-      expect(offending, offending.join('\n')).toEqual([]);
-    },
-    SLOW_TEST_TIMEOUT_MS,
-  );
+      text.split('\n').forEach((line, index) => {
+        if (LICENCE.test(line)) offending.push(`${file}:${String(index + 1)}`);
+      });
+    }
+    expect(offending, offending.join('\n')).toEqual([]);
+  });
 });
